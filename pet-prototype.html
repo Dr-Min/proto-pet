@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>하찮은 펫 프로토타입</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f4efe4; }
+  canvas { display: block; }
+  #hint {
+    position: fixed; top: 14px; left: 16px;
+    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+    color: #9a8f7d; user-select: none; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="hint">클릭: 놀래키기 · 마우스로 문지르기: 쓰다듬기</div>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const mouse = { x: -999, y: -999, px: -999, py: -999, moveAmt: 0 };
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---------- 펫 상태 ----------
+const pet = {
+  x: 0, y: 0,          // 지면 위치 (y가 클수록 앞/아래)
+  vx: 0, vy: 0,
+  dir: 1,              // 바라보는 방향
+  r: 46,               // 몸통 기본 반지름
+  squash: 1, squashVel: 0,   // 말랑 스프링 (세로 스케일)
+  jy: 0, jvy: 0,       // 점프 오프셋
+  walkPhase: 0,
+  wobblePhase: 0,
+  gazeX: 0, gazeY: 0,  // 시선 (-1..1)
+  blink: 0, nextBlink: 1,
+  happy: 0, dizzy: 0,
+  tripT: 0,
+  behavior: 'stare', behaviorT: 2,
+  target: { x: 0, y: 0 },
+  caption: '…',
+  captionT: 0,
+  zTimer: 0,
+  lumps: [],           // 몸통 비대칭 울퉁불퉁 (개체 고유)
+};
+pet.x = W / 2; pet.y = H * 0.62;
+pet.target.x = pet.x; pet.target.y = pet.y;
+for (let i = 0; i < 14; i++) pet.lumps.push(rand(-2.2, 2.2));
+
+function depthScale() { return 0.75 + (pet.y / H) * 0.45; }
+
+// ---------- 발: 절차적 걸음 ----------
+// 발은 땅에 붙어 있다가, 몸이 지나가서 너무 멀어지면 앞쪽으로 폴짝 옮겨 딛는다
+const feet = [-0.62, -0.22, 0.22, 0.62].map((ox, i) => ({
+  ox, x: pet.x + ox * pet.r, y: pet.y,
+  fromX: 0, fromY: 0, toX: 0, toY: 0,
+  lift: -1,            // 0..1 진행중, -1이면 착지 상태
+  group: i % 2,        // 대각선 발끼리 같이 움직임
+}));
+let stepClock = 0;
+
+function updateFeet(dt) {
+  const s = depthScale(), r = pet.r * s;
+  const speed = Math.hypot(pet.vx, pet.vy);
+  stepClock += dt;
+  for (const f of feet) {
+    const idealX = pet.x + f.ox * r;
+    const idealY = pet.y + Math.abs(f.ox) * 4 * s;
+    if (f.lift < 0) {
+      const d = Math.hypot(idealX - f.x, idealY - f.y);
+      const thresh = speed > 150 ? 10 : 16;
+      const groupBusy = feet.some(o => o !== f && o.group === f.group && o.lift >= 0);
+      if (d > thresh * s && !groupBusy) {
+        f.lift = 0;
+        f.fromX = f.x; f.fromY = f.y;
+        // 진행 방향으로 조금 앞서 딛기
+        f.toX = idealX + pet.vx * 0.12;
+        f.toY = idealY + pet.vy * 0.12;
+      }
+    } else {
+      f.lift += dt / (speed > 150 ? 0.09 : 0.14);
+      if (f.lift >= 1) {
+        f.lift = -1; f.x = f.toX; f.y = f.toY;
+        // 발 디딜 때 몸이 살짝 출렁
+        pet.squashVel -= 0.9;
+      } else {
+        f.x = lerp(f.fromX, f.toX, f.lift);
+        f.y = lerp(f.fromY, f.toY, f.lift) - Math.sin(f.lift * Math.PI) * 9 * s;
+      }
+    }
+  }
+}
+
+// ---------- 귀/꼬리: 버렛(verlet) 체인 → 출렁임 ----------
+function makeChain(n, segLen) {
+  const pts = [];
+  for (let i = 0; i < n; i++) pts.push({ x: pet.x, y: pet.y - 60 - i * segLen, px: pet.x, py: pet.y - 60 - i * segLen });
+  return { pts, segLen };
+}
+const earL = makeChain(3, 7), earR = makeChain(3, 7), tail = makeChain(4, 7);
+
+function updateChain(ch, ax, ay, dt, gravity) {
+  const p0 = ch.pts[0];
+  p0.px = p0.x; p0.py = p0.y; p0.x = ax; p0.y = ay;
+  for (let i = 1; i < ch.pts.length; i++) {
+    const p = ch.pts[i];
+    const nx = p.x + (p.x - p.px) * 0.86;
+    const ny = p.y + (p.y - p.py) * 0.86 + gravity * dt * dt;
+    p.px = p.x; p.py = p.y; p.x = nx; p.y = ny;
+  }
+  for (let k = 0; k < 3; k++) {
+    for (let i = 1; i < ch.pts.length; i++) {
+      const a = ch.pts[i - 1], b = ch.pts[i];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const diff = (d - ch.segLen * depthScale()) / d;
+      b.x -= dx * diff; b.y -= dy * diff;
+    }
+  }
+}
+
+// ---------- 파티클 (하트, Zzz, 먼지) ----------
+const particles = [];
+function spawn(type, x, y) {
+  particles.push({ type, x, y, vx: rand(-14, 14), vy: rand(-46, -26), life: 1.4, t: 0 });
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.type === 'dust' ? 40 : -6) * dt;
+    if (p.t > p.life) particles.splice(i, 1);
+  }
+}
+
+// ---------- 행동 스케줄러: 가만히 있질 못함 ----------
+const BEHAVIORS = {
+  wander:  { w: 3.0, dur: [2.5, 5] },
+  stare:   { w: 1.8, dur: [1.5, 3.5] },
+  sniff:   { w: 2.0, dur: [2, 3.5] },
+  plop:    { w: 1.4, dur: [2, 4] },
+  zoomies: { w: 1.0, dur: [1.8, 3] },
+  wiggle:  { w: 1.6, dur: [1, 2] },
+  sleep:   { w: 0.6, dur: [6, 10] },
+};
+const CAPTIONS = {
+  wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름'],
+  stare: ['멍…', '아무것도 안 보는 중', '생각이 없다'],
+  sniff: ['킁킁', '바닥에서 뭔가 발견', '킁킁킁…'],
+  plop: ['철푸덕', '움직이기 싫음', '녹는 중'],
+  zoomies: ['갑자기 신남!!', '우다다다!!'],
+  wiggle: ['꼬물꼬물', '춤(본인 생각)'],
+  sleep: ['Zzz…', '꿈나라'],
+};
+function setBehavior(name) {
+  pet.behavior = name;
+  const b = BEHAVIORS[name];
+  pet.behaviorT = rand(b.dur[0], b.dur[1]);
+  const caps = CAPTIONS[name];
+  pet.caption = caps[Math.floor(Math.random() * caps.length)];
+  pet.captionT = 0;
+  if (name === 'wander' || name === 'zoomies') pickTarget();
+  if (name === 'plop') pet.squashVel -= 3.5;
+}
+function pickTarget() {
+  pet.target.x = rand(90, W - 90);
+  pet.target.y = rand(H * 0.42, H * 0.82);
+}
+function nextBehavior() {
+  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior);
+  let total = entries.reduce((s, [, b]) => s + b.w, 0);
+  let roll = Math.random() * total;
+  for (const [name, b] of entries) { roll -= b.w; if (roll <= 0) return setBehavior(name); }
+  setBehavior('stare');
+}
+
+// ---------- 상호작용 ----------
+cv.addEventListener('mousedown', e => {
+  const s = depthScale();
+  const d = Math.hypot(e.clientX - pet.x, e.clientY - (pet.y - pet.r * s));
+  if (d < pet.r * s * 1.7) {
+    pet.jvy = -240;
+    pet.squashVel -= 4;
+    pet.dizzy = Math.min(pet.dizzy + 1, 3);
+    pet.caption = pet.dizzy >= 3 ? '@_@ 그만…' : '깜짝!?';
+    pet.captionT = 0;
+    if (pet.behavior === 'sleep' || pet.behavior === 'plop') setTimeout(() => setBehavior('stare'), 0);
+    pet.behaviorT = Math.max(pet.behaviorT, 1.2);
+    for (let i = 0; i < 4; i++) spawn('dust', pet.x + rand(-20, 20), pet.y);
+  }
+});
+
+function updatePetting(dt) {
+  const s = depthScale();
+  const over = Math.hypot(mouse.x - pet.x, mouse.y - (pet.y - pet.r * s)) < pet.r * s * 1.5;
+  const moved = Math.hypot(mouse.x - mouse.px, mouse.y - mouse.py);
+  if (over && moved > 2 && pet.behavior !== 'zoomies') {
+    pet.happy = clamp(pet.happy + moved * 0.004, 0, 1);
+    if (pet.happy > 0.5 && Math.random() < dt * 3) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * s * 1.6);
+    if (pet.happy > 0.5 && pet.captionT > 1) { pet.caption = '기분좋아…'; pet.captionT = 0; }
+  }
+  pet.happy = Math.max(0, pet.happy - dt * 0.12);
+  pet.dizzy = Math.max(0, pet.dizzy - dt * 0.5);
+  mouse.px = mouse.x; mouse.py = mouse.y;
+}
+
+// ---------- 메인 업데이트 ----------
+function update(dt) {
+  pet.behaviorT -= dt;
+  pet.captionT += dt;
+  if (pet.behaviorT <= 0) nextBehavior();
+
+  // 이동
+  let desiredVX = 0, desiredVY = 0;
+  const moving = pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff';
+  if (moving && pet.tripT <= 0) {
+    const speed = pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62;
+    const dx = pet.target.x - pet.x, dy = pet.target.y - pet.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 14) { desiredVX = dx / d * speed; desiredVY = dy / d * speed; }
+    else if (pet.behavior === 'zoomies') pickTarget();
+    else if (pet.behavior === 'wander' && Math.random() < dt * 0.4) pickTarget();
+  }
+  pet.vx = lerp(pet.vx, desiredVX, 1 - Math.exp(-8 * dt));
+  pet.vy = lerp(pet.vy, desiredVY, 1 - Math.exp(-8 * dt));
+  pet.x += pet.vx * dt; pet.y += pet.vy * dt;
+  pet.x = clamp(pet.x, 80, W - 80); pet.y = clamp(pet.y, H * 0.4, H * 0.85);
+  if (Math.abs(pet.vx) > 6) pet.dir = Math.sign(pet.vx);
+
+  // 가끔 자빠짐 (하찮음의 핵심)
+  const sp = Math.hypot(pet.vx, pet.vy);
+  if (sp > 40 && pet.tripT <= 0 && Math.random() < dt * (pet.behavior === 'zoomies' ? 0.35 : 0.07)) {
+    pet.tripT = 0.9;
+    pet.squashVel -= 5;
+    pet.vx *= 0.15; pet.vy *= 0.15;
+    pet.caption = '아이쿠;;'; pet.captionT = 0;
+    for (let i = 0; i < 5; i++) spawn('dust', pet.x + rand(-24, 24), pet.y);
+  }
+  pet.tripT = Math.max(0, pet.tripT - dt);
+
+  // 말랑 스프링 (부피 보존: 세로로 찌부되면 가로로 퍼짐)
+  const stiff = 110, damp = 7.5;
+  pet.squashVel += (1 - pet.squash) * stiff * dt - pet.squashVel * damp * dt;
+  pet.squash = clamp(pet.squash + pet.squashVel * dt, 0.42, 1.5);
+
+  // 점프
+  if (pet.jvy !== 0 || pet.jy !== 0) {
+    pet.jvy += 900 * dt; pet.jy += pet.jvy * dt;
+    if (pet.jy >= 0) { pet.jy = 0; pet.jvy = 0; pet.squashVel -= 3; }
+  }
+
+  // 걷기 리듬 & 잔출렁임
+  pet.walkPhase += sp * dt * 0.09;
+  pet.wobblePhase += dt * (2.2 + sp * 0.02);
+
+  // 시선: 커서가 가까우면 커서를, 아니면 허공을 본다
+  const md = Math.hypot(mouse.x - pet.x, mouse.y - pet.y);
+  let gx, gy;
+  if (md < 300 && pet.behavior !== 'sleep') {
+    gx = clamp((mouse.x - pet.x) / 200, -1, 1); gy = clamp((mouse.y - pet.y + 60) / 200, -1, 1);
+  } else {
+    gx = Math.sin(pet.wobblePhase * 0.23) * 0.6; gy = Math.cos(pet.wobblePhase * 0.31) * 0.3;
+  }
+  pet.gazeX = lerp(pet.gazeX, gx, 1 - Math.exp(-5 * dt));
+  pet.gazeY = lerp(pet.gazeY, gy, 1 - Math.exp(-5 * dt));
+
+  // 눈 깜빡임
+  pet.nextBlink -= dt;
+  if (pet.nextBlink <= 0) { pet.blink = 0.14; pet.nextBlink = rand(1.5, 4.5); }
+  pet.blink = Math.max(0, pet.blink - dt);
+
+  // 잠: Zzz
+  if (pet.behavior === 'sleep') {
+    pet.zTimer -= dt;
+    if (pet.zTimer <= 0) { spawn('z', pet.x + 30 * depthScale(), pet.y - pet.r * 1.6 * depthScale()); pet.zTimer = 1.3; }
+  }
+
+  updateFeet(dt);
+  const s = depthScale(), r = pet.r * s;
+  const bodyTop = pet.y + pet.jy - r * 2 * pet.squash + r * 0.3;
+  const bob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
+  updateChain(earL, pet.x - r * 0.72, bodyTop + bob + r * 0.12, dt, 620);
+  updateChain(earR, pet.x + r * 0.72, bodyTop + bob + r * 0.12, dt, 620);
+  updateChain(tail, pet.x - pet.dir * r * 0.95, pet.y + pet.jy - r * 0.75 + bob, dt, 500);
+  updateParticles(dt);
+  updatePetting(dt);
+}
+
+// ---------- 그리기 ----------
+const BODY = '#efd9b8', BODY_DARK = '#dfc49c', OUTLINE = 'rgba(96,74,56,0.35)';
+
+function drawBlob(cx, cy, rx, ry) {
+  const n = pet.lumps.length;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2;
+    const lump = pet.lumps[i] + Math.sin(a * 3 + pet.wobblePhase) * 1.6;
+    pts.push({ x: cx + Math.cos(a) * (rx + lump), y: cy + Math.sin(a) * (ry + lump) });
+  }
+  // 꼭짓점 사이 중점을 지나는 곡선 → 각지지 않는 말랑한 윤곽
+  ctx.beginPath();
+  ctx.moveTo((pts[0].x + pts[n - 1].x) / 2, (pts[0].y + pts[n - 1].y) / 2);
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], q = pts[(i + 1) % n];
+    ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+  }
+  ctx.closePath();
+}
+
+function drawChain(ch, baseR) {
+  ctx.fillStyle = BODY; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
+  for (let i = ch.pts.length - 1; i >= 0; i--) {
+    const p = ch.pts[i];
+    const r = baseR * (1 - i * 0.22) * depthScale();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+}
+
+function draw(t) {
+  ctx.clearRect(0, 0, W, H);
+  // 바닥 힌트
+  ctx.fillStyle = '#ece5d3';
+  ctx.fillRect(0, H * 0.38, W, H);
+
+  const s = depthScale(), r = pet.r * s;
+  const sy = pet.squash, sx = 1 + (1 - sy) * 0.85;
+  const sp = Math.hypot(pet.vx, pet.vy);
+  const bob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
+  const breathe = (pet.behavior === 'sleep' ? Math.sin(t * 1.6) * 0.035 : Math.sin(t * 2.6) * 0.015);
+  const cy = pet.y + pet.jy + bob - r * sy;
+
+  // 그림자
+  ctx.fillStyle = 'rgba(120,100,70,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(pet.x, pet.y + 4, r * 1.15 * sx * (1 - pet.jy * -0.002), r * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 꼬리
+  drawChain(tail, 7);
+
+  // 다리 (뭉툭한 캡슐)
+  ctx.strokeStyle = BODY_DARK; ctx.lineWidth = 9 * s; ctx.lineCap = 'round';
+  for (const f of feet) {
+    ctx.beginPath();
+    ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * sy);
+    ctx.lineTo(f.x, f.y);
+    ctx.stroke();
+  }
+  // 발끝
+  ctx.fillStyle = BODY_DARK;
+  for (const f of feet) { ctx.beginPath(); ctx.arc(f.x, f.y, 5.5 * s, 0, Math.PI * 2); ctx.fill(); }
+
+  // 몸통 (머리 겸용 한 덩어리)
+  ctx.save();
+  ctx.translate(pet.x, cy);
+  if (pet.behavior === 'wiggle') ctx.rotate(Math.sin(t * 14) * 0.13);
+  if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
+  ctx.scale(sx + breathe, sy - breathe);
+  drawBlob(0, 0, r * 1.05, r);
+  ctx.fillStyle = BODY; ctx.fill();
+  ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
+  // 배 무늬
+  ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,250,240,0.55)'; ctx.fill();
+  ctx.restore();
+
+  // 귀 — 몸 앞에 그려서 옆으로 축 늘어진 게 보이게
+  drawChain(earL, 6); drawChain(earR, 6);
+
+  // 얼굴
+  const sniffing = pet.behavior === 'sniff';
+  const headDip = sniffing ? r * 0.35 + Math.sin(t * 9) * 2 : 0;
+  const fx = pet.x + pet.dir * r * 0.22 * sx;
+  const fy = cy - r * 0.25 * sy + headDip;
+  const eyeGap = r * 0.3 * sx;
+  const gx = pet.gazeX * 3.2, gy = pet.gazeY * 2.4;
+  const sleeping = pet.behavior === 'sleep';
+  const closed = sleeping || pet.blink > 0 || (pet.behavior === 'plop' && pet.squash < 0.7);
+  const happyEyes = pet.happy > 0.5;
+
+  ctx.strokeStyle = '#4a3a2c'; ctx.fillStyle = '#4a3a2c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  // 눈 두 개 — 일부러 크기가 다름 (하찮음 포인트)
+  const eyes = [{ ox: -eyeGap, r: 3.6 * s, oy: 0 }, { ox: eyeGap, r: 2.9 * s, oy: -1.5 * s }];
+  for (const e of eyes) {
+    if (closed) {
+      ctx.beginPath();
+      ctx.moveTo(fx + e.ox + gx - 3.5, fy + e.oy + gy);
+      ctx.lineTo(fx + e.ox + gx + 3.5, fy + e.oy + gy);
+      ctx.stroke();
+    } else if (happyEyes) {
+      ctx.beginPath();
+      ctx.arc(fx + e.ox + gx, fy + e.oy + gy + 2, 4 * s, Math.PI * 1.15, Math.PI * 1.85);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(fx + e.ox + gx, fy + e.oy + gy, e.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // 어지러움 소용돌이
+  if (pet.dizzy >= 3) {
+    ctx.save(); ctx.strokeStyle = '#8a7a68'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(fx, fy - r * 0.8, 6, t * 6, t * 6 + 4.6); ctx.stroke();
+    ctx.restore();
+  }
+  // 입: ω
+  const my = fy + r * 0.28 * sy + gy * 0.5;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(fx + gx * 0.7 - 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.arc(fx + gx * 0.7 + 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  // 볼터치
+  if (pet.happy > 0.25) {
+    ctx.fillStyle = `rgba(240,140,130,${pet.happy * 0.5})`;
+    ctx.beginPath(); ctx.arc(fx - eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(fx + eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 파티클
+  for (const p of particles) {
+    const a = 1 - p.t / p.life;
+    if (p.type === 'heart') {
+      ctx.fillStyle = `rgba(235,110,120,${a})`;
+      ctx.font = `${11 + a * 4}px sans-serif`;
+      ctx.fillText('♥', p.x, p.y);
+    } else if (p.type === 'z') {
+      ctx.fillStyle = `rgba(140,125,105,${a})`;
+      ctx.font = `${10 + (1 - a) * 8}px sans-serif`;
+      ctx.fillText('z', p.x + (1 - a) * 14, p.y - (1 - a) * 20);
+    } else {
+      ctx.fillStyle = `rgba(170,150,120,${a * 0.6})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3 * a, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // 캡션 (혼잣말)
+  const capAlpha = clamp(1.4 - pet.captionT * 0.25, 0, 1);
+  if (capAlpha > 0) {
+    ctx.fillStyle = `rgba(130,115,95,${capAlpha})`;
+    ctx.font = '13px -apple-system, "Apple SD Gothic Neo", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(pet.caption, pet.x, pet.y + 34);
+    ctx.textAlign = 'left';
+  }
+}
+
+// ---------- 루프 ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  update(dt);
+  draw(now / 1000);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
