@@ -280,6 +280,7 @@ const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐�
 const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다'];
 const DROP_LINES = ['어어… 내려간다', '착지 준비…', '후웅', '나 내려놔짐', '바닥 온다'];
 const LAND_LINES = ['착지…', '콩', '살았다', '땅이다', '다리 있음'];
+const BOUNCE_LINES = ['통!', '퐁!', '앗 통통', '말랑반사', '벽이 있었네'];
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
 function setBehavior(name) {
   pet.behavior = name;
@@ -373,6 +374,17 @@ function updateDrag(dt) {
   }
 }
 
+function bounceReact({ lines, strength, x, y }) {
+  if (pet.captionT > 0.14) {
+    pet.caption = randomLine(lines);
+    pet.captionT = 0;
+  }
+  pet.landingT = Math.max(pet.landingT, clamp(strength / 1200, 0.22, 0.65));
+  pet.squashVel = clamp(pet.squashVel - clamp(strength / 180, 1.5, 7.5), -12, 12);
+  const count = clamp(Math.floor(strength / 180), 2, 7);
+  for (let i = 0; i < count; i++) spawn('dust', x + rand(-14, 14), y + rand(-4, 6));
+}
+
 function finishPointer(e) {
   if (!input.active || input.pointerId !== e.pointerId) return;
   const elapsed = performance.now() - input.downAt;
@@ -380,14 +392,20 @@ function finishPointer(e) {
   const wasDrag = input.mode === 'drag';
   const wasPetting = input.mode === 'pet';
   if (wasDrag) {
-    pet.vx = clamp(input.releaseVX * 0.35, -180, 180);
-    pet.vy = clamp(input.releaseVY * 0.2, -120, 120);
+    const releaseAge = performance.now() - (input.lastMoveAt || input.downAt);
+    const fresh = clamp(1 - releaseAge / 320, 0, 1);
+    const throwVX = input.releaseVX * fresh;
+    const throwVY = input.releaseVY * fresh;
+    pet.vx = clamp(throwVX * 0.92, -1100, 1100);
+    pet.vy = 0;
     pet.jy = Math.min(pet.jy, -44);
-    pet.jvy = Math.max(80, clamp(input.releaseVY * 0.12 + 140, 80, 260));
+    pet.jvy = clamp(throwVY * 0.9 + 60, -1050, 1120);
     pet.squashVel = clamp(pet.squashVel - 2.4, -8, 8);
     pet.caption = randomLine(DROP_LINES);
     pet.captionT = 0;
     pet.landCaption = randomLine(LAND_LINES);
+    pet.behavior = 'stare';
+    pet.behaviorT = Math.max(pet.behaviorT, 2.2);
   } else if (!wasPetting && elapsed < 260 && moved < rubThreshold(e) * 1.4 && petHitTest(e.clientX, e.clientY, 1.8)) {
     surprisePet();
   }
@@ -458,6 +476,7 @@ function updatePetting(dt) {
 function update(dt) {
   input.tapCooldown = Math.max(0, input.tapCooldown - dt);
   const dragging = input.mode === 'drag';
+  const airborne = !dragging && (Math.abs(pet.jy) > 0.01 || Math.abs(pet.jvy) > 0.01);
 
   if (!dragging) pet.behaviorT -= dt;
   pet.captionT += dt;
@@ -465,7 +484,7 @@ function update(dt) {
 
   // 이동
   let desiredVX = 0, desiredVY = 0;
-  const moving = !dragging && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
+  const moving = !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
   if (moving && pet.tripT <= 0) {
     const speed = pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62;
     const dx = pet.target.x - pet.x, dy = pet.target.y - pet.y;
@@ -476,12 +495,30 @@ function update(dt) {
   }
   if (dragging) {
     updateDrag(dt);
+  } else if (airborne) {
+    pet.vx *= Math.exp(-0.45 * dt);
+    pet.vy = 0;
+    pet.x += pet.vx * dt;
   } else {
     pet.vx = lerp(pet.vx, desiredVX, 1 - Math.exp(-8 * dt));
     pet.vy = lerp(pet.vy, desiredVY, 1 - Math.exp(-8 * dt));
     pet.x += pet.vx * dt; pet.y += pet.vy * dt;
   }
-  pet.x = clamp(pet.x, 80, W - 80); pet.y = clamp(pet.y, H * 0.4, H * 0.85);
+  pet.y = clamp(pet.y, H * 0.4, H * 0.85);
+  if (airborne) {
+    const sideLimit = pet.r * depthScale() * 1.05;
+    if (pet.x < sideLimit) {
+      pet.x = sideLimit;
+      pet.vx = Math.abs(pet.vx) * 0.84;
+      bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.vx), x: pet.x, y: pet.y + pet.jy });
+    } else if (pet.x > W - sideLimit) {
+      pet.x = W - sideLimit;
+      pet.vx = -Math.abs(pet.vx) * 0.84;
+      bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.vx), x: pet.x, y: pet.y + pet.jy });
+    }
+  } else {
+    pet.x = clamp(pet.x, 80, W - 80);
+  }
   if (Math.abs(pet.vx) > 6) pet.dir = Math.sign(pet.vx);
 
   // 가끔 자빠짐 (하찮음의 핵심)
@@ -504,17 +541,45 @@ function update(dt) {
   // 점프
   if (!dragging && (pet.jvy !== 0 || pet.jy !== 0)) {
     pet.jvy += 900 * dt; pet.jy += pet.jvy * dt;
+    const s = depthScale();
+    const top = pet.y + pet.jy - pet.r * s;
+    if (top < 42 && pet.jvy < 0) {
+      pet.jy = 42 + pet.r * s - pet.y;
+      pet.jvy = Math.abs(pet.jvy) * 0.72;
+      bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.jvy), x: pet.x, y: pet.y + pet.jy - pet.r * s });
+    }
     if (pet.jy >= 0) {
+      const impact = pet.jvy;
       pet.jy = 0;
-      pet.jvy = 0;
-      pet.squashVel -= 3;
-      if (pet.landCaption) {
-        pet.caption = pet.landCaption;
-        pet.captionT = 0;
-        pet.landCaption = '';
+      const shouldBounce = impact > 170 || Math.abs(pet.vx) > 260;
+      if (shouldBounce) {
+        const bounce = clamp(0.58 + Math.min(Math.abs(pet.vx) / 1100, 1) * 0.18, 0.58, 0.76);
+        pet.jvy = -Math.max(95, impact * bounce);
+        pet.vx *= 0.86;
+        bounceReact({ lines: BOUNCE_LINES, strength: impact + Math.abs(pet.vx) * 0.35, x: pet.x, y: pet.y });
+      } else {
+        pet.jvy = 0;
+        pet.vx *= 0.55;
+        pet.squashVel -= 3;
+        if (pet.landCaption) {
+          pet.caption = pet.landCaption;
+          pet.captionT = 0;
+          pet.landCaption = '';
+        }
         pet.landingT = 1.05;
         pet.behaviorT = Math.max(pet.behaviorT, 1.35);
         for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-18, 18), pet.y);
+      }
+      if (Math.abs(pet.jvy) < 115 && Math.abs(pet.vx) < 160) {
+        pet.jvy = 0;
+        pet.vx *= 0.45;
+        if (pet.landCaption) {
+          pet.caption = pet.landCaption;
+          pet.landCaption = '';
+        }
+        pet.captionT = 0;
+        pet.landingT = 1.05;
+        pet.behaviorT = Math.max(pet.behaviorT, 1.35);
       }
     }
   } else if (dragging) {
@@ -688,24 +753,18 @@ function draw(t) {
   for (const e of eyes) {
     const ex = fx + e.ox + gx;
     const ey = fy + e.oy + gy;
-    if (justLanded) {
+    if (held || justLanded) {
       const pinch = e.ox < 0 ? 1 : -1;
       ctx.beginPath();
       ctx.moveTo(ex - 4.2 * pinch * s, ey - 2.6 * s);
       ctx.lineTo(ex, ey + 0.8 * s);
       ctx.lineTo(ex - 4.2 * pinch * s, ey + 4.2 * s);
       ctx.stroke();
-    } else if (held || falling) {
-      const eyeLift = held ? -1.4 * s : 0.8 * s;
+    } else if (falling) {
+      const eyeLift = 0.8 * s;
       ctx.beginPath();
       ctx.ellipse(ex, ey + eyeLift, e.r * 1.25, e.r * 1.55, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.save();
-      ctx.fillStyle = 'rgba(255,250,240,0.85)';
-      ctx.beginPath();
-      ctx.arc(ex - e.r * 0.35, ey + eyeLift - e.r * 0.45, 1.1 * s, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     } else if (closed) {
       ctx.beginPath();
       ctx.moveTo(ex - 3.5, ey);
@@ -727,24 +786,13 @@ function draw(t) {
     ctx.beginPath(); ctx.arc(fx, fy - r * 0.8, 6, t * 6, t * 6 + 4.6); ctx.stroke();
     ctx.restore();
   }
-  // 입
+  // 입: 항상 같은 ω 모양을 유지한다
   const my = fy + r * 0.28 * sy + gy * 0.5;
   ctx.lineWidth = 1.5;
-  if (held || falling) {
-    ctx.beginPath();
-    ctx.ellipse(fx + gx * 0.7, my + 1.5 * s, 2.7 * s, 4.2 * s, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if (justLanded) {
-    ctx.beginPath();
-    ctx.moveTo(fx + gx * 0.7 - 3.2 * s, my + 1.5 * s);
-    ctx.quadraticCurveTo(fx + gx * 0.7, my + 3.4 * s, fx + gx * 0.7 + 3.2 * s, my + 1.5 * s);
-    ctx.stroke();
-  } else {
-    ctx.beginPath();
-    ctx.arc(fx + gx * 0.7 - 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);
-    ctx.arc(fx + gx * 0.7 + 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);
-    ctx.stroke();
-  }
+  ctx.beginPath();
+  ctx.arc(fx + gx * 0.7 - 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.arc(fx + gx * 0.7 + 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.stroke();
   ctx.lineWidth = 2;
   // 볼터치
   if (pet.happy > 0.25) {
@@ -789,7 +837,7 @@ window.__petDebug = {
       viewport: { width: W, height: H },
       pet: {
         x: pet.x, y: pet.y, jy: pet.jy,
-        vx: pet.vx, vy: pet.vy,
+        vx: pet.vx, vy: pet.vy, jvy: pet.jvy,
         squash: pet.squash,
         behavior: pet.behavior,
         caption: pet.caption,
