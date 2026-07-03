@@ -2,10 +2,11 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>하찮은 펫 프로토타입</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #f4efe4; }
-  canvas { display: block; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f4efe4; touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  canvas { display: block; touch-action: none; }
   #hint {
     position: fixed; top: 14px; left: 16px;
     font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
@@ -14,7 +15,7 @@
 </style>
 </head>
 <body>
-<div id="hint">클릭: 놀래키기 · 마우스로 문지르기: 쓰다듬기</div>
+<div id="hint">탭: 놀래키기 · 문지르기: 쓰다듬기</div>
 <canvas id="c"></canvas>
 <script>
 'use strict';
@@ -27,11 +28,12 @@ function resize() {
   cv.style.width = W + 'px'; cv.style.height = H + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
-window.addEventListener('resize', resize);
+window.addEventListener('resize', () => { resize(); applySize(); });
 resize();
 
+// 마우스와 터치를 포인터 이벤트 하나로 처리 (모바일 대응)
 const mouse = { x: -999, y: -999, px: -999, py: -999, moveAmt: 0 };
-window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+window.addEventListener('pointermove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -61,6 +63,10 @@ const pet = {
 pet.x = W / 2; pet.y = H * 0.62;
 pet.target.x = pet.x; pet.target.y = pet.y;
 for (let i = 0; i < 14; i++) pet.lumps.push(rand(-2.2, 2.2));
+
+// 화면 크기에 맞는 몸집 (작은 폰에서 너무 크지 않게)
+function applySize() { pet.r = clamp(Math.min(W, H) * 0.105, 34, 50); }
+applySize();
 
 function depthScale() { return 0.75 + (pet.y / H) * 0.45; }
 
@@ -102,34 +108,6 @@ function updateFeet(dt) {
         f.x = lerp(f.fromX, f.toX, f.lift);
         f.y = lerp(f.fromY, f.toY, f.lift) - Math.sin(f.lift * Math.PI) * 9 * s;
       }
-    }
-  }
-}
-
-// ---------- 귀/꼬리: 버렛(verlet) 체인 → 출렁임 ----------
-function makeChain(n, segLen) {
-  const pts = [];
-  for (let i = 0; i < n; i++) pts.push({ x: pet.x, y: pet.y - 60 - i * segLen, px: pet.x, py: pet.y - 60 - i * segLen });
-  return { pts, segLen };
-}
-const earL = makeChain(3, 7), earR = makeChain(3, 7), tail = makeChain(4, 7);
-
-function updateChain(ch, ax, ay, dt, gravity) {
-  const p0 = ch.pts[0];
-  p0.px = p0.x; p0.py = p0.y; p0.x = ax; p0.y = ay;
-  for (let i = 1; i < ch.pts.length; i++) {
-    const p = ch.pts[i];
-    const nx = p.x + (p.x - p.px) * 0.86;
-    const ny = p.y + (p.y - p.py) * 0.86 + gravity * dt * dt;
-    p.px = p.x; p.py = p.y; p.x = nx; p.y = ny;
-  }
-  for (let k = 0; k < 3; k++) {
-    for (let i = 1; i < ch.pts.length; i++) {
-      const a = ch.pts[i - 1], b = ch.pts[i];
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const d = Math.hypot(dx, dy) || 1;
-      const diff = (d - ch.segLen * depthScale()) / d;
-      b.x -= dx * diff; b.y -= dy * diff;
     }
   }
 }
@@ -189,7 +167,7 @@ function nextBehavior() {
 }
 
 // ---------- 상호작용 ----------
-cv.addEventListener('mousedown', e => {
+cv.addEventListener('pointerdown', e => {
   const s = depthScale();
   const d = Math.hypot(e.clientX - pet.x, e.clientY - (pet.y - pet.r * s));
   if (d < pet.r * s * 1.7) {
@@ -290,12 +268,6 @@ function update(dt) {
   }
 
   updateFeet(dt);
-  const s = depthScale(), r = pet.r * s;
-  const bodyTop = pet.y + pet.jy - r * 2 * pet.squash + r * 0.3;
-  const bob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
-  updateChain(earL, pet.x - r * 0.72, bodyTop + bob + r * 0.12, dt, 620);
-  updateChain(earR, pet.x + r * 0.72, bodyTop + bob + r * 0.12, dt, 620);
-  updateChain(tail, pet.x - pet.dir * r * 0.95, pet.y + pet.jy - r * 0.75 + bob, dt, 500);
   updateParticles(dt);
   updatePetting(dt);
 }
@@ -321,15 +293,6 @@ function drawBlob(cx, cy, rx, ry) {
   ctx.closePath();
 }
 
-function drawChain(ch, baseR) {
-  ctx.fillStyle = BODY; ctx.strokeStyle = OUTLINE; ctx.lineWidth = 1.5;
-  for (let i = ch.pts.length - 1; i >= 0; i--) {
-    const p = ch.pts[i];
-    const r = baseR * (1 - i * 0.22) * depthScale();
-    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  }
-}
-
 function draw(t) {
   ctx.clearRect(0, 0, W, H);
   // 바닥 힌트
@@ -348,9 +311,6 @@ function draw(t) {
   ctx.beginPath();
   ctx.ellipse(pet.x, pet.y + 4, r * 1.15 * sx * (1 - pet.jy * -0.002), r * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
-
-  // 꼬리
-  drawChain(tail, 7);
 
   // 다리 (뭉툭한 캡슐)
   ctx.strokeStyle = BODY_DARK; ctx.lineWidth = 9 * s; ctx.lineCap = 'round';
@@ -377,9 +337,6 @@ function draw(t) {
   ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(255,250,240,0.55)'; ctx.fill();
   ctx.restore();
-
-  // 귀 — 몸 앞에 그려서 옆으로 축 늘어진 게 보이게
-  drawChain(earL, 6); drawChain(earR, 6);
 
   // 얼굴
   const sniffing = pet.behavior === 'sniff';
