@@ -51,6 +51,7 @@ const pet = {
   wobblePhase: 0,
   gazeX: 0, gazeY: 0,  // 시선 (-1..1)
   blink: 0, nextBlink: 1,
+  earTwitch: { side: 0, t: 9 }, nextTwitch: 3,   // 가끔 귀 움찔
   happy: 0, dizzy: 0,
   tripT: 0,
   behavior: 'stare', behaviorT: 2,
@@ -319,6 +320,14 @@ function update(dt) {
   if (pet.nextBlink <= 0) { pet.blink = 0.14; pet.nextBlink = rand(1.5, 4.5); }
   pet.blink = Math.max(0, pet.blink - dt);
 
+  // 귀 움찔
+  pet.nextTwitch -= dt;
+  if (pet.nextTwitch <= 0) {
+    pet.earTwitch = { side: Math.random() < 0.5 ? -1 : 1, t: 0 };
+    pet.nextTwitch = rand(2.5, 7);
+  }
+  pet.earTwitch.t += dt;
+
   // 잠: Zzz
   if (pet.behavior === 'sleep') {
     pet.zTimer -= dt;
@@ -354,6 +363,36 @@ function drawBlob(cx, cy, rx, ry) {
     ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
   }
   ctx.closePath();
+}
+
+// 고양이 귀 — 몸통 로컬 좌표계에서 그려서 찌부/숨쉬기를 같이 탄다
+// phase 'outer': 몸통보다 먼저 (베이스가 몸에 묻힘), 'inner': 몸통 뒤에 속귀만
+function drawEars(r, phase) {
+  const tw = pet.earTwitch;
+  for (const side of [-1, 1]) {
+    let twitch = 0;
+    if (tw.side === side && tw.t < 0.4) twitch = Math.sin(tw.t * 28) * 0.25 * (1 - tw.t / 0.4);
+    ctx.save();
+    ctx.translate(side * r * 0.52, -r * 0.66);
+    ctx.rotate(side * 0.3 + twitch);
+    if (phase === 'outer') {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.27, 0);
+      ctx.quadraticCurveTo(-r * 0.2, -r * 0.44, 0, -r * 0.56);
+      ctx.quadraticCurveTo(r * 0.2, -r * 0.44, r * 0.27, 0);
+      ctx.closePath();
+      ctx.fillStyle = BODY; ctx.fill();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.13, -r * 0.12);
+      ctx.quadraticCurveTo(-r * 0.09, -r * 0.34, 0, -r * 0.42);
+      ctx.quadraticCurveTo(r * 0.09, -r * 0.34, r * 0.13, -r * 0.12);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(232,160,150,0.5)'; ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 
 function draw(t) {
@@ -396,12 +435,14 @@ function draw(t) {
   if (pet.behavior === 'wiggle') ctx.rotate(Math.sin(t * 14) * 0.13);
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
   ctx.scale(sx + breathe, sy - breathe);
+  drawEars(r, 'outer');
   drawBlob(0, 0, r * 1.05, r);
   ctx.fillStyle = BODY; ctx.fill();
   ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
   // 배 무늬
   ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(255,250,240,0.55)'; ctx.fill();
+  drawEars(r, 'inner');
   ctx.restore();
 
   // 얼굴
