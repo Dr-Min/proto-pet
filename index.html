@@ -112,6 +112,64 @@ function updateFeet(dt) {
   }
 }
 
+// ---------- 꼬리: 버렛 체인 물리 + 매끈한 테이퍼 렌더링 ----------
+function makeChain(n, segLen) {
+  const pts = [];
+  for (let i = 0; i < n; i++) pts.push({ x: pet.x, y: pet.y - 40 - i * segLen, px: pet.x, py: pet.y - 40 - i * segLen });
+  return { pts, segLen };
+}
+const tail = makeChain(4, 8);
+
+function updateChain(ch, ax, ay, dt, gravity, windX) {
+  const p0 = ch.pts[0];
+  p0.px = p0.x; p0.py = p0.y; p0.x = ax; p0.y = ay;
+  for (let i = 1; i < ch.pts.length; i++) {
+    const p = ch.pts[i];
+    const nx = p.x + (p.x - p.px) * 0.86 + windX * dt * dt;
+    const ny = p.y + (p.y - p.py) * 0.86 + gravity * dt * dt;
+    p.px = p.x; p.py = p.y; p.x = nx; p.y = ny;
+  }
+  for (let k = 0; k < 3; k++) {
+    for (let i = 1; i < ch.pts.length; i++) {
+      const a = ch.pts[i - 1], b = ch.pts[i];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const diff = (d - ch.segLen * depthScale()) / d;
+      b.x -= dx * diff; b.y -= dy * diff;
+    }
+  }
+}
+
+// 체인을 원이 아니라 하나의 테이퍼진 살덩이로 그린다 (포도송이 금지)
+function drawTail(ch, baseR) {
+  const pts = ch.pts, n = pts.length, s = depthScale();
+  const left = [], right = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const o = pts[Math.max(i - 1, 0)], q = pts[Math.min(i + 1, n - 1)];
+    let dx = q.x - o.x, dy = q.y - o.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const w = baseR * (1 - (i / n) * 0.75) * s;
+    left.push({ x: p.x - dy / d * w, y: p.y + dx / d * w });
+    right.push({ x: p.x + dy / d * w, y: p.y - dx / d * w });
+  }
+  const tip = pts[n - 1], prev = pts[n - 2];
+  const ex = tip.x + (tip.x - prev.x) * 0.6, ey = tip.y + (tip.y - prev.y) * 0.6;
+  ctx.beginPath();
+  ctx.moveTo(right[0].x, right[0].y);
+  for (let i = 0; i < n - 1; i++) {
+    ctx.quadraticCurveTo(right[i].x, right[i].y, (right[i].x + right[i + 1].x) / 2, (right[i].y + right[i + 1].y) / 2);
+  }
+  ctx.quadraticCurveTo(ex, ey, (left[n - 1].x + left[n - 2].x) / 2, (left[n - 1].y + left[n - 2].y) / 2);
+  for (let i = n - 2; i > 0; i--) {
+    ctx.quadraticCurveTo(left[i].x, left[i].y, (left[i].x + left[i - 1].x) / 2, (left[i].y + left[i - 1].y) / 2);
+  }
+  ctx.lineTo(left[0].x, left[0].y);
+  ctx.closePath();
+  ctx.fillStyle = BODY; ctx.fill();
+  ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
+}
+
 // ---------- 파티클 (하트, Zzz, 먼지) ----------
 const particles = [];
 function spawn(type, x, y) {
@@ -268,6 +326,11 @@ function update(dt) {
   }
 
   updateFeet(dt);
+  const ts = depthScale(), tr = pet.r * ts;
+  const tailBob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
+  // 기분 좋으면 살랑살랑 흔들림
+  const wag = Math.sin(pet.wobblePhase * 5) * (120 + pet.happy * 1600);
+  updateChain(tail, pet.x - pet.dir * tr * 0.8, pet.y + pet.jy + tailBob - tr * 0.6, dt, 520, wag);
   updateParticles(dt);
   updatePetting(dt);
 }
@@ -311,6 +374,9 @@ function draw(t) {
   ctx.beginPath();
   ctx.ellipse(pet.x, pet.y + 4, r * 1.15 * sx * (1 - pet.jy * -0.002), r * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // 꼬리 (몸 뒤)
+  drawTail(tail, 8);
 
   // 다리 (뭉툭한 캡슐)
   ctx.strokeStyle = BODY_DARK; ctx.lineWidth = 9 * s; ctx.lineCap = 'round';
