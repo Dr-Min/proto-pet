@@ -311,7 +311,7 @@ function setBehavior(name) {
   pet.behavior = name;
   const b = BEHAVIORS[name];
   pet.behaviorT = rand(b.dur[0], b.dur[1]);
-  const caps = CAPTIONS[name];
+  const caps = typeof careBehaviorCaptions === 'function' ? careBehaviorCaptions(name, CAPTIONS[name]) : CAPTIONS[name];
   pet.caption = caps[Math.floor(Math.random() * caps.length)];
   pet.captionT = 0;
   if (name === 'wander' || name === 'zoomies') pickTarget();
@@ -346,6 +346,7 @@ window.__petDebug = {
         landingT: pet.landingT,
         needs: { ...needs },
         mood: careMood(),
+        traits: typeof careTraitNames === 'function' ? careTraitNames() : [],
         careStats: { ...careStats },
         genes: { ...genes },
         bondMilestone,

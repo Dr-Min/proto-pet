@@ -127,6 +127,15 @@ All spacing derives from a base of 4px.
 - **Accessibility**: completion is visible as text, not only hearts.
 - **Motion**: completion uses existing heart particles only.
 
+### Care Traits
+
+- **Structure**: hidden care history unlocks observed temperament traits.
+- **Variants**: cuddly from repeated petting, foodie from repeated meals, mellow from repeated naps.
+- **Spacing**: no stat panel; traits are revealed through memory line, captions, and autonomous behavior weights.
+- **States**: undiscovered, newly revealed, persistent.
+- **Accessibility**: first reveal is written in the memory line.
+- **Motion**: traits reuse existing behavior and particle motion.
+
 ### Food Bowl
 
 - **Structure**: canvas bowl placed near the pet after `밥주기`.

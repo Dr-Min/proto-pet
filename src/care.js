@@ -13,10 +13,16 @@ const careStats = {
   routineBits: 0,
   routineCount: 0,
   lastRoutineAt: 0,
+  traitMask: 0,
 };
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
+const CARE_TRAITS = {
+  cuddly: { bit: 1, line: '애교가 늘었어', caption: '손 찾는 중' },
+  foodie: { bit: 2, line: '먹보 기질이 보임', caption: '밥 냄새 기억함' },
+  mellow: { bit: 4, line: '느긋해졌어', caption: '천천히 할래' },
+};
 const BOND_MILESTONES = [
   { at: 0.25, line: '조금 친해졌어' },
   { at: 0.55, line: '이제 나 알아보지?' },
@@ -60,6 +66,7 @@ function saveCareState() {
       routineBits: careStats.routineBits,
       routineCount: careStats.routineCount,
       lastRoutineAt: careStats.lastRoutineAt,
+      traitMask: careStats.traitMask,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -86,6 +93,7 @@ function loadCareState() {
     const savedRoutineBits = Number(saved.routineBits);
     const savedRoutineCount = Number(saved.routineCount);
     const savedLastRoutineAt = Number(saved.lastRoutineAt);
+    const savedTraitMask = Number(saved.traitMask);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
@@ -101,6 +109,7 @@ function loadCareState() {
     careStats.routineBits = Math.floor(clamp(Number.isFinite(savedRoutineBits) ? savedRoutineBits : careStats.routineBits, 0, 7));
     careStats.routineCount = Math.max(0, Math.floor(Number.isFinite(savedRoutineCount) ? savedRoutineCount : careStats.routineCount));
     careStats.lastRoutineAt = Math.max(0, Number.isFinite(savedLastRoutineAt) ? savedLastRoutineAt : careStats.lastRoutineAt);
+    careStats.traitMask = Math.floor(clamp(Number.isFinite(savedTraitMask) ? savedTraitMask : careStats.traitMask, 0, 7));
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -128,6 +137,37 @@ function rememberCare(line) {
   careStats.lastCareLine = line;
   careStats.lastCareAt = Date.now();
 }
+function hasCareTrait(name) {
+  return Boolean(careStats.traitMask & CARE_TRAITS[name].bit);
+}
+function careTraitNames() {
+  return Object.entries(CARE_TRAITS).filter(([, trait]) => careStats.traitMask & trait.bit).map(([name]) => name);
+}
+function careBehaviorCaptions(name, caps) {
+  if (hasCareTrait('cuddly') && name === 'stare') return caps.concat(['가까이 있을래', '손 기다림']);
+  if (hasCareTrait('cuddly') && name === 'wiggle') return caps.concat(['쓰다듬 대기중', '꼬물꼬물 다가감']);
+  if (hasCareTrait('foodie') && name === 'sniff') return caps.concat(['밥 냄새 탐색', '혹시 간식?']);
+  if (hasCareTrait('mellow') && name === 'plop') return caps.concat(['천천히 녹는 중', '느긋하게 철푸덕']);
+  if (hasCareTrait('mellow') && name === 'sleep') return caps.concat(['좋은 낮잠 자리', '느긋한 꿈']);
+  return caps;
+}
+function revealCareTrait(name) {
+  const trait = CARE_TRAITS[name];
+  if (careStats.traitMask & trait.bit) return false;
+  careStats.traitMask |= trait.bit;
+  rememberCare(trait.line);
+  pet.caption = trait.caption;
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.72);
+  for (let i = 0; i < 4; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
+  return true;
+}
+function updateCareTraits() {
+  if (needs.bond >= 0.28 && careStats.petStrokes >= 72 && revealCareTrait('cuddly')) return true;
+  if ((careStats.mealsFed >= 3 || careStats.favoriteMeals >= 2) && revealCareTrait('foodie')) return true;
+  if (careStats.napsTaken >= 2 && revealCareTrait('mellow')) return true;
+  return false;
+}
 function noteCareAction(kind) {
   const bit = CARE_ACTION_BITS[kind] || 0;
   if (!bit) return false;
@@ -153,10 +193,14 @@ function recordMeal(foodType) {
   if (isFavoriteFood(foodType)) {
     careStats.favoriteMeals += 1;
     rememberCare(`${foodObjectLabel(foodType)} 제일 좋아함`);
-    return noteCareAction('meal');
+    const routineCompleted = noteCareAction('meal');
+    updateCareTraits();
+    return routineCompleted;
   }
   rememberCare(`${foodObjectLabel(foodType)} 먹어봄`);
-  return noteCareAction('meal');
+  const routineCompleted = noteCareAction('meal');
+  updateCareTraits();
+  return routineCompleted;
 }
 function rejectFoodWhenFull() {
   pet.caption = needs.hunger > 0.96 ? '배 빵빵해' : '조금 이따 먹을래';
@@ -189,10 +233,11 @@ function requestRest() {
   careStats.napsTaken += 1;
   careStats.lastNapAt = Date.now();
   rememberCare(needs.energy < 0.28 ? '낮잠으로 기운 충전 중' : '잠깐 눈 붙이는 중');
-  noteCareAction('rest');
+  const routineCompleted = noteCareAction('rest');
+  const traitRevealed = updateCareTraits();
   setBehavior('sleep');
   pet.behaviorT = Math.max(pet.behaviorT, clamp((1 - needs.energy) * 18, 7, 15));
-  pet.caption = needs.energy < 0.28 ? '충전할게…' : '눈 좀 붙일게…';
+  if (!routineCompleted && !traitRevealed) pet.caption = needs.energy < 0.28 ? '충전할게…' : '눈 좀 붙일게…';
   pet.captionT = 0;
   pet.zTimer = 0.2;
   pet.squashVel = clamp(pet.squashVel - 1.5, -8, 8);
@@ -202,6 +247,7 @@ function recordPetting(amount) {
   careStats.petStrokes += amount;
   if (now - careStats.lastPetAt > 1400) rememberCare(needs.bond > 0.45 ? '쓰다듬받고 골골거림' : '손길을 기억함');
   if (amount > 2.4) noteCareAction('pet');
+  updateCareTraits();
   careStats.lastPetAt = now;
 }
 function updateCare(dt, { airborne, speed }) {
@@ -231,5 +277,8 @@ function behaviorWeight(name, base) {
   if (name === 'sniff') w *= needs.hunger < 0.5 ? 2.2 : 1;
   if (name === 'stare') w *= 1 + needs.bond * 1.8;
   if (name === 'wiggle') w *= 1 + needs.bond * 1.2;
+  if (hasCareTrait('cuddly') && (name === 'stare' || name === 'wiggle')) w *= 1.45;
+  if (hasCareTrait('foodie') && name === 'sniff') w *= 1.55;
+  if (hasCareTrait('mellow') && (name === 'plop' || name === 'sleep')) w *= 1.35;
   return w;
 }
