@@ -13,16 +13,48 @@
     font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
     color: #9a8f7d; user-select: none; pointer-events: none;
   }
+  #hud {
+    position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom));
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+    pointer-events: none; user-select: none;
+    font: 11px/1.2 -apple-system, "Apple SD Gothic Neo", sans-serif;
+    color: #776956;
+  }
+  .need {
+    min-width: 0; padding: 7px 8px 8px;
+    background: rgba(246, 239, 224, 0.72);
+    border: 1px solid rgba(136, 116, 88, 0.16);
+    border-radius: 8px;
+  }
+  .need-label { display: flex; justify-content: space-between; gap: 4px; margin-bottom: 5px; white-space: nowrap; }
+  .need-track { height: 4px; border-radius: 999px; background: rgba(142, 123, 93, 0.18); overflow: hidden; }
+  .need-fill {
+    height: 100%; width: 100%; transform: scaleX(var(--value, 0.5)); transform-origin: left center;
+    border-radius: inherit; background: #c8a56f;
+  }
+  @media (min-width: 680px) {
+    #hud { left: 18px; right: auto; bottom: 18px; width: 340px; }
+  }
 </style>
 </head>
 <body>
 <div id="hint">탭: 놀래키기 · 문지르기: 쓰다듬기 · 길게/쭉 끌기: 잡기</div>
+<div id="hud" aria-label="펫 상태">
+  <div class="need" data-need="mood"><div class="need-label"><span>기분</span><span class="need-value">-</span></div><div class="need-track"><div class="need-fill"></div></div></div>
+  <div class="need" data-need="bond"><div class="need-label"><span>애착</span><span class="need-value">-</span></div><div class="need-track"><div class="need-fill"></div></div></div>
+  <div class="need" data-need="energy"><div class="need-label"><span>기력</span><span class="need-value">-</span></div><div class="need-track"><div class="need-fill"></div></div></div>
+  <div class="need" data-need="hunger"><div class="need-label"><span>배고픔</span><span class="need-value">-</span></div><div class="need-track"><div class="need-fill"></div></div></div>
+</div>
 <canvas id="c"></canvas>
 <script>
 'use strict';
 // allow: SIZE_OK — temporary single-file static prototype until input physics is stable; next wave should split input, simulation, and rendering.
 const cv = document.getElementById('c');
 const ctx = cv.getContext('2d');
+const needEls = Object.fromEntries([...document.querySelectorAll('.need')].map(el => [el.dataset.need, {
+  fill: el.querySelector('.need-fill'),
+  value: el.querySelector('.need-value'),
+}]));
 let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
@@ -72,6 +104,7 @@ const pet = {
   blink: 0, nextBlink: 1,
   earTwitch: { side: 0, t: 9 }, nextTwitch: 3,   // 가끔 귀 움찔
   happy: 0, dizzy: 0,
+  needs: { mood: 0.58, bond: 0.16, energy: 0.78, hunger: 0.22 },
   tripT: 0,
   behavior: 'stare', behaviorT: 2,
   target: { x: 0, y: 0 },
@@ -284,6 +317,39 @@ const DROP_LINES = ['어어… 내려간다', '착지 준비…', '후웅', '나
 const LAND_LINES = ['착지…', '콩', '살았다', '땅이다', '다리 있음'];
 const BOUNCE_LINES = ['통!', '퐁!', '앗 통통', '말랑반사', '벽이 있었네'];
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
+function affectNeed(name, delta) {
+  pet.needs[name] = clamp(pet.needs[name] + delta, 0, 1);
+}
+function updateHud() {
+  for (const [name, el] of Object.entries(needEls)) {
+    const value = pet.needs[name];
+    el.fill.style.setProperty('--value', value.toFixed(3));
+    el.value.textContent = `${Math.round(value * 100)}`;
+  }
+}
+function updateCare(dt, { airborne, speed }) {
+  affectNeed('hunger', dt * 0.0024);
+  affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012));
+  const comfort = pet.needs.bond * 0.018 + (pet.happy > 0.35 ? 0.018 : 0);
+  const stress = pet.needs.hunger * 0.028 + (airborne ? 0.014 : 0) + (pet.dizzy / 3) * 0.012;
+  affectNeed('mood', (comfort - stress) * dt);
+  if (pet.needs.hunger > 0.82 && pet.captionT > 4) {
+    pet.caption = '배고픈 듯…';
+    pet.captionT = 0;
+  } else if (pet.needs.energy < 0.16 && pet.captionT > 4) {
+    pet.caption = '졸려…';
+    pet.captionT = 0;
+  }
+}
+function behaviorWeight(name, base) {
+  let w = base.w;
+  if (pet.needs.energy < 0.24 && (name === 'sleep' || name === 'plop')) w *= 2.4;
+  if (pet.needs.mood > 0.68 && (name === 'wiggle' || name === 'zoomies')) w *= 1.8;
+  if (pet.needs.hunger > 0.62 && name === 'sniff') w *= 2.2;
+  if (pet.needs.bond > 0.55 && name === 'stare') w *= 1.5;
+  if (pet.needs.energy < 0.2 && name === 'zoomies') w *= 0.25;
+  return w;
+}
 function setBehavior(name) {
   pet.behavior = name;
   const b = BEHAVIORS[name];
@@ -300,9 +366,9 @@ function pickTarget() {
 }
 function nextBehavior() {
   const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior);
-  let total = entries.reduce((s, [, b]) => s + b.w, 0);
+  let total = entries.reduce((s, [n, b]) => s + behaviorWeight(n, b), 0);
   let roll = Math.random() * total;
-  for (const [name, b] of entries) { roll -= b.w; if (roll <= 0) return setBehavior(name); }
+  for (const [name, b] of entries) { roll -= behaviorWeight(name, b); if (roll <= 0) return setBehavior(name); }
   setBehavior('stare');
 }
 
@@ -324,6 +390,8 @@ function surprisePet() {
   else pet.jvy = Math.max(pet.jvy, -80);
   pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
   pet.dizzy = Math.min(pet.dizzy + 1, 3);
+  affectNeed('mood', -0.035);
+  affectNeed('energy', -0.012);
   pet.caption = pet.dizzy >= 3 ? '@_@ 그만…' : '깜짝!?';
   pet.captionT = 0;
   if (pet.behavior === 'sleep' || pet.behavior === 'plop') setTimeout(() => setBehavior('stare'), 0);
@@ -346,6 +414,7 @@ function startDrag(e) {
   pet.behaviorT = Math.max(pet.behaviorT, 1.5);
   pet.caption = randomLine(PICKUP_LINES);
   pet.captionT = 0;
+  affectNeed('mood', -0.006);
   pet.landCaption = '';
   pet.landingT = 0;
   reanchorFeetToBody(1);
@@ -382,6 +451,8 @@ function bounceReact({ lines, strength, x, y }) {
     pet.captionT = 0;
   }
   pet.landingT = Math.max(pet.landingT, clamp(strength / 1200, 0.22, 0.65));
+  affectNeed('energy', -clamp(strength / 18000, 0.006, 0.06));
+  affectNeed('mood', -clamp(strength / 24000, 0.004, 0.045));
   pet.squashVel = clamp(pet.squashVel - clamp(strength / 180, 1.5, 7.5), -12, 12);
   const count = clamp(Math.floor(strength / 180), 2, 7);
   for (let i = 0; i < count; i++) spawn('dust', x + rand(-14, 14), y + rand(-4, 6));
@@ -405,6 +476,8 @@ function finishPointer(e) {
     pet.squashVel = clamp(pet.squashVel - 2.4, -8, 8);
     pet.caption = randomLine(DROP_LINES);
     pet.captionT = 0;
+    affectNeed('energy', -0.025);
+    affectNeed('mood', -0.012);
     pet.landCaption = randomLine(LAND_LINES);
     pet.behavior = 'stare';
     pet.behaviorT = Math.max(pet.behaviorT, 2.2);
@@ -466,6 +539,9 @@ function updatePetting(dt) {
   const moved = Math.hypot(mouse.x - mouse.px, mouse.y - mouse.py);
   if (over && moved > 2 && pet.behavior !== 'zoomies') {
     pet.happy = clamp(pet.happy + moved * 0.004, 0, 1);
+    affectNeed('bond', moved * 0.00008);
+    affectNeed('mood', moved * 0.00009);
+    affectNeed('energy', moved * 0.000025);
     if (pet.happy > 0.5 && Math.random() < dt * 3) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * s * 1.6);
     if (pet.happy > 0.5 && pet.captionT > 1) { pet.caption = '기분좋아…'; pet.captionT = 0; }
   }
@@ -592,6 +668,7 @@ function update(dt) {
   // 걷기 리듬 & 잔출렁임
   pet.walkPhase += sp * dt * 0.09;
   pet.wobblePhase += dt * (2.2 + sp * 0.02);
+  updateCare(dt, { airborne, speed: sp });
 
   // 시선: 커서가 가까우면 커서를, 아니면 허공을 본다
   const md = Math.hypot(mouse.x - pet.x, mouse.y - pet.y);
@@ -748,7 +825,7 @@ function draw(t) {
   const falling = pet.jy < -8 && pet.landCaption;
   const justLanded = pet.landingT > 0;
   const closed = sleeping || pet.blink > 0 || (pet.behavior === 'plop' && pet.squash < 0.7);
-  const happyEyes = pet.happy > 0.5;
+  const happyEyes = pet.happy > 0.5 || pet.needs.mood > 0.72;
 
   ctx.strokeStyle = '#4a3a2c'; ctx.fillStyle = '#4a3a2c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   // 눈 두 개 — 일부러 크기가 다름 (하찮음 포인트)
@@ -845,6 +922,7 @@ window.__petDebug = {
         behavior: pet.behavior,
         caption: pet.caption,
         landingT: pet.landingT,
+        needs: { ...pet.needs },
       },
       visualTop: pet.y + pet.jy - r,
       topBounceLimit: topBounceLimit(),
@@ -868,6 +946,7 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   update(dt);
+  updateHud();
   draw(now / 1000);
   requestAnimationFrame(frame);
 }
