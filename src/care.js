@@ -1,5 +1,6 @@
 // ---------- 욕구 ----------
 const needs = { hunger: 0.85, energy: 0.9, bond: 0.08 }; // bond는 쓰다듬기로 쌓이는 친밀도
+const careStats = { mealsFed: 0, lastMealAt: 0 };
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
 const BOND_MILESTONES = [
@@ -32,6 +33,8 @@ function saveCareState() {
       hunger: needs.hunger,
       energy: needs.energy,
       bond: needs.bond,
+      mealsFed: careStats.mealsFed,
+      lastMealAt: careStats.lastMealAt,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -47,9 +50,13 @@ function loadCareState() {
     const savedEnergy = Number(saved.energy);
     const savedBond = Number(saved.bond);
     const savedBondMilestone = Number(saved.bondMilestone);
+    const savedMealsFed = Number(saved.mealsFed);
+    const savedLastMealAt = Number(saved.lastMealAt);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
+    careStats.mealsFed = Math.max(0, Math.floor(Number.isFinite(savedMealsFed) ? savedMealsFed : careStats.mealsFed));
+    careStats.lastMealAt = Math.max(0, Number.isFinite(savedLastMealAt) ? savedLastMealAt : careStats.lastMealAt);
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -65,6 +72,23 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveC
 function affectNeed(name, delta) {
   needs[name] = clamp(needs[name] + delta, 0, 1);
   if (name === 'bond') updateBondMilestone();
+}
+function recordMeal() {
+  careStats.mealsFed += 1;
+  careStats.lastMealAt = Date.now();
+}
+function rejectFoodWhenFull() {
+  pet.caption = needs.hunger > 0.96 ? '배 빵빵해' : '조금 이따 먹을래';
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.35);
+  pet.squashVel = clamp(pet.squashVel - 2.2, -10, 10);
+  affectNeed('bond', 0.004);
+}
+function mealCaption() {
+  if (needs.hunger < 0.25) return '밥이다!! 살았다';
+  if (needs.hunger < 0.55) return '냠냠 해야지';
+  if (careStats.mealsFed > 0) return '또 밥 냄새';
+  return '처음 밥이다';
 }
 function updateCare(dt, { airborne, speed }) {
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));

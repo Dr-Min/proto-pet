@@ -25,13 +25,15 @@ function update(dt) {
           spawn('dust', food.x + rand(-10, 10), food.y - 10);
         }
         if (pet.munchT > 2.4) {
-          affectNeed('hunger', 0.45);
+          const hungerGain = clamp(0.56 - needs.hunger * 0.14, 0.36, 0.56);
+          affectNeed('hunger', hungerGain);
           affectNeed('energy', 0.04);
           affectNeed('bond', 0.015);
+          recordMeal();
           food = null;
           for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
           setBehavior('stare');
-          pet.caption = '잘 먹었습니다';
+          pet.caption = careStats.mealsFed % 3 === 0 ? '오늘 밥 최고' : '잘 먹었습니다';
           pet.captionT = 0;
         }
       }
@@ -185,4 +187,3 @@ function update(dt) {
   updateParticles(dt);
   updatePetting(dt);
 }
-

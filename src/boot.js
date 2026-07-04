@@ -1,12 +1,27 @@
 // ---------- 하단 UI ----------
 const gH = document.getElementById('gH'), gE = document.getElementById('gE');
 document.getElementById('feedBtn').addEventListener('click', () => {
-  if (food) return;
+  if (food) {
+    pet.caption = '밥 여기 있어';
+    pet.captionT = 0;
+    if (input.mode !== 'drag' && needs.hunger < 0.98) setBehavior('eat');
+    return;
+  }
+  if (needs.hunger > 0.9) {
+    rejectFoodWhenFull();
+    return;
+  }
   food = {
     x: clamp(pet.x + rand(-170, 170), 90, W - 90),
     y: clamp(pet.y + rand(-70, 70), H * 0.45, H * 0.82),
   };
-  if (input.mode !== 'drag') setBehavior('eat');
+  pet.caption = mealCaption();
+  pet.captionT = 0;
+  pet.munchT = 0;
+  if (input.mode !== 'drag') {
+    pet.behavior = 'eat';
+    pet.behaviorT = rand(BEHAVIORS.eat.dur[0], BEHAVIORS.eat.dur[1]);
+  }
 });
 function updateGauges() {
   gH.style.width = needs.hunger * 100 + '%';

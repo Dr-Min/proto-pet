@@ -286,6 +286,7 @@ window.__petDebug = {
         caption: pet.caption,
         landingT: pet.landingT,
         needs: { ...needs },
+        careStats: { ...careStats },
         bondMilestone,
         food: food ? { ...food } : null,
       },
