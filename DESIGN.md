@@ -14,8 +14,8 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Surface/floor | --surface-floor | #ece5d3 | n/a | Ground plane |
 | Text/muted | --text-muted | #9a8f7d | n/a | Top hint |
 | Text/ui | --text-ui | #8a7f6c | n/a | Bottom labels and memory line |
-| Pet/body | --pet-body | #efd9b8 | n/a | Main pet body |
-| Pet/body-dark | --pet-body-dark | #dfc49c | n/a | Legs and darker body parts |
+| Pet/body | --pet-body | #efd9b8 | n/a | Default pet body, varied slightly by gene seed |
+| Pet/body-dark | --pet-body-dark | #dfc49c | n/a | Default legs and darker body parts, varied slightly by gene seed |
 | Pet/outline | --pet-outline | rgba(96,74,56,0.35) | n/a | Soft outline |
 | Care/hunger | --care-hunger | #a8c686 | n/a | Hunger healthy fill |
 | Care/energy | --care-energy | #8fb7d9 | n/a | Energy healthy fill |
@@ -28,6 +28,7 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 
 - Use warm neutrals for the world, not saturated game UI chrome.
 - Care colors are functional: green for hunger, blue for energy, pink for bond, coral for low state.
+- Pet body color may vary inside the documented peach-to-cream family through the saved gene seed.
 - New colors should extend the table before use.
 
 ## 3. Typography
@@ -106,6 +107,15 @@ All spacing derives from a base of 4px.
 - **States**: default, truncated if narrow.
 - **Accessibility**: text is visible and concise.
 - **Motion**: no decorative animation.
+
+### Gene-Based Pet Shape
+
+- **Structure**: saved `protopet-genes` seed drives body color, blob lumps, ear spread, eye size, and tail length.
+- **Variants**: subtle peach/cream body tones and small asymmetry changes.
+- **Spacing**: no layout impact; canvas-only variation.
+- **States**: persistent per browser profile, testable with `?seed=`.
+- **Accessibility**: variation must not affect care controls.
+- **Motion**: shares the same procedural animation rig.
 
 ## 6. Motion & Interaction
 

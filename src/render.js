@@ -1,6 +1,13 @@
 // ---------- 그리기 ----------
 const BODY = '#efd9b8', BODY_DARK = '#dfc49c', OUTLINE = 'rgba(96,74,56,0.35)';
 
+function geneValue(name, fallback) {
+  return typeof genes === 'undefined' ? fallback : genes[name];
+}
+function bodyColor() { return geneValue('body', BODY); }
+function bodyDarkColor() { return geneValue('bodyDark', BODY_DARK); }
+function bellyColor() { return geneValue('belly', 'rgba(255,250,240,0.55)'); }
+
 function drawBlob(cx, cy, rx, ry) {
   const n = pet.lumps.length;
   const pts = [];
@@ -24,25 +31,27 @@ function drawBlob(cx, cy, rx, ry) {
 function drawEars(r, phase) {
   const tw = pet.earTwitch;
   const heldOrFalling = input.mode === 'drag' || pet.jy < -8;
+  const earScale = geneValue('earScale', 1);
+  const earSpread = geneValue('earSpread', 0.52);
   for (const side of [-1, 1]) {
     let twitch = 0;
     if (tw.side === side && tw.t < 0.4) twitch = Math.sin(tw.t * 28) * 0.25 * (1 - tw.t / 0.4);
     ctx.save();
-    ctx.translate(side * r * 0.52, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0));
+    ctx.translate(side * r * earSpread, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0));
     ctx.rotate(side * (heldOrFalling ? 0.43 : 0.3) + twitch * (heldOrFalling ? 0.35 : 1));
     if (phase === 'outer') {
       ctx.beginPath();
       ctx.moveTo(-r * 0.27, 0);
-      ctx.quadraticCurveTo(-r * 0.2, -r * 0.44, 0, -r * 0.56);
-      ctx.quadraticCurveTo(r * 0.2, -r * 0.44, r * 0.27, 0);
+      ctx.quadraticCurveTo(-r * 0.2, -r * 0.44 * earScale, 0, -r * 0.56 * earScale);
+      ctx.quadraticCurveTo(r * 0.2, -r * 0.44 * earScale, r * 0.27, 0);
       ctx.closePath();
-      ctx.fillStyle = BODY; ctx.fill();
+      ctx.fillStyle = bodyColor(); ctx.fill();
       ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(r); ctx.stroke();
     } else {
       ctx.beginPath();
       ctx.moveTo(-r * 0.13, -r * 0.12);
-      ctx.quadraticCurveTo(-r * 0.09, -r * 0.34, 0, -r * 0.42);
-      ctx.quadraticCurveTo(r * 0.09, -r * 0.34, r * 0.13, -r * 0.12);
+      ctx.quadraticCurveTo(-r * 0.09, -r * 0.34 * earScale, 0, -r * 0.42 * earScale);
+      ctx.quadraticCurveTo(r * 0.09, -r * 0.34 * earScale, r * 0.13, -r * 0.12);
       ctx.closePath();
       ctx.fillStyle = 'rgba(232,160,150,0.5)'; ctx.fill();
     }
@@ -90,7 +99,7 @@ function draw(t) {
   drawTail(tail, 8);
 
   // 다리 (뭉툭한 캡슐)
-  ctx.strokeStyle = BODY_DARK; ctx.lineWidth = 9 * s; ctx.lineCap = 'round';
+  ctx.strokeStyle = bodyDarkColor(); ctx.lineWidth = 9 * s; ctx.lineCap = 'round';
   for (const f of feet) {
     ctx.beginPath();
     ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * sy);
@@ -98,7 +107,7 @@ function draw(t) {
     ctx.stroke();
   }
   // 발끝
-  ctx.fillStyle = BODY_DARK;
+  ctx.fillStyle = bodyDarkColor();
   for (const f of feet) { ctx.beginPath(); ctx.arc(f.x, f.y, 5.5 * s, 0, Math.PI * 2); ctx.fill(); }
 
   // 몸통 (머리 겸용 한 덩어리)
@@ -108,12 +117,12 @@ function draw(t) {
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
   ctx.scale(sx + breathe, sy - breathe);
   drawEars(r, 'outer');
-  drawBlob(0, 0, r * 1.05, r);
-  ctx.fillStyle = BODY; ctx.fill();
+  drawBlob(0, 0, r * 1.05 * geneValue('bodyAspect', 1), r);
+  ctx.fillStyle = bodyColor(); ctx.fill();
   ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(r); ctx.stroke();
   // 배 무늬
   ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,250,240,0.55)'; ctx.fill();
+  ctx.fillStyle = bellyColor(); ctx.fill();
   drawEars(r, 'inner');
   ctx.restore();
 
@@ -133,7 +142,7 @@ function draw(t) {
 
   ctx.strokeStyle = '#4a3a2c'; ctx.fillStyle = '#4a3a2c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   // 눈 두 개 — 일부러 크기가 다름 (하찮음 포인트)
-  const eyes = [{ ox: -eyeGap, r: 3.6 * s, oy: 0 }, { ox: eyeGap, r: 2.9 * s, oy: -1.5 * s }];
+  const eyes = [{ ox: -eyeGap, r: geneValue('eyeL', 3.6) * s, oy: 0 }, { ox: eyeGap, r: geneValue('eyeR', 2.9) * s, oy: geneValue('eyeTilt', -1.5) * s }];
   for (const e of eyes) {
     const ex = fx + e.ox + gx;
     const ey = fy + e.oy + gy;
@@ -212,4 +221,3 @@ function draw(t) {
     ctx.textAlign = 'left';
   }
 }
-

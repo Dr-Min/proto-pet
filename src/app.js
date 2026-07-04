@@ -17,6 +17,47 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
+function makeGeneRng(seed) {
+  let a = seed;
+  return () => {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function loadGeneSeed() {
+  const urlSeed = new URLSearchParams(location.search).get('seed');
+  if (urlSeed !== null && Number.isInteger(+urlSeed)) return +urlSeed;
+  try {
+    const saved = JSON.parse(localStorage.getItem('protopet-genes') || 'null');
+    if (Number.isInteger(saved)) return saved;
+  } catch (_) {}
+  const seed = Math.floor(Math.random() * 2147483647);
+  try { localStorage.setItem('protopet-genes', String(seed)); } catch (_) {}
+  return seed;
+}
+const geneSeed = loadGeneSeed();
+const geneRand = makeGeneRng(geneSeed);
+function genePick(lo, hi) { return lo + geneRand() * (hi - lo); }
+const genes = {
+  seed: geneSeed,
+  hue: genePick(24, 42),
+  sat: genePick(34, 50),
+  light: genePick(80, 87),
+  bodyAspect: genePick(0.96, 1.1),
+  earScale: genePick(0.84, 1.18),
+  earSpread: genePick(0.48, 0.58),
+  eyeL: genePick(3.0, 4.2),
+  eyeR: genePick(2.5, 3.7),
+  eyeTilt: genePick(-2.2, 0.8),
+  tailLen: genePick(7, 10),
+  lump: genePick(1.7, 3.0),
+};
+genes.body = `hsl(${genes.hue} ${genes.sat}% ${genes.light}%)`;
+genes.bodyDark = `hsl(${genes.hue} ${Math.max(24, genes.sat - 8)}% ${Math.max(68, genes.light - 12)}%)`;
+genes.belly = `hsla(${genes.hue + 8} 70% 96% / 0.58)`;
+
 // ---------- 펫 상태 ----------
 const pet = {
   x: 0, y: 0,          // 지면 위치 (y가 클수록 앞/아래)
@@ -44,7 +85,7 @@ const pet = {
 };
 pet.x = W / 2; pet.y = H * 0.62;
 pet.target.x = pet.x; pet.target.y = pet.y;
-for (let i = 0; i < 14; i++) pet.lumps.push(rand(-2.2, 2.2));
+for (let i = 0; i < 14; i++) pet.lumps.push((geneRand() * 2 - 1) * genes.lump);
 
 // PC에서 보이는 현재 비율을 기준으로 모바일에서도 같은 체감 크기를 유지한다.
 function applySize() { pet.r = 46; }
@@ -154,7 +195,7 @@ function makeChain(n, segLen) {
   for (let i = 0; i < n; i++) pts.push({ x: pet.x, y: pet.y - 40 - i * segLen, px: pet.x, py: pet.y - 40 - i * segLen });
   return { pts, segLen };
 }
-const tail = makeChain(4, 8);
+const tail = makeChain(4, genes.tailLen);
 
 function updateChain(ch, ax, ay, dt, gravity, windX) {
   const p0 = ch.pts[0];
@@ -202,7 +243,7 @@ function drawTail(ch, baseR) {
   }
   ctx.lineTo(left[0].x, left[0].y);
   ctx.closePath();
-  ctx.fillStyle = BODY; ctx.fill();
+  ctx.fillStyle = bodyColor(); ctx.fill();
   ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
 }
 
@@ -287,6 +328,7 @@ window.__petDebug = {
         landingT: pet.landingT,
         needs: { ...needs },
         careStats: { ...careStats },
+        genes: { ...genes },
         bondMilestone,
         food: food ? { ...food } : null,
       },
