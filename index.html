@@ -121,6 +121,29 @@ function outlineWidth(r) { return clamp(r * 0.043, 1.8, 2.15); }
 const needs = { hunger: 0.85, energy: 0.9, bond: 0.08 }; // bond는 쓰다듬기로 쌓이는 친밀도
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
+const BOND_MILESTONES = [
+  { at: 0.25, line: '조금 친해졌어' },
+  { at: 0.55, line: '이제 나 알아보지?' },
+  { at: 0.85, line: '완전 믿고 있어' },
+];
+let bondMilestone = 0;
+
+function bondStage(value) {
+  let stage = 0;
+  for (let i = 0; i < BOND_MILESTONES.length; i++) if (value >= BOND_MILESTONES[i].at) stage = i + 1;
+  return stage;
+}
+
+function updateBondMilestone() {
+  const next = bondStage(needs.bond);
+  if (next <= bondMilestone) return;
+  bondMilestone = next;
+  const milestone = BOND_MILESTONES[next - 1];
+  pet.caption = milestone.line;
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.75);
+  for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
+}
 
 function saveCareState() {
   try {
@@ -128,6 +151,7 @@ function saveCareState() {
       hunger: needs.hunger,
       energy: needs.energy,
       bond: needs.bond,
+      bondMilestone,
       ts: Date.now(),
     }));
   } catch (_) {}
@@ -141,9 +165,11 @@ function loadCareState() {
     const savedHunger = Number(saved.hunger);
     const savedEnergy = Number(saved.energy);
     const savedBond = Number(saved.bond);
+    const savedBondMilestone = Number(saved.bondMilestone);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
+    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
       pet.captionT = 0;
@@ -351,6 +377,7 @@ const BOND_LINES = ['옆에 있을래', '너 냄새 안다', '나 너 좋아', '
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
 function affectNeed(name, delta) {
   needs[name] = clamp(needs[name] + delta, 0, 1);
+  if (name === 'bond') updateBondMilestone();
 }
 function updateCare(dt, { airborne, speed }) {
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));
@@ -995,6 +1022,7 @@ window.__petDebug = {
         caption: pet.caption,
         landingT: pet.landingT,
         needs: { ...needs },
+        bondMilestone,
         food: food ? { ...food } : null,
       },
       visualTop: pet.y + pet.jy - r,
