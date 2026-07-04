@@ -31,11 +31,11 @@ function update(dt) {
           affectNeed('hunger', hungerGain);
           affectNeed('energy', likedFood ? 0.05 : 0.04);
           affectNeed('bond', likedFood ? 0.032 : 0.015);
-          recordMeal(eatenFood);
+          const routineCompleted = recordMeal(eatenFood);
           food = null;
           for (let i = 0; i < (likedFood ? 5 : 3); i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
           setBehavior('stare');
-          pet.caption = likedFood ? '이거 좋아!' : '잘 먹었습니다';
+          pet.caption = routineCompleted ? '나 챙겨줬네' : likedFood ? '이거 좋아!' : '잘 먹었습니다';
           pet.captionT = 0;
         }
       }

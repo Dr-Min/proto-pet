@@ -112,11 +112,20 @@ All spacing derives from a base of 4px.
 ### Care Memory Line
 
 - **Structure**: single `#memoryLine` text row above gauges.
-- **Variants**: quiet default, latest care memory.
+- **Variants**: quiet default, latest care memory, routine completion memory.
 - **Spacing**: compact bottom UI row.
 - **States**: default, truncated if narrow.
 - **Accessibility**: text is visible and concise.
 - **Motion**: no decorative animation.
+
+### Care Routine Memory
+
+- **Structure**: saved care state tracks whether meal, rest, and petting happened in the current care cycle.
+- **Variants**: first full routine, repeated full routine.
+- **Spacing**: no extra UI; feedback appears through caption, hearts, bond gain, and memory line.
+- **States**: partial cycle, completed cycle, reset for the next cycle.
+- **Accessibility**: completion is visible as text, not only hearts.
+- **Motion**: completion uses existing heart particles only.
 
 ### Food Bowl
 

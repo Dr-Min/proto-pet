@@ -10,9 +10,13 @@ const careStats = {
   lastCareLine: '오늘은 아직 조용해',
   lastCareAt: 0,
   favoriteMeals: 0,
+  routineBits: 0,
+  routineCount: 0,
+  lastRoutineAt: 0,
 };
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
+const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const BOND_MILESTONES = [
   { at: 0.25, line: '조금 친해졌어' },
   { at: 0.55, line: '이제 나 알아보지?' },
@@ -53,6 +57,9 @@ function saveCareState() {
       lastCareLine: careStats.lastCareLine,
       lastCareAt: careStats.lastCareAt,
       favoriteMeals: careStats.favoriteMeals,
+      routineBits: careStats.routineBits,
+      routineCount: careStats.routineCount,
+      lastRoutineAt: careStats.lastRoutineAt,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -76,6 +83,9 @@ function loadCareState() {
     const savedLastPetAt = Number(saved.lastPetAt);
     const savedLastCareAt = Number(saved.lastCareAt);
     const savedFavoriteMeals = Number(saved.favoriteMeals);
+    const savedRoutineBits = Number(saved.routineBits);
+    const savedRoutineCount = Number(saved.routineCount);
+    const savedLastRoutineAt = Number(saved.lastRoutineAt);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
@@ -88,6 +98,9 @@ function loadCareState() {
     careStats.lastCareLine = typeof saved.lastCareLine === 'string' ? saved.lastCareLine : careStats.lastCareLine;
     careStats.lastCareAt = Math.max(0, Number.isFinite(savedLastCareAt) ? savedLastCareAt : careStats.lastCareAt);
     careStats.favoriteMeals = Math.max(0, Math.floor(Number.isFinite(savedFavoriteMeals) ? savedFavoriteMeals : careStats.favoriteMeals));
+    careStats.routineBits = Math.floor(clamp(Number.isFinite(savedRoutineBits) ? savedRoutineBits : careStats.routineBits, 0, 7));
+    careStats.routineCount = Math.max(0, Math.floor(Number.isFinite(savedRoutineCount) ? savedRoutineCount : careStats.routineCount));
+    careStats.lastRoutineAt = Math.max(0, Number.isFinite(savedLastRoutineAt) ? savedLastRoutineAt : careStats.lastRoutineAt);
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -108,6 +121,22 @@ function rememberCare(line) {
   careStats.lastCareLine = line;
   careStats.lastCareAt = Date.now();
 }
+function noteCareAction(kind) {
+  const bit = CARE_ACTION_BITS[kind] || 0;
+  if (!bit) return false;
+  careStats.routineBits |= bit;
+  if (careStats.routineBits !== 7) return false;
+  careStats.routineBits = 0;
+  careStats.routineCount += 1;
+  careStats.lastRoutineAt = Date.now();
+  affectNeed('bond', 0.045);
+  rememberCare(careStats.routineCount > 1 ? '돌봄 한 바퀴를 또 기억함' : '돌봄 한 바퀴를 기억함');
+  pet.caption = careStats.routineCount > 1 ? '또 챙겨줬다' : '나 챙겨줬네';
+  pet.captionT = 0;
+  pet.happy = 1;
+  for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
+  return true;
+}
 function isFavoriteFood(foodType) {
   return foodType.id === genes.favoriteFoodId;
 }
@@ -117,9 +146,10 @@ function recordMeal(foodType) {
   if (isFavoriteFood(foodType)) {
     careStats.favoriteMeals += 1;
     rememberCare(`${foodObjectLabel(foodType)} 제일 좋아함`);
-    return;
+    return noteCareAction('meal');
   }
   rememberCare(`${foodObjectLabel(foodType)} 먹어봄`);
+  return noteCareAction('meal');
 }
 function rejectFoodWhenFull() {
   pet.caption = needs.hunger > 0.96 ? '배 빵빵해' : '조금 이따 먹을래';
@@ -152,6 +182,7 @@ function requestRest() {
   careStats.napsTaken += 1;
   careStats.lastNapAt = Date.now();
   rememberCare(needs.energy < 0.28 ? '낮잠으로 기운 충전 중' : '잠깐 눈 붙이는 중');
+  noteCareAction('rest');
   setBehavior('sleep');
   pet.behaviorT = Math.max(pet.behaviorT, clamp((1 - needs.energy) * 18, 7, 15));
   pet.caption = needs.energy < 0.28 ? '충전할게…' : '눈 좀 붙일게…';
@@ -163,6 +194,7 @@ function recordPetting(amount) {
   const now = Date.now();
   careStats.petStrokes += amount;
   if (now - careStats.lastPetAt > 1400) rememberCare(needs.bond > 0.45 ? '쓰다듬받고 골골거림' : '손길을 기억함');
+  if (amount > 2.4) noteCareAction('pet');
   careStats.lastPetAt = now;
 }
 function updateCare(dt, { airborne, speed }) {
