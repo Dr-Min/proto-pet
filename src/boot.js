@@ -23,6 +23,10 @@ document.getElementById('feedBtn').addEventListener('click', () => {
     pet.behaviorT = rand(BEHAVIORS.eat.dur[0], BEHAVIORS.eat.dur[1]);
   }
 });
+document.getElementById('restBtn').addEventListener('click', () => {
+  if (input.mode === 'drag') return;
+  requestRest();
+});
 function updateGauges() {
   gH.style.width = needs.hunger * 100 + '%';
   gH.style.background = needs.hunger < 0.3 ? '#d9776b' : '#a8c686';

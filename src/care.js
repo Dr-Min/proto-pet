@@ -1,6 +1,6 @@
 // ---------- 욕구 ----------
 const needs = { hunger: 0.85, energy: 0.9, bond: 0.08 }; // bond는 쓰다듬기로 쌓이는 친밀도
-const careStats = { mealsFed: 0, lastMealAt: 0 };
+const careStats = { mealsFed: 0, lastMealAt: 0, napsTaken: 0, lastNapAt: 0 };
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
 const BOND_MILESTONES = [
@@ -35,6 +35,8 @@ function saveCareState() {
       bond: needs.bond,
       mealsFed: careStats.mealsFed,
       lastMealAt: careStats.lastMealAt,
+      napsTaken: careStats.napsTaken,
+      lastNapAt: careStats.lastNapAt,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -52,11 +54,15 @@ function loadCareState() {
     const savedBondMilestone = Number(saved.bondMilestone);
     const savedMealsFed = Number(saved.mealsFed);
     const savedLastMealAt = Number(saved.lastMealAt);
+    const savedNapsTaken = Number(saved.napsTaken);
+    const savedLastNapAt = Number(saved.lastNapAt);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
     careStats.mealsFed = Math.max(0, Math.floor(Number.isFinite(savedMealsFed) ? savedMealsFed : careStats.mealsFed));
     careStats.lastMealAt = Math.max(0, Number.isFinite(savedLastMealAt) ? savedLastMealAt : careStats.lastMealAt);
+    careStats.napsTaken = Math.max(0, Math.floor(Number.isFinite(savedNapsTaken) ? savedNapsTaken : careStats.napsTaken));
+    careStats.lastNapAt = Math.max(0, Number.isFinite(savedLastNapAt) ? savedLastNapAt : careStats.lastNapAt);
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -89,6 +95,29 @@ function mealCaption() {
   if (needs.hunger < 0.55) return '냠냠 해야지';
   if (careStats.mealsFed > 0) return '또 밥 냄새';
   return '처음 밥이다';
+}
+function requestRest() {
+  if (food && needs.hunger < 0.7) {
+    pet.caption = '밥 먹고 잘래';
+    pet.captionT = 0;
+    if (input.mode !== 'drag') setBehavior('eat');
+    return;
+  }
+  if (needs.energy > 0.88) {
+    pet.caption = '아직 안 졸려';
+    pet.captionT = 0;
+    pet.happy = Math.max(pet.happy, 0.3);
+    affectNeed('bond', 0.003);
+    return;
+  }
+  careStats.napsTaken += 1;
+  careStats.lastNapAt = Date.now();
+  setBehavior('sleep');
+  pet.behaviorT = Math.max(pet.behaviorT, clamp((1 - needs.energy) * 18, 7, 15));
+  pet.caption = needs.energy < 0.28 ? '충전할게…' : '눈 좀 붙일게…';
+  pet.captionT = 0;
+  pet.zTimer = 0.2;
+  pet.squashVel = clamp(pet.squashVel - 1.5, -8, 8);
 }
 function updateCare(dt, { airborne, speed }) {
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));

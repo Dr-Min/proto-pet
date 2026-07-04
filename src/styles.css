@@ -7,18 +7,26 @@
   }
   #ui {
     position: fixed; left: 0; right: 0; bottom: 0;
-    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
-    display: flex; align-items: center; justify-content: center; gap: 16px;
+    box-sizing: border-box;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; justify-content: center; gap: 10px;
     font: 12px -apple-system, "Apple SD Gothic Neo", sans-serif; color: #8a7f6c;
     user-select: none;
   }
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .bar { width: 84px; height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
+  .bar { width: clamp(64px, 18vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 50%; background: #a8c686; border-radius: 5px; }
-  #feedBtn {
-    min-height: 44px; padding: 10px 20px; border: none; border-radius: 22px;
+  #feedBtn, #restBtn {
+    min-height: 44px; padding: 10px 14px; border: none; border-radius: 22px;
     background: #e8b87f; color: #5a4632;
     font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
-    cursor: pointer; touch-action: manipulation;
+    cursor: pointer; touch-action: manipulation; white-space: nowrap;
   }
-  #feedBtn:active { transform: scale(0.96); }
+  #restBtn { background: #b8c7d7; color: #3f4d58; }
+  #feedBtn:active, #restBtn:active { transform: scale(0.96); }
+  @media (max-width: 380px) {
+    #ui { gap: 6px; padding-left: 10px; padding-right: 10px; font-size: 11px; }
+    .g { gap: 4px; }
+    .bar { width: 48px; }
+    #feedBtn, #restBtn { padding: 10px 11px; font-size: 12px; }
+  }
