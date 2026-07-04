@@ -120,6 +120,37 @@ function outlineWidth(r) { return clamp(r * 0.043, 1.8, 2.15); }
 // ---------- 욕구 ----------
 const needs = { hunger: 0.85, energy: 0.9 }; // 1 = 든든/쌩쌩, 0 = 배고픔/탈진
 let food = null;                             // {x, y} 밥그릇
+const SAVE_KEY = 'protopet-care-v1';
+
+function saveCareState() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      hunger: needs.hunger,
+      energy: needs.energy,
+      ts: Date.now(),
+    }));
+  } catch (_) {}
+}
+
+function loadCareState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (!saved) return;
+    const away = clamp((Date.now() - saved.ts) / 1000, 0, 12 * 3600);
+    const savedHunger = Number(saved.hunger);
+    const savedEnergy = Number(saved.energy);
+    needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
+    needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
+    if (away > 60) {
+      pet.caption = '기다렸어…';
+      pet.captionT = 0;
+    }
+  } catch (_) {}
+}
+loadCareState();
+setInterval(saveCareState, 5000);
+window.addEventListener('pagehide', saveCareState);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveCareState(); });
 
 // ---------- 발: 절차적 걸음 ----------
 // 발은 땅에 붙어 있다가, 몸이 지나가서 너무 멀어지면 앞쪽으로 폴짝 옮겨 딛는다
@@ -319,6 +350,11 @@ function affectNeed(name, delta) {
 function updateCare(dt, { airborne, speed }) {
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));
   affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012));
+  if (!airborne && input.mode !== 'drag' && !food && pet.behavior !== 'sleep' && needs.energy < 0.1) {
+    setBehavior('sleep');
+    pet.caption = '스르륵…';
+    pet.captionT = 0;
+  }
   if (needs.hunger < 0.24 && pet.captionT > 4) {
     pet.caption = '밥 생각 중…';
     pet.captionT = 0;
@@ -351,6 +387,7 @@ function pickTarget() {
 }
 function nextBehavior() {
   if (food && needs.hunger < 0.98) return setBehavior('eat');
+  if (needs.energy < 0.16) return setBehavior('sleep');
   const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat');
   let total = entries.reduce((s, [n, b]) => s + behaviorWeight(n, b), 0);
   let roll = Math.random() * total;
