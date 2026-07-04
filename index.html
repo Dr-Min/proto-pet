@@ -86,11 +86,13 @@ pet.x = W / 2; pet.y = H * 0.62;
 pet.target.x = pet.x; pet.target.y = pet.y;
 for (let i = 0; i < 14; i++) pet.lumps.push(rand(-2.2, 2.2));
 
-// 화면 크기에 맞는 몸집 (작은 폰에서 너무 크지 않게)
-function applySize() { pet.r = clamp(Math.min(W, H) * 0.105, 34, 50); }
+// PC에서 보이는 현재 비율을 기준으로 모바일에서도 같은 체감 크기를 유지한다.
+function applySize() { pet.r = 46; }
 applySize();
 
 function depthScale() { return 0.75 + (pet.y / H) * 0.45; }
+function topBounceLimit() { return Math.max(78, H * 0.1); }
+function outlineWidth(r) { return clamp(r * 0.043, 1.8, 2.15); }
 
 // ---------- 발: 절차적 걸음 ----------
 // 발은 땅에 붙어 있다가, 몸이 지나가서 너무 멀어지면 앞쪽으로 폴짝 옮겨 딛는다
@@ -543,8 +545,9 @@ function update(dt) {
     pet.jvy += 900 * dt; pet.jy += pet.jvy * dt;
     const s = depthScale();
     const top = pet.y + pet.jy - pet.r * s;
-    if (top < 42 && pet.jvy < 0) {
-      pet.jy = 42 + pet.r * s - pet.y;
+    const topLimit = topBounceLimit();
+    if (top < topLimit && pet.jvy < 0) {
+      pet.jy = topLimit + pet.r * s - pet.y;
       pet.jvy = Math.abs(pet.jvy) * 0.72;
       bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.jvy), x: pet.x, y: pet.y + pet.jy - pet.r * s });
     }
@@ -670,7 +673,7 @@ function drawEars(r, phase) {
       ctx.quadraticCurveTo(r * 0.2, -r * 0.44, r * 0.27, 0);
       ctx.closePath();
       ctx.fillStyle = BODY; ctx.fill();
-      ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(r); ctx.stroke();
     } else {
       ctx.beginPath();
       ctx.moveTo(-r * 0.13, -r * 0.12);
@@ -726,7 +729,7 @@ function draw(t) {
   drawEars(r, 'outer');
   drawBlob(0, 0, r * 1.05, r);
   ctx.fillStyle = BODY; ctx.fill();
-  ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(r); ctx.stroke();
   // 배 무늬
   ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(255,250,240,0.55)'; ctx.fill();
@@ -843,6 +846,8 @@ window.__petDebug = {
         caption: pet.caption,
         landingT: pet.landingT,
       },
+      visualTop: pet.y + pet.jy - r,
+      topBounceLimit: topBounceLimit(),
       input: { active: input.active, mode: input.mode },
       feet: feet.map((f, i) => ({
         x: f.x,
