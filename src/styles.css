@@ -14,6 +14,15 @@
     user-select: none;
   }
   #gauges, #actions { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #memoryLine {
+    max-width: min(360px, calc(100vw - 24px));
+    min-height: 14px;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #8a7f6c;
+  }
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .bar { width: clamp(56px, 17vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 50%; background: #a8c686; border-radius: 5px; }
@@ -28,6 +37,7 @@
   @media (max-width: 380px) {
     #ui { gap: 7px; padding-left: 10px; padding-right: 10px; font-size: 11px; }
     #gauges, #actions { gap: 7px; }
+    #memoryLine { max-width: calc(100vw - 20px); }
     .g { gap: 4px; }
     .bar { width: 48px; }
     #feedBtn, #restBtn { padding: 10px 11px; font-size: 12px; }

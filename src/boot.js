@@ -1,4 +1,5 @@
 // ---------- 하단 UI ----------
+const memoryLine = document.getElementById('memoryLine');
 const gH = document.getElementById('gH'), gE = document.getElementById('gE'), gB = document.getElementById('gB');
 document.getElementById('feedBtn').addEventListener('click', () => {
   if (food) {
@@ -34,6 +35,7 @@ function updateGauges() {
   gE.style.background = needs.energy < 0.3 ? '#d9776b' : '#8fb7d9';
   gB.style.width = needs.bond * 100 + '%';
   gB.style.background = needs.bond < 0.25 ? '#d9a36b' : '#e78aa1';
+  memoryLine.textContent = careStats.lastCareLine || '오늘은 아직 조용해';
 }
 
 // ---------- 루프 ----------
