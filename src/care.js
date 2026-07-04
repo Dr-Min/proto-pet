@@ -117,6 +117,13 @@ function affectNeed(name, delta) {
   needs[name] = clamp(needs[name] + delta, 0, 1);
   if (name === 'bond') updateBondMilestone();
 }
+function careMood() {
+  if (needs.hunger < 0.24) return 'hungry';
+  if (needs.energy < 0.18) return 'tired';
+  if (needs.bond < 0.16 && careStats.petStrokes < 24) return 'shy';
+  if (needs.bond > 0.65 && needs.hunger > 0.48 && needs.energy > 0.35) return 'content';
+  return 'neutral';
+}
 function rememberCare(line) {
   careStats.lastCareLine = line;
   careStats.lastCareAt = Date.now();

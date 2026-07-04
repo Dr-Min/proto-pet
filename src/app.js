@@ -345,6 +345,7 @@ window.__petDebug = {
         caption: pet.caption,
         landingT: pet.landingT,
         needs: { ...needs },
+        mood: careMood(),
         careStats: { ...careStats },
         genes: { ...genes },
         bondMilestone,

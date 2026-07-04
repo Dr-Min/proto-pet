@@ -145,6 +145,15 @@ All spacing derives from a base of 4px.
 - **Accessibility**: variation must not affect care controls.
 - **Motion**: shares the same procedural animation rig.
 
+### Care Mood Face
+
+- **Structure**: canvas face reads the saved care needs and current interaction state.
+- **Variants**: neutral, hungry, tired, shy, content, held, landing.
+- **Spacing**: face geometry stays inside the existing pet body.
+- **States**: held and landing override care moods; sleep keeps closed eyes; mouth remains the same small `w` shape.
+- **Accessibility**: mood is paired with captions and gauges, not expressed by facial shape alone.
+- **Motion**: expression changes use immediate canvas redraws with no extra UI animation.
+
 ## 6. Motion & Interaction
 
 ### Timing

@@ -139,7 +139,11 @@ function draw(t) {
   const falling = pet.jy < -8 && pet.landCaption;
   const justLanded = pet.landingT > 0;
   const closed = sleeping || pet.blink > 0 || (pet.behavior === 'plop' && pet.squash < 0.7);
-  const happyEyes = pet.happy > 0.5;
+  const mood = careMood();
+  const hungryEyes = mood === 'hungry';
+  const tiredEyes = mood === 'tired';
+  const shyEyes = mood === 'shy';
+  const happyEyes = pet.happy > 0.5 || mood === 'content';
 
   ctx.strokeStyle = '#4a3a2c'; ctx.fillStyle = '#4a3a2c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   // 눈 두 개 — 일부러 크기가 다름 (하찮음 포인트)
@@ -164,6 +168,19 @@ function draw(t) {
       ctx.moveTo(ex - 3.5, ey);
       ctx.lineTo(ex + 3.5, ey);
       ctx.stroke();
+    } else if (tiredEyes) {
+      ctx.beginPath();
+      ctx.moveTo(ex - 4.6 * s, ey + 0.6 * s);
+      ctx.quadraticCurveTo(ex, ey + 3.3 * s, ex + 4.6 * s, ey + 0.6 * s);
+      ctx.stroke();
+    } else if (hungryEyes) {
+      ctx.beginPath();
+      ctx.ellipse(ex, ey + 0.5 * s, e.r * 1.22, e.r * 1.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (shyEyes) {
+      ctx.beginPath();
+      ctx.arc(ex - Math.sign(e.ox) * 0.9 * s, ey + 0.8 * s, e.r * 0.72, 0, Math.PI * 2);
+      ctx.fill();
     } else if (happyEyes) {
       ctx.beginPath();
       ctx.arc(ex, ey + 2, 4 * s, Math.PI * 1.15, Math.PI * 1.85);
