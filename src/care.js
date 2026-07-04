@@ -9,6 +9,7 @@ const careStats = {
   lastPetAt: 0,
   lastCareLine: '오늘은 아직 조용해',
   lastCareAt: 0,
+  favoriteMeals: 0,
 };
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
@@ -51,6 +52,7 @@ function saveCareState() {
       lastPetAt: careStats.lastPetAt,
       lastCareLine: careStats.lastCareLine,
       lastCareAt: careStats.lastCareAt,
+      favoriteMeals: careStats.favoriteMeals,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -73,6 +75,7 @@ function loadCareState() {
     const savedPetStrokes = Number(saved.petStrokes);
     const savedLastPetAt = Number(saved.lastPetAt);
     const savedLastCareAt = Number(saved.lastCareAt);
+    const savedFavoriteMeals = Number(saved.favoriteMeals);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
@@ -84,6 +87,7 @@ function loadCareState() {
     careStats.lastPetAt = Math.max(0, Number.isFinite(savedLastPetAt) ? savedLastPetAt : careStats.lastPetAt);
     careStats.lastCareLine = typeof saved.lastCareLine === 'string' ? saved.lastCareLine : careStats.lastCareLine;
     careStats.lastCareAt = Math.max(0, Number.isFinite(savedLastCareAt) ? savedLastCareAt : careStats.lastCareAt);
+    careStats.favoriteMeals = Math.max(0, Math.floor(Number.isFinite(savedFavoriteMeals) ? savedFavoriteMeals : careStats.favoriteMeals));
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -104,10 +108,18 @@ function rememberCare(line) {
   careStats.lastCareLine = line;
   careStats.lastCareAt = Date.now();
 }
-function recordMeal() {
+function isFavoriteFood(foodType) {
+  return foodType.id === genes.favoriteFoodId;
+}
+function recordMeal(foodType) {
   careStats.mealsFed += 1;
   careStats.lastMealAt = Date.now();
-  rememberCare(careStats.mealsFed % 3 === 0 ? '밥 먹고 기분 최고' : '밥그릇을 깨끗이 비움');
+  if (isFavoriteFood(foodType)) {
+    careStats.favoriteMeals += 1;
+    rememberCare(`${foodObjectLabel(foodType)} 제일 좋아함`);
+    return;
+  }
+  rememberCare(`${foodObjectLabel(foodType)} 먹어봄`);
 }
 function rejectFoodWhenFull() {
   pet.caption = needs.hunger > 0.96 ? '배 빵빵해' : '조금 이따 먹을래';
@@ -116,8 +128,9 @@ function rejectFoodWhenFull() {
   pet.squashVel = clamp(pet.squashVel - 2.2, -10, 10);
   affectNeed('bond', 0.004);
 }
-function mealCaption() {
+function mealCaption(foodType) {
   if (needs.hunger < 0.25) return '밥이다!! 살았다';
+  if (isFavoriteFood(foodType)) return '이 냄새 좋아';
   if (needs.hunger < 0.55) return '냠냠 해야지';
   if (careStats.mealsFed > 0) return '또 밥 냄새';
   return '처음 밥이다';

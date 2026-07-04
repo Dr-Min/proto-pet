@@ -23,11 +23,21 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Care/low | --care-low | #d9776b | n/a | Low need warning |
 | Care/warm | --care-warm | #e8b87f | n/a | Feed button |
 | Care/cool | --care-cool | #b8c7d7 | n/a | Rest button |
+| Food/kibble-base | --food-kibble-base | #f0c98b | n/a | Default round food bowl |
+| Food/kibble-top | --food-kibble-top | #d59b57 | n/a | Default round food mound |
+| Food/kibble-bit | --food-kibble-bit | #8c6042 | n/a | Default food bits |
+| Food/berry-base | --food-berry-base | #eeb0b7 | n/a | Berry snack bowl |
+| Food/berry-top | --food-berry-top | #ce7084 | n/a | Berry snack mound |
+| Food/berry-bit | --food-berry-bit | #89495b | n/a | Berry snack bits |
+| Food/leaf-base | --food-leaf-base | #c9d99a | n/a | Leafy food bowl |
+| Food/leaf-top | --food-leaf-top | #94ad68 | n/a | Leafy food mound |
+| Food/leaf-bit | --food-leaf-bit | #5f7446 | n/a | Leafy food bits |
 
 ### Rules
 
 - Use warm neutrals for the world, not saturated game UI chrome.
 - Care colors are functional: green for hunger, blue for energy, pink for bond, coral for low state.
+- Food colors stay soft and edible, with three recognizable families: warm kibble, berry pink, and leafy green.
 - Pet body color may vary inside the documented peach-to-cream family through the saved gene seed.
 - New colors should extend the table before use.
 
@@ -107,6 +117,15 @@ All spacing derives from a base of 4px.
 - **States**: default, truncated if narrow.
 - **Accessibility**: text is visible and concise.
 - **Motion**: no decorative animation.
+
+### Food Bowl
+
+- **Structure**: canvas bowl placed near the pet after `밥주기`.
+- **Variants**: kibble, berry, leaf.
+- **Spacing**: placed inside the lower play field so the pet can walk to it.
+- **States**: waiting, being eaten, removed after eating.
+- **Accessibility**: represented through the visible bowl and pet caption.
+- **Motion**: pet walks to the bowl; chewing uses pet squash and small dust puffs.
 
 ### Gene-Based Pet Shape
 

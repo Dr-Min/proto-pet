@@ -17,6 +17,23 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
+const FOOD_TYPES = [
+  { id: 'kibble', name: '동글 사료', fill: '#f0c98b', top: '#d59b57', bits: '#8c6042' },
+  { id: 'berry', name: '베리 간식', fill: '#eeb0b7', top: '#ce7084', bits: '#89495b' },
+  { id: 'leaf', name: '풀내음 밥', fill: '#c9d99a', top: '#94ad68', bits: '#5f7446' },
+];
+function foodTypeById(id) {
+  return FOOD_TYPES.find(type => type.id === id) || FOOD_TYPES[0];
+}
+function nextFoodType() {
+  return FOOD_TYPES[careStats.mealsFed % FOOD_TYPES.length];
+}
+function foodObjectLabel(foodType) {
+  const code = foodType.name.charCodeAt(foodType.name.length - 1) - 0xac00;
+  const particle = code >= 0 && code <= 11171 && code % 28 === 0 ? '를' : '을';
+  return `${foodType.name}${particle}`;
+}
+
 function makeGeneRng(seed) {
   let a = seed;
   return () => {
@@ -54,6 +71,7 @@ const genes = {
   tailLen: genePick(7, 10),
   lump: genePick(1.7, 3.0),
 };
+genes.favoriteFoodId = FOOD_TYPES[Math.floor(geneRand() * FOOD_TYPES.length)].id;
 genes.body = `hsl(${genes.hue} ${genes.sat}% ${genes.light}%)`;
 genes.bodyDark = `hsl(${genes.hue} ${Math.max(24, genes.sat - 8)}% ${Math.max(68, genes.light - 12)}%)`;
 genes.belly = `hsla(${genes.hue + 8} 70% 96% / 0.58)`;

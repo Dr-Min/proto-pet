@@ -80,14 +80,15 @@ function draw(t) {
 
   // 밥그릇
   if (food) {
+    const foodType = foodTypeById(food.kind);
     const fs = 0.75 + (food.y / H) * 0.45;
     ctx.fillStyle = 'rgba(115,95,70,0.18)';
     ctx.beginPath(); ctx.ellipse(food.x, food.y + 2, 16 * fs, 5 * fs, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#f0c98b';
+    ctx.fillStyle = foodType.fill;
     ctx.beginPath(); ctx.ellipse(food.x, food.y - 5 * fs, 14 * fs, 9 * fs, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#d59b57';
+    ctx.fillStyle = foodType.top;
     ctx.beginPath(); ctx.ellipse(food.x, food.y - 8 * fs, 11 * fs, 5 * fs, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#8c6042';
+    ctx.fillStyle = foodType.bits;
     for (let i = 0; i < 5; i++) {
       ctx.beginPath();
       ctx.arc(food.x + Math.cos(i * 1.9) * 6 * fs, food.y - 8 * fs + Math.sin(i * 2.4) * 2 * fs, 2.6 * fs, 0, Math.PI * 2);

@@ -12,11 +12,13 @@ document.getElementById('feedBtn').addEventListener('click', () => {
     rejectFoodWhenFull();
     return;
   }
+  const nextFood = nextFoodType();
   food = {
     x: clamp(pet.x + rand(-170, 170), 90, W - 90),
     y: clamp(pet.y + rand(-70, 70), H * 0.45, H * 0.82),
+    kind: nextFood.id,
   };
-  pet.caption = mealCaption();
+  pet.caption = mealCaption(nextFood);
   pet.captionT = 0;
   pet.munchT = 0;
   if (input.mode !== 'drag') {

@@ -25,15 +25,17 @@ function update(dt) {
           spawn('dust', food.x + rand(-10, 10), food.y - 10);
         }
         if (pet.munchT > 2.4) {
-          const hungerGain = clamp(0.56 - needs.hunger * 0.14, 0.36, 0.56);
+          const eatenFood = foodTypeById(food.kind);
+          const likedFood = isFavoriteFood(eatenFood);
+          const hungerGain = clamp(0.56 - needs.hunger * 0.14 + (likedFood ? 0.06 : 0), 0.36, 0.62);
           affectNeed('hunger', hungerGain);
-          affectNeed('energy', 0.04);
-          affectNeed('bond', 0.015);
-          recordMeal();
+          affectNeed('energy', likedFood ? 0.05 : 0.04);
+          affectNeed('bond', likedFood ? 0.032 : 0.015);
+          recordMeal(eatenFood);
           food = null;
-          for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
+          for (let i = 0; i < (likedFood ? 5 : 3); i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
           setBehavior('stare');
-          pet.caption = careStats.mealsFed % 3 === 0 ? '오늘 밥 최고' : '잘 먹었습니다';
+          pet.caption = likedFood ? '이거 좋아!' : '잘 먹었습니다';
           pet.captionT = 0;
         }
       }
