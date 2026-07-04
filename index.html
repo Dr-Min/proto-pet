@@ -11,10 +11,15 @@
 <div id="hint">탭: 놀래키기 · 문지르기: 쓰다듬기 · 길게/쭉 끌기: 잡기</div>
 <canvas id="c"></canvas>
 <div id="ui">
-  <div class="g">밥<div class="bar"><i id="gH"></i></div></div>
-  <div class="g">기운<div class="bar"><i id="gE"></i></div></div>
-  <button id="feedBtn">밥주기</button>
-  <button id="restBtn">재우기</button>
+  <div id="gauges">
+    <div class="g">밥<div class="bar"><i id="gH"></i></div></div>
+    <div class="g">기운<div class="bar"><i id="gE"></i></div></div>
+    <div class="g">친함<div class="bar"><i id="gB"></i></div></div>
+  </div>
+  <div id="actions">
+    <button id="feedBtn">밥주기</button>
+    <button id="restBtn">재우기</button>
+  </div>
 </div>
 <script src="./src/render.js" defer></script>
 <script src="./src/app.js" defer></script>

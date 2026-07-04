@@ -185,6 +185,7 @@ function updatePetting(dt) {
     pet.happy = clamp(pet.happy + moved * 0.004, 0, 1);
     affectNeed('bond', moved * 0.00011);
     affectNeed('energy', moved * 0.000025);
+    recordPetting(moved);
     if (pet.happy > 0.5 && Math.random() < dt * (3 + needs.bond * 2)) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * s * 1.6);
     if (pet.happy > 0.5 && pet.captionT > 1) { pet.caption = randomLine(needs.bond > 0.45 ? PETTING_LINES : ['기분좋아…']); pet.captionT = 0; }
   }
@@ -192,4 +193,3 @@ function updatePetting(dt) {
   pet.dizzy = Math.max(0, pet.dizzy - dt * 0.5);
   mouse.px = mouse.x; mouse.py = mouse.y;
 }
-

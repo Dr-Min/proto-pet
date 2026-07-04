@@ -1,6 +1,6 @@
 // ---------- 욕구 ----------
 const needs = { hunger: 0.85, energy: 0.9, bond: 0.08 }; // bond는 쓰다듬기로 쌓이는 친밀도
-const careStats = { mealsFed: 0, lastMealAt: 0, napsTaken: 0, lastNapAt: 0 };
+const careStats = { mealsFed: 0, lastMealAt: 0, napsTaken: 0, lastNapAt: 0, petStrokes: 0, lastPetAt: 0 };
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
 const BOND_MILESTONES = [
@@ -37,6 +37,8 @@ function saveCareState() {
       lastMealAt: careStats.lastMealAt,
       napsTaken: careStats.napsTaken,
       lastNapAt: careStats.lastNapAt,
+      petStrokes: careStats.petStrokes,
+      lastPetAt: careStats.lastPetAt,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -56,6 +58,8 @@ function loadCareState() {
     const savedLastMealAt = Number(saved.lastMealAt);
     const savedNapsTaken = Number(saved.napsTaken);
     const savedLastNapAt = Number(saved.lastNapAt);
+    const savedPetStrokes = Number(saved.petStrokes);
+    const savedLastPetAt = Number(saved.lastPetAt);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
@@ -63,6 +67,8 @@ function loadCareState() {
     careStats.lastMealAt = Math.max(0, Number.isFinite(savedLastMealAt) ? savedLastMealAt : careStats.lastMealAt);
     careStats.napsTaken = Math.max(0, Math.floor(Number.isFinite(savedNapsTaken) ? savedNapsTaken : careStats.napsTaken));
     careStats.lastNapAt = Math.max(0, Number.isFinite(savedLastNapAt) ? savedLastNapAt : careStats.lastNapAt);
+    careStats.petStrokes = Math.max(0, Number.isFinite(savedPetStrokes) ? savedPetStrokes : careStats.petStrokes);
+    careStats.lastPetAt = Math.max(0, Number.isFinite(savedLastPetAt) ? savedLastPetAt : careStats.lastPetAt);
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -118,6 +124,10 @@ function requestRest() {
   pet.captionT = 0;
   pet.zTimer = 0.2;
   pet.squashVel = clamp(pet.squashVel - 1.5, -8, 8);
+}
+function recordPetting(amount) {
+  careStats.petStrokes += amount;
+  careStats.lastPetAt = Date.now();
 }
 function updateCare(dt, { airborne, speed }) {
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));

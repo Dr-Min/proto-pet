@@ -1,5 +1,5 @@
 // ---------- 하단 UI ----------
-const gH = document.getElementById('gH'), gE = document.getElementById('gE');
+const gH = document.getElementById('gH'), gE = document.getElementById('gE'), gB = document.getElementById('gB');
 document.getElementById('feedBtn').addEventListener('click', () => {
   if (food) {
     pet.caption = '밥 여기 있어';
@@ -32,6 +32,8 @@ function updateGauges() {
   gH.style.background = needs.hunger < 0.3 ? '#d9776b' : '#a8c686';
   gE.style.width = needs.energy * 100 + '%';
   gE.style.background = needs.energy < 0.3 ? '#d9776b' : '#8fb7d9';
+  gB.style.width = needs.bond * 100 + '%';
+  gB.style.background = needs.bond < 0.25 ? '#d9a36b' : '#e78aa1';
 }
 
 // ---------- 루프 ----------
