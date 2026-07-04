@@ -13,11 +13,33 @@
     font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
     color: #9a8f7d; user-select: none; pointer-events: none;
   }
+  #ui {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    font: 12px -apple-system, "Apple SD Gothic Neo", sans-serif; color: #8a7f6c;
+    user-select: none;
+  }
+  .g { display: flex; align-items: center; gap: 6px; }
+  .bar { width: 84px; height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 50%; background: #a8c686; border-radius: 5px; }
+  #feedBtn {
+    min-height: 44px; padding: 10px 20px; border: none; border-radius: 22px;
+    background: #e8b87f; color: #5a4632;
+    font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
+    cursor: pointer; touch-action: manipulation;
+  }
+  #feedBtn:active { transform: scale(0.96); }
 </style>
 </head>
 <body>
 <div id="hint">탭: 놀래키기 · 문지르기: 쓰다듬기 · 길게/쭉 끌기: 잡기</div>
 <canvas id="c"></canvas>
+<div id="ui">
+  <div class="g">밥<div class="bar"><i id="gH"></i></div></div>
+  <div class="g">기운<div class="bar"><i id="gE"></i></div></div>
+  <button id="feedBtn">밥주기</button>
+</div>
 <script>
 'use strict';
 // allow: SIZE_OK — temporary single-file static prototype until input physics is stable; next wave should split input, simulation, and rendering.
@@ -74,6 +96,7 @@ const pet = {
   happy: 0, dizzy: 0,
   tripT: 0,
   behavior: 'stare', behaviorT: 2,
+  munchT: 0,
   target: { x: 0, y: 0 },
   caption: '…',
   captionT: 0,
@@ -91,6 +114,30 @@ function applySize() { pet.r = clamp(Math.min(W, H) * 0.105, 34, 50); }
 applySize();
 
 function depthScale() { return 0.75 + (pet.y / H) * 0.45; }
+
+// ---------- 욕구 & 저장 ----------
+const needs = { hunger: 0.85, energy: 0.9 }; // 1 = 든든/쌩쌩, 0 = 굶주림/탈진
+let food = null;                             // {x, y} 밥그릇
+const SAVE_KEY = 'protopet-v1';
+
+function saveState() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ h: needs.hunger, e: needs.energy, ts: Date.now() }));
+  } catch (_) {}
+}
+// 껐다 켜도 시간이 흐른다: 부재중엔 배가 천천히 꺼지고, 혼자 낮잠 자며 기운은 회복
+(function loadState() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (!d) return;
+    const away = clamp((Date.now() - d.ts) / 1000, 0, 12 * 3600);
+    needs.hunger = clamp(d.h - away * 0.0005, 0, 1);
+    needs.energy = clamp(d.e + away * 0.001, 0, 1);
+    if (away > 60) { pet.caption = '어디 갔었어!!'; pet.captionT = 0; }
+  } catch (_) {}
+})();
+setInterval(saveState, 5000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
 
 // ---------- 발: 절차적 걸음 ----------
 // 발은 땅에 붙어 있다가, 몸이 지나가서 너무 멀어지면 앞쪽으로 폴짝 옮겨 딛는다
@@ -266,6 +313,7 @@ const BEHAVIORS = {
   zoomies: { w: 1.0, dur: [1.8, 3] },
   wiggle:  { w: 1.6, dur: [1, 2] },
   sleep:   { w: 0.6, dur: [6, 10] },
+  eat:     { w: 0, dur: [60, 60] },   // 랜덤 선택 없음 — 밥그릇이 있을 때만 진입
 };
 const CAPTIONS = {
   wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름'],
@@ -275,6 +323,7 @@ const CAPTIONS = {
   zoomies: ['갑자기 신남!!', '우다다다!!'],
   wiggle: ['꼬물꼬물', '춤(본인 생각)'],
   sleep: ['Zzz…', '꿈나라'],
+  eat: ['밥이다!!', '우걱우걱'],
 };
 const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐만', '발이 없어짐'];
 const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다'];
@@ -296,11 +345,22 @@ function pickTarget() {
   pet.target.x = rand(90, W - 90);
   pet.target.y = rand(H * 0.42, H * 0.82);
 }
+// 욕구가 행동 가중치를 바꾼다 — 게이지보다 몸짓에서 먼저 티가 나게
+function effWeight(name, w) {
+  if (name === 'sleep') w *= needs.energy < 0.3 ? 5 : needs.energy < 0.6 ? 2 : 1;
+  if (name === 'plop') w *= needs.energy < 0.4 ? 2.2 : 1;
+  if (name === 'zoomies' || name === 'wiggle') w *= needs.energy < 0.35 ? 0.15 : 1;
+  if (name === 'sniff') w *= needs.hunger < 0.5 ? 2.2 : 1;
+  return w;
+}
 function nextBehavior() {
-  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior);
-  let total = entries.reduce((s, [, b]) => s + b.w, 0);
+  if (food && needs.hunger < 0.98) return setBehavior('eat');
+  const entries = Object.entries(BEHAVIORS)
+    .map(([name, b]) => [name, effWeight(name, b.w)])
+    .filter(([name, w]) => name !== pet.behavior && w > 0);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
   let roll = Math.random() * total;
-  for (const [name, b] of entries) { roll -= b.w; if (roll <= 0) return setBehavior(name); }
+  for (const [name, w] of entries) { roll -= w; if (roll <= 0) return setBehavior(name); }
   setBehavior('stare');
 }
 
@@ -478,12 +538,43 @@ function update(dt) {
   const dragging = input.mode === 'drag';
   const airborne = !dragging && (Math.abs(pet.jy) > 0.01 || Math.abs(pet.jvy) > 0.01);
 
+  // 욕구는 항상 흐른다 — 자는 동안 기운 회복, 우다다는 기운 소모
+  needs.hunger = Math.max(0, needs.hunger - dt * 0.002);
+  const eGain = pet.behavior === 'sleep' ? 0.035
+    : pet.behavior === 'plop' ? 0.006
+    : pet.behavior === 'zoomies' ? -0.012
+    : -0.0015;
+  needs.energy = clamp(needs.energy + eGain * dt, 0, 1);
+
   if (!dragging) pet.behaviorT -= dt;
   pet.captionT += dt;
   if (!dragging && pet.behaviorT <= 0) nextBehavior();
 
   // 이동
   let desiredVX = 0, desiredVY = 0;
+  // 밥 먹기: 그릇까지 달려가서 냠냠
+  if (!dragging && !airborne && pet.behavior === 'eat' && pet.tripT <= 0) {
+    if (!food) setBehavior('stare');
+    else {
+      const dx = food.x - pet.x, dy = food.y - pet.y, d = Math.hypot(dx, dy);
+      if (d > 34) { desiredVX = dx / d * 150; desiredVY = dy / d * 150; pet.munchT = 0; }
+      else {
+        pet.munchT += dt;
+        if (pet.munchT % 0.4 < dt) {
+          pet.squashVel = clamp(pet.squashVel - 1.6, -12, 12);
+          spawn('dust', food.x + rand(-10, 10), food.y - 10);
+        }
+        if (pet.munchT > 2.4) {
+          needs.hunger = Math.min(1, needs.hunger + 0.45);
+          food = null;
+          saveState();
+          for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
+          setBehavior('stare');
+          pet.caption = '잘 먹었습니다'; pet.captionT = 0;
+        }
+      }
+    }
+  }
   const moving = !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
   if (moving && pet.tripT <= 0) {
     const speed = pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62;
@@ -615,6 +706,12 @@ function update(dt) {
   }
   pet.earTwitch.t += dt;
 
+  // 배고픔/졸림 혼잣말
+  if (!dragging && pet.captionT > 4) {
+    if (needs.hunger < 0.25 && Math.random() < dt * 0.4) { pet.caption = '배고파…'; pet.captionT = 0; }
+    else if (needs.energy < 0.2 && Math.random() < dt * 0.4) { pet.caption = '졸려…'; pet.captionT = 0; }
+  }
+
   // 잠: Zzz
   if (pet.behavior === 'sleep') {
     pet.zTimer -= dt;
@@ -701,6 +798,23 @@ function draw(t) {
   ctx.beginPath();
   ctx.ellipse(pet.x, pet.y + 4, r * 1.15 * sx * (1 - pet.jy * -0.002), r * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // 밥그릇
+  if (food) {
+    const fs = 0.75 + (food.y / H) * 0.45;
+    ctx.fillStyle = 'rgba(120,100,70,0.15)';
+    ctx.beginPath(); ctx.ellipse(food.x, food.y + 2, 16 * fs, 5 * fs, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c08a5a';
+    ctx.beginPath(); ctx.ellipse(food.x, food.y - 5 * fs, 14 * fs, 9 * fs, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8f6238';
+    ctx.beginPath(); ctx.ellipse(food.x, food.y - 8 * fs, 11 * fs, 5 * fs, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f4e3c2';
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc(food.x + Math.cos(i * 1.9) * 6 * fs, food.y - 8 * fs + Math.sin(i * 2.4) * 2 * fs, 2.6 * fs, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   // 꼬리 (몸 뒤)
   drawTail(tail, 8);
@@ -857,6 +971,23 @@ window.__petDebug = {
   },
 };
 
+// ---------- 하단 UI ----------
+const gH = document.getElementById('gH'), gE = document.getElementById('gE');
+document.getElementById('feedBtn').addEventListener('click', () => {
+  if (food) return;
+  food = {
+    x: clamp(pet.x + rand(-170, 170), 90, W - 90),
+    y: clamp(pet.y + rand(-70, 70), H * 0.45, H * 0.82),
+  };
+  if (input.mode !== 'drag') setBehavior('eat');
+});
+function updateGauges() {
+  gH.style.width = needs.hunger * 100 + '%';
+  gH.style.background = needs.hunger < 0.3 ? '#d9776b' : '#a8c686';
+  gE.style.width = needs.energy * 100 + '%';
+  gE.style.background = needs.energy < 0.3 ? '#d9776b' : '#8fb7d9';
+}
+
 // ---------- 루프 ----------
 let last = performance.now();
 function frame(now) {
@@ -864,6 +995,7 @@ function frame(now) {
   last = now;
   update(dt);
   draw(now / 1000);
+  updateGauges();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
