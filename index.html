@@ -80,6 +80,45 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
+// ---------- 유전: 시드 하나로 세상에 하나뿐인 아이 ----------
+const genes = (() => {
+  let seed = null;
+  const urlSeed = new URLSearchParams(location.search).get('seed');
+  if (urlSeed !== null && Number.isInteger(+urlSeed)) {
+    seed = +urlSeed; // 테스트용 — 저장하지 않음
+  } else {
+    try { seed = JSON.parse(localStorage.getItem('protopet-genes') || 'null'); } catch (_) {}
+    if (!Number.isInteger(seed)) {
+      seed = Math.floor(Math.random() * 2147483647);
+      try { localStorage.setItem('protopet-genes', String(seed)); } catch (_) {}
+    }
+  }
+  // mulberry32 — 같은 시드는 언제나 같은 아이
+  let a = seed;
+  const rng = () => {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+  const pick = (lo, hi) => lo + rng() * (hi - lo);
+  return {
+    seed,
+    rand01: rng,
+    hue: pick(18, 48),           // 복숭아빛~크림빛 사이의 털색
+    sat: pick(28, 55),
+    light: pick(79, 87),
+    earScale: pick(0.8, 1.25),
+    earSpread: pick(0.46, 0.6),
+    eyeL: pick(2.9, 4.2),        // 눈 크기 짝짝이는 유전이다
+    eyeR: pick(2.5, 3.8),
+    eyeTilt: pick(-2.2, 0.5),
+    bodyAspect: pick(1.0, 1.14),
+    tailLen: pick(6.5, 10),
+    lump: pick(1.6, 3.0),        // 몸통 울퉁불퉁 정도
+  };
+})();
+
 // ---------- 펫 상태 ----------
 const pet = {
   x: 0, y: 0,          // 지면 위치 (y가 클수록 앞/아래)
@@ -107,7 +146,7 @@ const pet = {
 };
 pet.x = W / 2; pet.y = H * 0.62;
 pet.target.x = pet.x; pet.target.y = pet.y;
-for (let i = 0; i < 14; i++) pet.lumps.push(rand(-2.2, 2.2));
+for (let i = 0; i < 14; i++) pet.lumps.push((genes.rand01() * 2 - 1) * genes.lump);
 
 // 화면 크기에 맞는 몸집 (작은 폰에서 너무 크지 않게)
 function applySize() { pet.r = clamp(Math.min(W, H) * 0.105, 34, 50); }
@@ -239,7 +278,7 @@ function makeChain(n, segLen) {
   for (let i = 0; i < n; i++) pts.push({ x: pet.x, y: pet.y - 40 - i * segLen, px: pet.x, py: pet.y - 40 - i * segLen });
   return { pts, segLen };
 }
-const tail = makeChain(4, 8);
+const tail = makeChain(4, genes.tailLen);
 
 function updateChain(ch, ax, ay, dt, gravity, windX) {
   const p0 = ch.pts[0];
@@ -729,7 +768,9 @@ function update(dt) {
 }
 
 // ---------- 그리기 ----------
-const BODY = '#efd9b8', BODY_DARK = '#dfc49c', OUTLINE = 'rgba(96,74,56,0.35)';
+const BODY = `hsl(${genes.hue} ${genes.sat}% ${genes.light}%)`;
+const BODY_DARK = `hsl(${genes.hue} ${genes.sat + 6}% ${genes.light - 9}%)`;
+const OUTLINE = 'rgba(96,74,56,0.35)';
 
 function drawBlob(cx, cy, rx, ry) {
   const n = pet.lumps.length;
@@ -758,8 +799,9 @@ function drawEars(r, phase) {
     let twitch = 0;
     if (tw.side === side && tw.t < 0.4) twitch = Math.sin(tw.t * 28) * 0.25 * (1 - tw.t / 0.4);
     ctx.save();
-    ctx.translate(side * r * 0.52, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0));
+    ctx.translate(side * r * genes.earSpread, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0));
     ctx.rotate(side * (heldOrFalling ? 0.43 : 0.3) + twitch * (heldOrFalling ? 0.35 : 1));
+    ctx.scale(genes.earScale, genes.earScale);
     if (phase === 'outer') {
       ctx.beginPath();
       ctx.moveTo(-r * 0.27, 0);
@@ -838,7 +880,7 @@ function draw(t) {
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
   ctx.scale(sx + breathe, sy - breathe);
   drawEars(r, 'outer');
-  drawBlob(0, 0, r * 1.05, r);
+  drawBlob(0, 0, r * genes.bodyAspect * 1.05, r);
   ctx.fillStyle = BODY; ctx.fill();
   ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
   // 배 무늬
@@ -863,7 +905,7 @@ function draw(t) {
 
   ctx.strokeStyle = '#4a3a2c'; ctx.fillStyle = '#4a3a2c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   // 눈 두 개 — 일부러 크기가 다름 (하찮음 포인트)
-  const eyes = [{ ox: -eyeGap, r: 3.6 * s, oy: 0 }, { ox: eyeGap, r: 2.9 * s, oy: -1.5 * s }];
+  const eyes = [{ ox: -eyeGap, r: genes.eyeL * s, oy: 0 }, { ox: eyeGap, r: genes.eyeR * s, oy: genes.eyeTilt * s }];
   for (const e of eyes) {
     const ex = fx + e.ox + gx;
     const ey = fy + e.oy + gy;
