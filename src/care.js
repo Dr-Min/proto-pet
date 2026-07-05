@@ -7,7 +7,7 @@ const careStats = {
   lastNapAt: 0,
   petStrokes: 0,
   lastPetAt: 0,
-  lastCareLine: '오늘은 아직 조용해',
+  lastCareLine: '오늘 아직 아무 일 없음',
   lastCareAt: 0,
   favoriteMeals: 0,
   routineBits: 0,
@@ -19,9 +19,9 @@ let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const CARE_TRAITS = {
-  cuddly: { bit: 1, line: '애교가 늘었어', caption: '손 찾는 중' },
-  foodie: { bit: 2, line: '먹보 기질이 보임', caption: '밥 냄새 기억함' },
-  mellow: { bit: 4, line: '느긋해졌어', caption: '천천히 할래' },
+  cuddly: { bit: 1, line: '손길 없으면 허전해짐', caption: '손 찾는 중' },
+  foodie: { bit: 2, line: '나 밥 좋아하는 거 들킴', caption: '밥 냄새 기억함' },
+  mellow: { bit: 4, line: '서두르는 법을 까먹음', caption: '천천히 할래' },
 };
 const BOND_MILESTONES = [
   { at: 0.25, line: '조금 친해졌어' },
@@ -177,7 +177,7 @@ function noteCareAction(kind) {
   careStats.routineCount += 1;
   careStats.lastRoutineAt = Date.now();
   affectNeed('bond', 0.045);
-  rememberCare(careStats.routineCount > 1 ? '돌봄 한 바퀴를 또 기억함' : '돌봄 한 바퀴를 기억함');
+  rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
   pet.caption = careStats.routineCount > 1 ? '또 챙겨줬다' : '나 챙겨줬네';
   pet.captionT = 0;
   pet.happy = 1;

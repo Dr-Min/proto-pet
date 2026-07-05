@@ -262,7 +262,7 @@ function drawTail(ch, baseR) {
   ctx.lineTo(left[0].x, left[0].y);
   ctx.closePath();
   ctx.fillStyle = bodyColor(); ctx.fill();
-  ctx.strokeStyle = OUTLINE; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(pet.r * depthScale()); ctx.stroke();
 }
 
 // ---------- 파티클 (하트, Zzz, 먼지) ----------

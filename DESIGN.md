@@ -22,6 +22,7 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Care/hunger | --care-hunger | #a8c686 | n/a | Hunger healthy fill |
 | Care/energy | --care-energy | #8fb7d9 | n/a | Energy healthy fill |
 | Care/bond | --care-bond | #e78aa1 | n/a | Bond fill |
+| Care/bond-low | --care-bond-low | #d9a36b | n/a | Low bond fill |
 | Care/low | --care-low | #d9776b | n/a | Low need warning |
 | Care/warm | --care-warm | #e8b87f | n/a | Feed button |
 | Care/cool | --care-cool | #b8c7d7 | n/a | Rest button |

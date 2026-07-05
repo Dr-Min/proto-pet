@@ -1,5 +1,7 @@
 // ---------- 그리기 ----------
 const BODY = '#efd9b8', BODY_DARK = '#dfc49c', OUTLINE = 'rgba(96,74,56,0.35)';
+const PET_FOODIE_MARK = 'rgba(176,128,82,0.36)';
+const PET_CHEEK_CHANNELS = '240,140,130';
 
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
@@ -127,7 +129,7 @@ function draw(t) {
   ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
   ctx.fillStyle = bellyColor(); ctx.fill();
   if (petHasTrait('foodie')) {
-    ctx.fillStyle = 'rgba(176,128,82,0.36)';
+    ctx.fillStyle = PET_FOODIE_MARK;
     for (let i = 0; i < 3; i++) {
       ctx.beginPath();
       ctx.arc((i - 1) * r * 0.13, r * (0.38 + i * 0.04), r * 0.045, 0, Math.PI * 2);
@@ -218,7 +220,7 @@ function draw(t) {
   // 볼터치
   const cheekAlpha = petHasTrait('cuddly') ? Math.max(0.18, pet.happy * 0.5) : pet.happy * 0.5;
   if (cheekAlpha > 0.12) {
-    ctx.fillStyle = `rgba(240,140,130,${cheekAlpha})`;
+    ctx.fillStyle = `rgba(${PET_CHEEK_CHANNELS},${cheekAlpha})`;
     ctx.beginPath(); ctx.arc(fx - eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(fx + eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
   }

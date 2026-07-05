@@ -35,7 +35,7 @@ function update(dt) {
           food = null;
           for (let i = 0; i < (likedFood ? 5 : 3); i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
           setBehavior('stare');
-          pet.caption = routineCompleted ? '나 챙겨줬네' : likedFood ? '이거 좋아!' : '잘 먹었습니다';
+          pet.caption = routineCompleted ? '나 챙겨줬네' : likedFood ? '이거 좋아!' : '다 먹어버림';
           pet.captionT = 0;
         }
       }
@@ -127,17 +127,6 @@ function update(dt) {
         pet.landingT = 1.05;
         pet.behaviorT = Math.max(pet.behaviorT, 1.35);
         for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-18, 18), pet.y);
-      }
-      if (Math.abs(pet.jvy) < 115 && Math.abs(pet.vx) < 160) {
-        pet.jvy = 0;
-        pet.vx *= 0.45;
-        if (pet.landCaption) {
-          pet.caption = pet.landCaption;
-          pet.landCaption = '';
-        }
-        pet.captionT = 0;
-        pet.landingT = 1.05;
-        pet.behaviorT = Math.max(pet.behaviorT, 1.35);
       }
     }
   } else if (dragging) {
