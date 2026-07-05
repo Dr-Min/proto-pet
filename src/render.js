@@ -7,6 +7,7 @@ function geneValue(name, fallback) {
 function bodyColor() { return geneValue('body', BODY); }
 function bodyDarkColor() { return geneValue('bodyDark', BODY_DARK); }
 function bellyColor() { return geneValue('belly', 'rgba(255,250,240,0.55)'); }
+function petHasTrait(name) { return typeof hasCareTrait === 'function' && hasCareTrait(name); }
 
 function drawBlob(cx, cy, rx, ry) {
   const n = pet.lumps.length;
@@ -31,14 +32,15 @@ function drawBlob(cx, cy, rx, ry) {
 function drawEars(r, phase) {
   const tw = pet.earTwitch;
   const heldOrFalling = input.mode === 'drag' || pet.jy < -8;
+  const mellow = petHasTrait('mellow');
   const earScale = geneValue('earScale', 1);
   const earSpread = geneValue('earSpread', 0.52);
   for (const side of [-1, 1]) {
     let twitch = 0;
     if (tw.side === side && tw.t < 0.4) twitch = Math.sin(tw.t * 28) * 0.25 * (1 - tw.t / 0.4);
     ctx.save();
-    ctx.translate(side * r * earSpread, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0));
-    ctx.rotate(side * (heldOrFalling ? 0.43 : 0.3) + twitch * (heldOrFalling ? 0.35 : 1));
+    ctx.translate(side * r * earSpread, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0) + (mellow ? r * 0.035 : 0));
+    ctx.rotate(side * (heldOrFalling ? 0.43 : mellow ? 0.22 : 0.3) + twitch * (heldOrFalling ? 0.35 : mellow ? 0.65 : 1));
     if (phase === 'outer') {
       ctx.beginPath();
       ctx.moveTo(-r * 0.27, 0);
@@ -124,6 +126,14 @@ function draw(t) {
   // 배 무늬
   ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
   ctx.fillStyle = bellyColor(); ctx.fill();
+  if (petHasTrait('foodie')) {
+    ctx.fillStyle = 'rgba(176,128,82,0.36)';
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc((i - 1) * r * 0.13, r * (0.38 + i * 0.04), r * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   drawEars(r, 'inner');
   ctx.restore();
 
@@ -206,8 +216,9 @@ function draw(t) {
   ctx.stroke();
   ctx.lineWidth = 2;
   // 볼터치
-  if (pet.happy > 0.25) {
-    ctx.fillStyle = `rgba(240,140,130,${pet.happy * 0.5})`;
+  const cheekAlpha = petHasTrait('cuddly') ? Math.max(0.18, pet.happy * 0.5) : pet.happy * 0.5;
+  if (cheekAlpha > 0.12) {
+    ctx.fillStyle = `rgba(240,140,130,${cheekAlpha})`;
     ctx.beginPath(); ctx.arc(fx - eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(fx + eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
   }

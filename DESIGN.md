@@ -17,6 +17,8 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Pet/body | --pet-body | #efd9b8 | n/a | Default pet body, varied slightly by gene seed |
 | Pet/body-dark | --pet-body-dark | #dfc49c | n/a | Default legs and darker body parts, varied slightly by gene seed |
 | Pet/outline | --pet-outline | rgba(96,74,56,0.35) | n/a | Soft outline |
+| Pet/cheek | --pet-cheek | rgba(240,140,130,0.18) | n/a | Cuddly blush, intensified by happy state |
+| Pet/foodie-mark | --pet-foodie-mark | rgba(176,128,82,0.36) | n/a | Small belly dots for foodie trait |
 | Care/hunger | --care-hunger | #a8c686 | n/a | Hunger healthy fill |
 | Care/energy | --care-energy | #8fb7d9 | n/a | Energy healthy fill |
 | Care/bond | --care-bond | #e78aa1 | n/a | Bond fill |
@@ -134,6 +136,7 @@ All spacing derives from a base of 4px.
 - **Spacing**: no stat panel; traits are revealed through memory line, captions, and autonomous behavior weights.
 - **States**: undiscovered, newly revealed, persistent.
 - **Accessibility**: first reveal is written in the memory line.
+- **Visual Marks**: cuddly keeps a faint cheek tint, foodie adds tiny belly dots, mellow relaxes the ear angle.
 - **Motion**: traits reuse existing behavior and particle motion.
 
 ### Food Bowl
