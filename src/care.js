@@ -18,6 +18,15 @@ const careStats = {
 let food = null;                             // {x, y} 밥그릇
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
+const ROUGHNESS_THROW_GAIN = 0.34;
+const ROUGHNESS_SURPRISE_GAIN = 0.18;
+const ROUGHNESS_DECAY_PER_SECOND = 0.06;
+const ROUGHNESS_PENALTY_THRESHOLD = 0.5;
+const ROUGHNESS_CLOSE_BOND = 0.55;
+const ROUGHNESS_BOND_PENALTY = -0.012;
+const ROUGHNESS_CLOSE_BOND_PENALTY = -0.006;
+const ROUGH_HURT_LINES = ['…', '어지러워', '무서웠어', '잠깐 내려놔 줘', '나 공 아님'];
+const ROUGH_FUN_LINES = ['한 번 더!!', '재밌다!!', '날았다!!'];
 const CARE_TRAITS = {
   cuddly: { bit: 1, line: '손길 없으면 허전해짐', caption: '손 찾는 중' },
   foodie: { bit: 2, line: '나 밥 좋아하는 거 들킴', caption: '밥 냄새 기억함' },
@@ -28,6 +37,11 @@ const BOND_MILESTONES = [
   { at: 0.55, line: '이제 나 알아보지?' },
   { at: 0.85, line: '완전 믿고 있어' },
 ];
+const roughPlayState = {
+  roughness: 0,
+  penaltyCount: 0,
+  flightMemoryRecorded: false,
+};
 let bondMilestone = 0;
 
 function bondStage(value) {
@@ -125,6 +139,21 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveC
 function affectNeed(name, delta) {
   needs[name] = clamp(needs[name] + delta, 0, 1);
   if (name === 'bond') updateBondMilestone();
+}
+function recordRoughPlay(amount) {
+  roughPlayState.roughness = clamp(roughPlayState.roughness + amount, 0, 1);
+  if (roughPlayState.roughness <= ROUGHNESS_PENALTY_THRESHOLD) return false;
+
+  const closeEnough = needs.bond >= ROUGHNESS_CLOSE_BOND;
+  affectNeed('bond', closeEnough ? ROUGHNESS_CLOSE_BOND_PENALTY : ROUGHNESS_BOND_PENALTY);
+  roughPlayState.penaltyCount += 1;
+  if (roughPlayState.penaltyCount >= 3 && !roughPlayState.flightMemoryRecorded) {
+    roughPlayState.flightMemoryRecorded = true;
+    rememberCare('오늘 너무 많이 날아다님');
+  }
+  pet.caption = closeEnough && Math.random() < 0.5 ? randomLine(ROUGH_FUN_LINES) : randomLine(ROUGH_HURT_LINES);
+  pet.captionT = 0;
+  return true;
 }
 function careMood() {
   if (needs.hunger < 0.24) return 'hungry';
@@ -251,6 +280,7 @@ function recordPetting(amount) {
   careStats.lastPetAt = now;
 }
 function updateCare(dt, { airborne, speed }) {
+  roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));
   affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012));
   if (!airborne && input.mode !== 'drag' && !food && pet.behavior !== 'sleep' && needs.energy < 0.1) {

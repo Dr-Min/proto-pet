@@ -41,6 +41,7 @@ function surprisePet() {
   affectNeed('energy', -0.012);
   pet.caption = pet.dizzy >= 3 ? '@_@ 그만…' : '깜짝!?';
   pet.captionT = 0;
+  recordRoughPlay(ROUGHNESS_SURPRISE_GAIN);
   if (pet.behavior === 'sleep' || pet.behavior === 'plop') setTimeout(() => setBehavior('stare'), 0);
   pet.behaviorT = Math.max(pet.behaviorT, 1.2);
   for (let i = 0; i < 4; i++) spawn('dust', pet.x + rand(-20, 20), pet.y);
@@ -123,6 +124,7 @@ function finishPointer(e) {
     pet.captionT = 0;
     affectNeed('energy', -0.025);
     pet.landCaption = randomLine(LAND_LINES);
+    if (recordRoughPlay(ROUGHNESS_THROW_GAIN)) pet.landCaption = '';
     pet.behavior = 'stare';
     pet.behaviorT = Math.max(pet.behaviorT, 2.2);
   } else if (!wasPetting && elapsed < 260 && moved < rubThreshold(e) * 1.4 && petHitTest(e.clientX, e.clientY, 1.8)) {
