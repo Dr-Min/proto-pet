@@ -26,6 +26,9 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Care/low | --care-low | #d9776b | n/a | Low need warning |
 | Care/warm | --care-warm | #e8b87f | n/a | Feed button |
 | Care/cool | --care-cool | #b8c7d7 | n/a | Rest button |
+| Care/play | --care-play | #dba6b4 | n/a | Play/fetch button |
+| Play/ball | --play-ball | #d98f7a | n/a | Fetch ball body |
+| Play/ball-seam | --play-ball-seam | rgba(96,74,56,0.4) | n/a | Fetch ball stitch line |
 | Food/kibble-base | --food-kibble-base | #f0c98b | n/a | Default round food bowl |
 | Food/kibble-top | --food-kibble-top | #d59b57 | n/a | Default round food mound |
 | Food/kibble-bit | --food-kibble-bit | #8c6042 | n/a | Default food bits |
@@ -39,7 +42,7 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 ### Rules
 
 - Use warm neutrals for the world, not saturated game UI chrome.
-- Care colors are functional: green for hunger, blue for energy, pink for bond, coral for low state.
+- Care colors are functional: green for hunger, blue for energy, pink for bond, rose for play, coral for low state.
 - Food colors stay soft and edible, with three recognizable families: warm kibble, berry pink, and leafy green.
 - Pet body color may vary inside the documented peach-to-cream family through the saved gene seed.
 - New colors should extend the table before use.
@@ -106,7 +109,7 @@ All spacing derives from a base of 4px.
 ### Care Action Button
 
 - **Structure**: native `button` in `#actions`.
-- **Variants**: feed warm, rest cool.
+- **Variants**: feed warm, rest cool, play rose.
 - **Spacing**: 44px minimum touch height, compact horizontal padding on narrow screens.
 - **States**: default, active.
 - **Accessibility**: native button semantics.
@@ -148,6 +151,15 @@ All spacing derives from a base of 4px.
 - **States**: waiting, being eaten, removed after eating.
 - **Accessibility**: represented through the visible bowl and pet caption.
 - **Motion**: pet walks to the bowl; chewing uses pet squash and small dust puffs.
+
+### Fetch Ball
+
+- **Structure**: canvas ball launched from the lower center by the play action.
+- **Variants**: soft rose-orange ball body with one muted stitch curve.
+- **Spacing**: target lands inside the lower play field and at least 120px from the pet.
+- **States**: flying, rolling, waiting, carried, fading out, timed out.
+- **Accessibility**: the play action is a native button and pet captions report acceptance, refusal, completion, and timeout.
+- **Motion**: ball reuses the pet's gravity scale, small bounces, ground friction, and existing chase/trip movement.
 
 ### Gene-Based Pet Shape
 

@@ -30,13 +30,16 @@ document.getElementById('restBtn').addEventListener('click', () => {
   if (input.mode === 'drag') return;
   requestRest();
 });
+document.getElementById('playBtn').addEventListener('click', () => {
+  requestPlayBall();
+});
 function updateGauges() {
   gH.style.width = needs.hunger * 100 + '%';
-  gH.style.background = needs.hunger < 0.3 ? '#d9776b' : '#a8c686';
+  gH.style.background = needs.hunger < 0.3 ? 'var(--care-low)' : 'var(--care-hunger)';
   gE.style.width = needs.energy * 100 + '%';
-  gE.style.background = needs.energy < 0.3 ? '#d9776b' : '#8fb7d9';
+  gE.style.background = needs.energy < 0.3 ? 'var(--care-low)' : 'var(--care-energy)';
   gB.style.width = needs.bond * 100 + '%';
-  gB.style.background = needs.bond < 0.25 ? '#d9a36b' : '#e78aa1';
+  gB.style.background = needs.bond < 0.25 ? 'var(--care-bond-low)' : 'var(--care-bond)';
   memoryLine.textContent = careStats.lastCareLine || '오늘 아직 아무 일 없음';
 }
 

@@ -49,6 +49,7 @@ function surprisePet() {
 
 function startDrag(e) {
   if (input.mode === 'drag') return;
+  const wasFetching = pet.behavior === 'fetch';
   input.mode = 'drag';
   const liftForFinger = isTouchPointer(e) ? 28 : 8;
   input.dragOffsetX = pet.x - e.clientX;
@@ -58,6 +59,7 @@ function startDrag(e) {
   pet.vx = 0;
   pet.vy = 0;
   pet.tripT = 0;
+  if (ball && wasFetching) ball.fetchState = ball.phase === 'carried' ? 'waiting' : ball.fetchState;
   pet.behavior = 'stare';
   pet.behaviorT = Math.max(pet.behaviorT, 1.5);
   pet.caption = randomLine(PICKUP_LINES);

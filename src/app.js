@@ -109,7 +109,18 @@ for (let i = 0; i < 14; i++) pet.lumps.push((geneRand() * 2 - 1) * genes.lump);
 function applySize() { pet.r = 46; }
 applySize();
 
-function depthScale() { return 0.75 + (pet.y / H) * 0.45; }
+function depthScaleAt(y) { return 0.75 + (y / H) * 0.45; }
+function depthScale() { return depthScaleAt(pet.y); }
+function ownerPlayPoint(yRatio) {
+  return { x: W / 2, y: H * yRatio };
+}
+function carriedBallPoint() {
+  const s = depthScale(), r = pet.r * s;
+  return {
+    x: pet.x + pet.dir * r * 0.56,
+    y: pet.y + pet.jy - r * 0.82,
+  };
+}
 function topBounceLimit() { return Math.max(78, H * 0.1); }
 function outlineWidth(r) { return clamp(r * 0.043, 1.8, 2.15); }
 
@@ -288,6 +299,7 @@ const BEHAVIORS = {
   wiggle:  { w: 1.6, dur: [1, 2] },
   sleep:   { w: 0.6, dur: [6, 10] },
   eat:     { w: 0, dur: [60, 60] },
+  fetch:   { w: 0, dur: [60, 60] },
 };
 const CAPTIONS = {
   wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름'],
@@ -298,6 +310,7 @@ const CAPTIONS = {
   wiggle: ['꼬물꼬물', '춤(본인 생각)'],
   sleep: ['Zzz…', '꿈나라'],
   eat: ['밥이다!!', '우걱우걱'],
+  fetch: ['공이다!!', '잡으러 감'],
 };
 const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐만', '발이 없어짐'];
 const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다'];
@@ -323,8 +336,9 @@ function pickTarget() {
 }
 function nextBehavior() {
   if (food && needs.hunger < 0.98) return setBehavior('eat');
+  if (typeof tryResumeFetch === 'function' && tryResumeFetch()) return;
   if (needs.energy < 0.16) return setBehavior('sleep');
-  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat');
+  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch');
   let total = entries.reduce((s, [n, b]) => s + behaviorWeight(n, b), 0);
   let roll = Math.random() * total;
   for (const [name, b] of entries) { roll -= behaviorWeight(name, b); if (roll <= 0) return setBehavior(name); }
@@ -351,6 +365,7 @@ window.__petDebug = {
         genes: { ...genes },
         bondMilestone,
         food: food ? { ...food } : null,
+        ball: typeof ball === 'undefined' || !ball ? null : { ...ball },
       },
       visualTop: pet.y + pet.jy - r,
       topBounceLimit: topBounceLimit(),

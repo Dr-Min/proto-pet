@@ -2,6 +2,8 @@
 const BODY = '#efd9b8', BODY_DARK = '#dfc49c', OUTLINE = 'rgba(96,74,56,0.35)';
 const PET_FOODIE_MARK = 'rgba(176,128,82,0.36)';
 const PET_CHEEK_CHANNELS = '240,140,130';
+const PLAY_BALL = '#d98f7a';
+const PLAY_BALL_SEAM = 'rgba(96,74,56,0.4)';
 
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
@@ -10,6 +12,32 @@ function bodyColor() { return geneValue('body', BODY); }
 function bodyDarkColor() { return geneValue('bodyDark', BODY_DARK); }
 function bellyColor() { return geneValue('belly', 'rgba(255,250,240,0.55)'); }
 function petHasTrait(name) { return typeof hasCareTrait === 'function' && hasCareTrait(name); }
+function drawBallObject(alpha = 1) {
+  if (!ball) return;
+  const bs = depthScaleAt(ball.phase === 'carried' ? pet.y : ball.y);
+  const br = 7 * bs;
+  const bx = ball.x;
+  const by = ball.y + (ball.phase === 'carried' ? 0 : ball.jy);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (ball.phase !== 'carried') {
+    ctx.fillStyle = 'rgba(115,95,70,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(ball.x, ball.y + 2, br * 1.35, br * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = PLAY_BALL;
+  ctx.beginPath();
+  ctx.arc(bx, by - br * 0.55, br, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = PLAY_BALL_SEAM;
+  ctx.lineWidth = Math.max(1.2, br * 0.18);
+  ctx.beginPath();
+  ctx.moveTo(bx - br * 0.58, by - br * 1.08);
+  ctx.quadraticCurveTo(bx, by - br * 0.36, bx + br * 0.58, by - br * 1.08);
+  ctx.stroke();
+  ctx.restore();
+}
 
 function drawBlob(cx, cy, rx, ry) {
   const n = pet.lumps.length;
@@ -99,6 +127,7 @@ function draw(t) {
       ctx.fill();
     }
   }
+  if (ball && ball.phase !== 'carried') drawBallObject(ball.phase === 'fading' ? clamp(ball.fadeT / 1.5, 0, 1) : 1);
 
   // 꼬리 (몸 뒤)
   drawTail(tail, 8);
@@ -224,6 +253,7 @@ function draw(t) {
     ctx.beginPath(); ctx.arc(fx - eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(fx + eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
   }
+  if (ball && ball.phase === 'carried') drawBallObject(1);
 
   // 파티클
   for (const p of particles) {

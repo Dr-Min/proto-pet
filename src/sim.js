@@ -10,6 +10,16 @@ function update(dt) {
 
   // 이동
   let desiredVX = 0, desiredVY = 0;
+  if (!dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
+    if (ball && ball.phase === 'carried') {
+      const mouth = carriedBallPoint();
+      ball.x = mouth.x;
+      ball.y = mouth.y;
+      ball.phase = 'settled';
+      ball.fetchState = 'waiting';
+    }
+    setBehavior('eat');
+  }
   if (!dragging && !airborne && pet.behavior === 'eat' && pet.tripT <= 0) {
     if (!food) setBehavior('stare');
     else {
@@ -37,6 +47,37 @@ function update(dt) {
           setBehavior('stare');
           pet.caption = routineCompleted ? '나 챙겨줬네' : likedFood ? '이거 좋아!' : '다 먹어버림';
           pet.captionT = 0;
+        }
+      }
+    }
+  }
+  if (!dragging && !airborne && pet.behavior === 'fetch' && pet.tripT <= 0 && !food) {
+    if (!ball) {
+      setBehavior('stare');
+    } else if (ball.fetchState === 'chase') {
+      const dx = ball.x - pet.x, dy = ball.y - pet.y, d = Math.hypot(dx, dy);
+      if (d > 30) {
+        desiredVX = dx / d * ball.fetchSpeed;
+        desiredVY = dy / d * ball.fetchSpeed;
+      } else {
+        catchBall();
+      }
+    } else if (ball.fetchState === 'return') {
+      if (needs.energy < 0.3) {
+        abandonFetchBall();
+      } else {
+        const owner = ownerPlayPoint(0.8);
+        const dx = owner.x - pet.x, dy = owner.y - pet.y, d = Math.hypot(dx, dy);
+        if (d > 34) {
+          desiredVX = dx / d * 220;
+          desiredVY = dy / d * 220;
+        } else {
+          const mouth = carriedBallPoint();
+          ball.x = mouth.x;
+          ball.y = mouth.y;
+          dropFetchedBall();
+          pet.behavior = 'stare';
+          pet.behaviorT = Math.max(pet.behaviorT, 2.2);
         }
       }
     }
@@ -177,4 +218,65 @@ function update(dt) {
   updateChain(tail, pet.x - pet.dir * tr * 0.8, pet.y + pet.jy + tailBob - tr * 0.6, dt, 520, wag);
   updateParticles(dt);
   updatePetting(dt);
+  updateBall(dt);
+}
+
+function updateBall(dt) {
+  if (!ball) return;
+  ball.age += dt;
+  if (clearBallIfTimedOut()) return;
+  if (ball.phase === 'carried') {
+    const mouth = carriedBallPoint();
+    ball.x = mouth.x;
+    ball.y = mouth.y;
+    return;
+  }
+  if (ball.phase === 'fading') {
+    if (ball.pendingComplete) {
+      ball.pendingComplete = false;
+      recordFetchComplete();
+    }
+    ball.fadeT -= dt;
+    if (ball.fadeT <= 0) ball = null;
+    return;
+  }
+  if (ball.phase === 'flying') {
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    ball.jvy += 900 * dt;
+    ball.jy += ball.jvy * dt;
+    if (ball.jy >= 0) {
+      const impact = ball.jvy;
+      ball.jy = 0;
+      ball.bounces += 1;
+      if (ball.bounces < ball.maxBounces) {
+        ball.jvy = -impact * ball.rebound;
+        ball.vx *= 0.78;
+        ball.vy *= 0.78;
+        ball.rebound *= 0.72;
+        spawn('dust', ball.x, ball.y);
+      } else {
+        ball.jvy = 0;
+        ball.phase = 'rolling';
+      }
+    }
+  } else if (ball.phase === 'rolling') {
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    const friction = Math.exp(-3.8 * dt);
+    ball.vx *= friction;
+    ball.vy *= friction;
+    if (Math.hypot(ball.vx, ball.vy) < 12) {
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.phase = 'settled';
+      startFetchBall();
+    }
+  } else if (ball.phase === 'settled') {
+    if (!ball.declined && !ball.abandoned && ball.fetchState === 'waiting' && !food) startFetchBall();
+  }
+  if (ball) {
+    ball.x = clamp(ball.x, 40, W - 40);
+    ball.y = clamp(ball.y, H * 0.42, H * 0.86);
+  }
 }

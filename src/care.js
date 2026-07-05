@@ -14,8 +14,11 @@ const careStats = {
   routineCount: 0,
   lastRoutineAt: 0,
   traitMask: 0,
+  fetchCount: 0,
+  lastPlayAt: 0,
 };
 let food = null;                             // {x, y} 밥그릇
+let ball = null;
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const ROUGHNESS_THROW_GAIN = 0.34;
@@ -27,6 +30,11 @@ const ROUGHNESS_BOND_PENALTY = -0.012;
 const ROUGHNESS_CLOSE_BOND_PENALTY = -0.006;
 const ROUGH_HURT_LINES = ['…', '어지러워', '무서웠어', '잠깐 내려놔 줘', '나 공 아님'];
 const ROUGH_FUN_LINES = ['한 번 더!!', '재밌다!!', '날았다!!'];
+const FETCH_START_LINES = ['공이다!!', '잡으러 감'];
+const FETCH_CAUGHT_LINES = ['잡았다', '입에 넣음'];
+const FETCH_DONE_LINES = ['가져왔다', '나 잘했지'];
+const FETCH_REFUSE_LINES = ['지금은 패스…', '공은 내일'];
+let sessionFetchRecorded = false;
 const CARE_TRAITS = {
   cuddly: { bit: 1, line: '손길 없으면 허전해짐', caption: '손 찾는 중' },
   foodie: { bit: 2, line: '나 밥 좋아하는 거 들킴', caption: '밥 냄새 기억함' },
@@ -81,6 +89,8 @@ function saveCareState() {
       routineCount: careStats.routineCount,
       lastRoutineAt: careStats.lastRoutineAt,
       traitMask: careStats.traitMask,
+      fetchCount: careStats.fetchCount,
+      lastPlayAt: careStats.lastPlayAt,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -108,6 +118,8 @@ function loadCareState() {
     const savedRoutineCount = Number(saved.routineCount);
     const savedLastRoutineAt = Number(saved.lastRoutineAt);
     const savedTraitMask = Number(saved.traitMask);
+    const savedFetchCount = Number(saved.fetchCount);
+    const savedLastPlayAt = Number(saved.lastPlayAt);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
@@ -124,6 +136,8 @@ function loadCareState() {
     careStats.routineCount = Math.max(0, Math.floor(Number.isFinite(savedRoutineCount) ? savedRoutineCount : careStats.routineCount));
     careStats.lastRoutineAt = Math.max(0, Number.isFinite(savedLastRoutineAt) ? savedLastRoutineAt : careStats.lastRoutineAt);
     careStats.traitMask = Math.floor(clamp(Number.isFinite(savedTraitMask) ? savedTraitMask : careStats.traitMask, 0, 7));
+    careStats.fetchCount = Math.max(0, Math.floor(Number.isFinite(savedFetchCount) ? savedFetchCount : careStats.fetchCount));
+    careStats.lastPlayAt = Math.max(0, Number.isFinite(savedLastPlayAt) ? savedLastPlayAt : careStats.lastPlayAt);
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = '기다렸어…';
@@ -154,6 +168,128 @@ function recordRoughPlay(amount) {
   pet.caption = closeEnough && Math.random() < 0.5 ? randomLine(ROUGH_FUN_LINES) : randomLine(ROUGH_HURT_LINES);
   pet.captionT = 0;
   return true;
+}
+function pickBallTarget() {
+  let target = { x: W / 2, y: H * 0.64 };
+  for (let i = 0; i < 18; i++) {
+    target = { x: rand(90, W - 90), y: rand(H * 0.45, H * 0.82) };
+    if (dist(target.x, target.y, pet.x, pet.y) >= 120) break;
+  }
+  return target;
+}
+function launchBall() {
+  const start = ownerPlayPoint(0.9);
+  const target = pickBallTarget();
+  const flightT = rand(0.82, 1.04);
+  ball = {
+    x: start.x,
+    y: start.y,
+    vx: (target.x - start.x) / flightT,
+    vy: (target.y - start.y) / flightT,
+    jy: 0,
+    jvy: -450 * flightT,
+    bounces: 0,
+    maxBounces: Math.random() < 0.5 ? 2 : 3,
+    rebound: 0.55,
+    age: 0,
+    phase: 'flying',
+    fetchState: 'waiting',
+    fetchStarted: false,
+    fetchSpeed: 220,
+    fadeT: 0,
+  };
+}
+function requestPlayBall() {
+  if (ball) {
+    pet.caption = '공 여기 있어';
+    pet.captionT = 0;
+    return;
+  }
+  launchBall();
+  pet.caption = randomLine(FETCH_START_LINES);
+  pet.captionT = 0;
+}
+function startFetchBall() {
+  if (!ball || food || ball.abandoned || ball.fetchState === 'return') return false;
+  if (needs.energy < 0.25) {
+    ball.declined = true;
+    pet.caption = randomLine(FETCH_REFUSE_LINES);
+    pet.captionT = 0;
+    return false;
+  }
+  ball.fetchStarted = true;
+  ball.fetchState = ball.phase === 'carried' ? 'return' : 'chase';
+  ball.fetchSpeed = hasCareTrait('mellow') && Math.random() < 0.2 ? 62 : 220;
+  setBehavior('fetch');
+  if (ball.fetchSpeed === 62) pet.caption = '천천히 가지러 감';
+  pet.captionT = 0;
+  return true;
+}
+function tryResumeFetch() {
+  if (!ball || food || ball.declined || ball.abandoned) return false;
+  if (ball.phase !== 'settled' && ball.phase !== 'rolling' && ball.phase !== 'carried') return false;
+  if (needs.energy < 0.25) return false;
+  return startFetchBall();
+}
+function catchBall() {
+  if (!ball) return;
+  ball.phase = 'carried';
+  ball.fetchState = 'return';
+  ball.vx = 0;
+  ball.vy = 0;
+  ball.jy = 0;
+  ball.jvy = 0;
+  pet.caption = randomLine(FETCH_CAUGHT_LINES);
+  pet.captionT = 0;
+}
+function abandonFetchBall() {
+  if (!ball) return;
+  ball.phase = 'settled';
+  ball.fetchState = 'waiting';
+  ball.abandoned = true;
+  ball.vx = 0;
+  ball.vy = 0;
+  ball.jy = 0;
+  ball.jvy = 0;
+  pet.caption = '그만 뛸래…';
+  pet.captionT = 0;
+  pet.behavior = 'stare';
+  pet.behaviorT = Math.max(pet.behaviorT, 1.6);
+}
+function dropFetchedBall() {
+  if (!ball) return;
+  ball.phase = 'fading';
+  ball.fetchState = 'done';
+  ball.fadeT = 1.5;
+  ball.pendingComplete = true;
+  ball.vx = 0;
+  ball.vy = 0;
+  ball.jy = 0;
+  ball.jvy = 0;
+}
+function clearBallIfTimedOut() {
+  if (!ball || ball.phase === 'carried' || ball.phase === 'fading') return false;
+  if (ball.age < 25) return false;
+  if (!ball.fetchStarted) {
+    pet.caption = '공 까먹음';
+    pet.captionT = 0;
+  }
+  ball = null;
+  return true;
+}
+function recordFetchComplete() {
+  const firstFetch = careStats.fetchCount === 0;
+  careStats.fetchCount += 1;
+  careStats.lastPlayAt = Date.now();
+  affectNeed('bond', 0.02);
+  affectNeed('energy', -0.03);
+  if (firstFetch) rememberCare('공 물어오기 배움');
+  else if (!sessionFetchRecorded) rememberCare('공 가져다줌');
+  sessionFetchRecorded = true;
+  pet.caption = randomLine(FETCH_DONE_LINES);
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.8);
+  for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(1.0, 1.65));
 }
 function careMood() {
   if (needs.hunger < 0.24) return 'hungry';
