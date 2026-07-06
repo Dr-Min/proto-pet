@@ -182,17 +182,18 @@ All spacing derives from a base of 4px.
 
 ### Relationship Rank
 
-- **Structure**: one compact `#rankLine` inside the top-center sign.
+- **Structure**: one compact `#bondBadge` fixed at the very top, containing `#rankLine` only.
 - **Variants**: `유대 · 초면` through `유대 · 충신`.
-- **Spacing**: text-only, no fourth gauge.
+- **Spacing**: separate from the tutorial sign; desktop centers it, mobile pins it to the top-left so it does not collide with `외출/기록`.
 - **States**: rank updates from daily care, walk returns, and battle wins.
 - **Accessibility**: visible text; details appear again inside the notebook.
 - **Motion**: rank-up feedback uses existing captions and hearts only.
 
 ### Tutorial Sign
 
-- **Structure**: top-center hand-drawn sign containing the relationship rank and short control hint.
-- **Spacing**: stays clear of the top-right outing/record buttons and top-left debug button on 320px+ mobile.
+- **Structure**: top-center wall-hung hand-drawn sign containing only the short control hint.
+- **Surface**: rectangular paper/wooden sign, not a pill; it uses soft sketch borders, subtle board grain, hanging strings, nail dots, and a small drop shadow so it reads like it is hung on the wall.
+- **Spacing**: sits below the separate relationship rank and stays clear of the top-right outing/record buttons and top-left debug button on 320px+ mobile.
 - **States**: static, text-only, never blocks canvas input.
 - **Accessibility**: visible Korean text; no icon-only instruction.
 - **Motion**: no decorative animation.
