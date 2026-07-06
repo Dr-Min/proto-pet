@@ -91,6 +91,10 @@ function tickUntil(context, predicate, label) {
   throw new Error(`Timed out waiting for ${label}`);
 }
 
+function tickBattleArrival(context) {
+  tickUntil(context, 'currentPlace() === "battle" && battle !== null && !isTraveling()', 'battle arrival');
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -107,21 +111,41 @@ function testBattleCanWin() {
   const context = makeContext();
   setRandom(context, Array(120).fill(0.1));
   run(context, 'careStats.stage = "adult"; needs.energy = 0.9; needs.bond = 0.9; careStats.fetchCount = 8; requestBattle();');
+  tickBattleArrival(context);
   tickUntil(context, 'battle === null && careStats.battleWins === 1', 'battle win');
-  const state = run(context, '({ wins: careStats.battleWins, memory: careStats.lastCareLine, energy: needs.energy, bond: needs.bond })');
+  const state = run(context, '({ wins: careStats.battleWins, memory: careStats.lastCareLine, energy: needs.energy, bond: needs.bond, place: currentPlace() })');
   assert(state.wins === 1, 'battle win increments battleWins');
   assert(state.memory === '처음 이겨본 날', 'first battle win memory is recorded');
   assert(state.energy < 0.9, 'battle costs energy');
   assert(state.bond > 0.9, 'battle win rewards bond');
+  assert(state.place === 'battle', 'battle happens at the battle place');
 }
 
 function testCheerCanBeIgnoredWhenBondLow() {
   const context = makeContext();
   setRandom(context, [0.99]);
-  run(context, 'careStats.stage = "adult"; needs.energy = 0.9; needs.bond = 0; requestBattle(); cheerBattle();');
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.9; needs.bond = 0; requestBattle();');
+  tickBattleArrival(context);
+  setRandom(context, [0.99]);
+  run(context, 'cheerBattle();');
   const state = run(context, '({ caption: pet.caption, hp: battle && battle.hp })');
   assert(state.caption === '못 들은 척함' || state.caption === '내 맘대로 함', 'low-bond cheer can be ignored');
   assert(state.hp === 1, 'ignored cheer does not damage opponent');
+}
+
+function testWalkTravelsOutAndReturnsHome() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "baby"; needs.energy = 0.9; requestWalk();');
+  tickUntil(context, 'currentPlace() === "walk" && !isTraveling()', 'walk arrival');
+  let state = run(context, '({ place: currentPlace(), memory: careStats.lastCareLine, energy: needs.energy, bond: needs.bond })');
+  assert(state.place === 'walk', 'walk action changes to walk place');
+  assert(state.memory === '밖 냄새 맡은 날', 'walk records outdoor memory');
+  assert(state.energy < 0.9, 'walk costs a little energy');
+  assert(state.bond > 0.08, 'walk adds a little bond');
+  run(context, 'requestWalk();');
+  tickUntil(context, 'currentPlace() === "home" && !isTraveling()', 'return home');
+  state = run(context, '({ place: currentPlace(), caption: pet.caption })');
+  assert(state.place === 'home', 'walk button returns home outside');
 }
 
 function testLongAbsenceAddsGrime() {
@@ -134,5 +158,6 @@ function testLongAbsenceAddsGrime() {
 testBattleRequiresAdult();
 testBattleCanWin();
 testCheerCanBeIgnoredWhenBondLow();
+testWalkTravelsOutAndReturnsHome();
 testLongAbsenceAddsGrime();
 console.log('battle harness passed');

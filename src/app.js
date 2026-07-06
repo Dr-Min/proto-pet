@@ -352,6 +352,7 @@ const BEHAVIORS = {
   eat:     { w: 0, dur: [60, 60] },
   fetch:   { w: 0, dur: [60, 60] },
   battle:  { w: 0, dur: [60, 60] },
+  travel:  { w: 0, dur: [60, 60] },
 };
 const CAPTIONS = {
   wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름'],
@@ -364,6 +365,7 @@ const CAPTIONS = {
   eat: ['밥이다!!', '우걱우걱'],
   fetch: ['공이다!!', '잡으러 감'],
   battle: ['진지해짐', '나가봄'],
+  travel: ['나감', '어디 가는 중'],
 };
 const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐만', '발이 없어짐'];
 const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다'];
@@ -390,10 +392,11 @@ function pickTarget() {
 }
 function nextBehavior() {
   if (currentStage() === 'egg') return setBehavior('stare');
+  if (typeof isTraveling === 'function' && isTraveling()) return;
   if (food && needs.hunger < 0.98) return setBehavior('eat');
   if (typeof tryResumeFetch === 'function' && tryResumeFetch()) return;
   if (needs.energy < 0.16) return setBehavior('sleep');
-  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch' && n !== 'battle');
+  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch' && n !== 'battle' && n !== 'travel');
   let total = entries.reduce((s, [n, b]) => s + behaviorWeight(n, b), 0);
   let roll = Math.random() * total;
   for (const [name, b] of entries) { roll -= behaviorWeight(name, b); if (roll <= 0) return setBehavior(name); }
@@ -425,6 +428,8 @@ window.__petDebug = {
         food: food ? { ...food } : null,
         battle: typeof battle === 'undefined' || !battle ? null : { ...battle },
         ball: typeof ball === 'undefined' || !ball ? null : { ...ball },
+        place: typeof currentPlace === 'function' ? currentPlace() : 'home',
+        travel: typeof travelState === 'function' ? travelState() : null,
       },
       visualTop: pet.y + pet.jy - r,
       topBounceLimit: topBounceLimit(),

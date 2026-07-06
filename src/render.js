@@ -8,6 +8,10 @@ const PLAY_BALL_SEAM = 'rgba(96,74,56,0.4)';
 const BATTLE_FOE = '#c9b7a2';
 const BATTLE_FOE_DARK = 'rgba(90,70,55,0.32)';
 const PET_GRIME = 'rgba(96,74,56,0.18)';
+const WALK_FLOOR = '#e1e7d1';
+const WALK_PATH = '#d7ccb7';
+const BATTLE_FLOOR = '#e2d8c7';
+const BATTLE_RING = 'rgba(120,96,72,0.22)';
 
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
@@ -96,6 +100,43 @@ function drawBattleObject() {
   ctx.globalAlpha = 0.78;
   ctx.fillRect(-br * 0.62, -br * 0.95, br * 1.24 * battle.hp, br * 0.08);
   ctx.restore();
+}
+
+function drawWorld(t) {
+  const placeName = typeof currentPlace === 'function' ? currentPlace() : 'home';
+  const floorY = H * 0.38;
+  ctx.fillStyle = placeName === 'walk' ? '#f1efe0' : '#f4efe4';
+  ctx.fillRect(0, 0, W, H);
+  if (placeName === 'walk') {
+    ctx.fillStyle = WALK_FLOOR;
+    ctx.fillRect(0, floorY, W, H - floorY);
+    ctx.fillStyle = WALK_PATH;
+    ctx.beginPath();
+    ctx.ellipse(W * 0.5, H * 0.76, Math.min(W * 0.34, 190), H * 0.07, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(120,140,96,0.18)';
+    for (let i = 0; i < 6; i++) {
+      const x = (i + 0.5) * W / 6 + Math.sin(t + i) * 8;
+      ctx.fillRect(x, floorY + 22 + (i % 2) * 16, 18, 2);
+    }
+    return;
+  }
+  if (placeName === 'battle') {
+    ctx.fillStyle = BATTLE_FLOOR;
+    ctx.fillRect(0, floorY, W, H - floorY);
+    ctx.strokeStyle = BATTLE_RING;
+    ctx.lineWidth = Math.max(2, W * 0.004);
+    ctx.beginPath();
+    ctx.ellipse(W * 0.5, H * 0.66, Math.min(W * 0.34, 180), H * 0.13, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(W * 0.2, H * 0.66);
+    ctx.lineTo(W * 0.8, H * 0.66);
+    ctx.stroke();
+    return;
+  }
+  ctx.fillStyle = '#ece5d3';
+  ctx.fillRect(0, floorY, W, H - floorY);
 }
 
 function drawBlob(cx, cy, rx, ry) {
@@ -201,9 +242,7 @@ function drawEgg(t) {
 
 function draw(t) {
   ctx.clearRect(0, 0, W, H);
-  // 바닥 힌트
-  ctx.fillStyle = '#ece5d3';
-  ctx.fillRect(0, H * 0.38, W, H);
+  drawWorld(t);
 
   if (currentStage() === 'egg') {
     drawEgg(t);

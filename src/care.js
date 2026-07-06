@@ -26,6 +26,8 @@ const careStats = {
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
 let battle = null;
+let place = 'home';
+let travel = null;
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const ROUGHNESS_THROW_GAIN = 0.34;
@@ -49,6 +51,10 @@ const BATTLE_WIN_LINES = ['이겼나 봄', '나 좀 했음', '앞에 없어짐']
 const BATTLE_LOSE_LINES = ['좀 누울래', '오늘은 여기까지', '다리 쉬는 중'];
 const BATTLE_CHEER_LINES = ['들었음', '힘 조금 남', '나 해봄'];
 const BATTLE_IGNORE_LINES = ['못 들은 척함', '내 맘대로 함'];
+const TRAVEL_BATTLE_LINES = ['싸움터 감', '밖에 일 있음', '진지하게 나감'];
+const TRAVEL_WALK_LINES = ['밖에 감', '냄새 맡으러 감', '발 바쁨'];
+const WALK_ARRIVE_LINES = ['바깥 냄새 남', '풀 냄새 발견', '여기 넓다'];
+const RETURN_HOME_LINES = ['집이다', '돌아옴', '바닥 익숙함'];
 const AI_LINE_COOLDOWN = 12000;
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
@@ -204,6 +210,111 @@ function migrateStage(savedStage, saved) {
 function isEggStage() { return currentStage() === 'egg'; }
 function isBabyStage() { return currentStage() === 'baby'; }
 function canPlayBallNow() { return currentStage() === 'adult'; }
+function currentPlace() { return place; }
+function isTraveling() { return Boolean(travel); }
+function travelState() { return travel ? { ...travel } : null; }
+function awayFromHome() { return place !== 'home'; }
+function clearPlaceObjects() {
+  food = null;
+  ball = null;
+}
+function travelArrivalPoint(to) {
+  if (to === 'battle') return { x: W * 0.46, y: H * 0.66 };
+  if (to === 'walk') return { x: W * 0.52, y: H * 0.65 };
+  return { x: W * 0.5, y: H * 0.62 };
+}
+function startTravel(to, options = {}) {
+  if (travel) {
+    pet.caption = '이미 가는 중';
+    pet.captionT = 0;
+    return false;
+  }
+  if (isEggStage()) {
+    nudgeEgg('아직 세상 구경 전');
+    return false;
+  }
+  if (input.mode === 'drag') {
+    pet.caption = '손에서 못 감';
+    pet.captionT = 0;
+    return false;
+  }
+  if (battle && to !== 'home') {
+    pet.caption = '지금 싸우는 중';
+    pet.captionT = 0;
+    return false;
+  }
+  const exitSide = pet.x < W / 2 ? -1 : 1;
+  const targetY = clamp(pet.y + rand(-24, 24), H * 0.5, H * 0.78);
+  travel = {
+    to,
+    phase: 'leaving',
+    exitSide,
+    y: targetY,
+    t: 0,
+    startBattle: Boolean(options.startBattle),
+  };
+  clearPlaceObjects();
+  pet.behavior = 'travel';
+  pet.behaviorT = 60;
+  pet.target.x = exitSide < 0 ? -70 : W + 70;
+  pet.target.y = targetY;
+  pet.caption = to === 'battle' ? randomLine(TRAVEL_BATTLE_LINES) : to === 'walk' ? randomLine(TRAVEL_WALK_LINES) : '집에 감';
+  pet.captionT = 0;
+  return true;
+}
+function travelTarget() {
+  if (!travel) return null;
+  if (travel.phase === 'leaving') {
+    return { x: travel.exitSide < 0 ? -70 : W + 70, y: travel.y };
+  }
+  return travelArrivalPoint(travel.to);
+}
+function completeTravelStep() {
+  if (!travel) return;
+  if (travel.phase === 'leaving') {
+    place = travel.to;
+    travel.phase = 'arriving';
+    travel.t = 0;
+    const entrySide = -travel.exitSide;
+    pet.x = entrySide < 0 ? -70 : W + 70;
+    const arrival = travelArrivalPoint(travel.to);
+    pet.y = arrival.y;
+    pet.vx = 0;
+    pet.vy = 0;
+    pet.target.x = arrival.x;
+    pet.target.y = arrival.y;
+    pet.caption = travel.to === 'battle' ? '여기 싸움터' : travel.to === 'walk' ? '여기 바깥' : '집 보임';
+    pet.captionT = 0;
+    return;
+  }
+  const destination = travel.to;
+  const shouldStartBattle = travel.startBattle;
+  travel = null;
+  if (destination === 'walk') {
+    rememberCare('밖 냄새 맡은 날');
+    affectNeed('energy', -0.025);
+    affectNeed('bond', 0.012);
+    careStats.grime = clamp(careStats.grime + 0.018, 0, 1);
+    pet.caption = randomLine(WALK_ARRIVE_LINES);
+    pet.captionT = 0;
+    pet.happy = Math.max(pet.happy, 0.58);
+    for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-24, 24), pet.y + rand(-8, 8));
+    pet.behavior = 'sniff';
+    pet.behaviorT = rand(BEHAVIORS.sniff.dur[0], BEHAVIORS.sniff.dur[1]);
+  } else if (destination === 'battle' && shouldStartBattle) {
+    startBattleHere();
+  } else {
+    pet.caption = randomLine(RETURN_HOME_LINES);
+    pet.captionT = 0;
+    pet.behavior = 'stare';
+    pet.behaviorT = rand(BEHAVIORS.stare.dur[0], BEHAVIORS.stare.dur[1]);
+  }
+}
+function updateTravel(dt) {
+  if (!travel) return;
+  travel.t += dt;
+  if (travel.t > 5) completeTravelStep();
+}
 function fetchSkillLevel() {
   return clamp(careStats.fetchCount / 8, 0, 1);
 }
@@ -346,6 +457,11 @@ function launchBall() {
   };
 }
 function requestPlayBall() {
+  if (awayFromHome() || travel) {
+    pet.caption = awayFromHome() ? '집에 공 있음' : '가는 중이라 안 됨';
+    pet.captionT = 0;
+    return;
+  }
   if (battle) {
     pet.caption = '지금 바쁨';
     pet.captionT = 0;
@@ -455,6 +571,15 @@ function recordFetchComplete() {
   requestAiLine('fetch_done', false);
 }
 function requestBattle() {
+  if (battle) {
+    cheerBattle();
+    return;
+  }
+  if (travel) {
+    pet.caption = '가는 중이라 안 됨';
+    pet.captionT = 0;
+    return;
+  }
   if (isEggStage()) {
     nudgeEgg('아직 세상 구경 전');
     return;
@@ -476,10 +601,13 @@ function requestBattle() {
     affectNeed('bond', 0.004);
     return;
   }
-  if (battle) {
-    cheerBattle();
+  if (place !== 'battle') {
+    startTravel('battle', { startBattle: true });
     return;
   }
+  startBattleHere();
+}
+function startBattleHere() {
   const foeX = pet.x < W / 2 ? W * 0.72 : W * 0.28;
   battle = {
     x: clamp(foeX, 90, W - 90),
@@ -500,6 +628,33 @@ function requestBattle() {
   pet.captionT = 0;
   rememberCare('처음 싸움 구경한 날');
   requestAiLine('battle_start', false);
+}
+function requestWalk() {
+  if (isEggStage()) {
+    nudgeEgg('아직 세상 구경 전');
+    return;
+  }
+  if (travel) {
+    pet.caption = '이미 가는 중';
+    pet.captionT = 0;
+    return;
+  }
+  if (battle) {
+    pet.caption = '끝나고 갈래';
+    pet.captionT = 0;
+    return;
+  }
+  if (place !== 'home') {
+    startTravel('home');
+    return;
+  }
+  if (food) {
+    pet.caption = '밥 먼저 봄';
+    pet.captionT = 0;
+    setBehavior('eat');
+    return;
+  }
+  startTravel('walk');
 }
 function cheerBattle() {
   if (!battle || battle.phase !== 'active') return;
@@ -675,6 +830,11 @@ function mealCaption(foodType) {
   return '처음 밥이다';
 }
 function requestRest() {
+  if (awayFromHome() || travel) {
+    pet.caption = awayFromHome() ? '집 가서 누울래' : '가는 중이라 안 됨';
+    pet.captionT = 0;
+    return;
+  }
   if (battle) {
     pet.caption = '끝나고 누울래';
     pet.captionT = 0;
@@ -724,6 +884,7 @@ function recordPetting(amount) {
   careStats.lastPetAt = now;
 }
 function updateCare(dt, { airborne, speed }) {
+  updateTravel(dt);
   updateBattle(dt);
   if (pet.stageTween) {
     pet.stageTween.t += dt;

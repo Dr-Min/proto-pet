@@ -10,6 +10,7 @@
     --care-warm: #e8b87f;
     --care-cool: #b8c7d7;
     --care-play: #dba6b4;
+    --care-walk: #b9cfa6;
     --care-battle: #c7b1d8;
   }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -28,6 +29,7 @@
     user-select: none;
   }
   #gauges, #actions { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  #actions { flex-wrap: wrap; max-width: min(480px, calc(100vw - 24px)); }
   #memoryLine {
     max-width: min(360px, calc(100vw - 24px));
     min-height: 14px;
@@ -40,7 +42,7 @@
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .bar { width: clamp(56px, 17vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 50%; background: var(--care-hunger); border-radius: 5px; }
-  #feedBtn, #restBtn, #playBtn, #battleBtn {
+  #feedBtn, #restBtn, #playBtn, #walkBtn, #battleBtn {
     min-height: 44px; padding: 10px 14px; border: none; border-radius: 22px;
     background: var(--care-warm); color: #5a4632;
     font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
@@ -48,9 +50,10 @@
   }
   #restBtn { background: var(--care-cool); color: #3f4d58; }
   #playBtn { background: var(--care-play); color: #5b3f49; }
+  #walkBtn { background: var(--care-walk); color: #46573d; }
   #battleBtn { background: var(--care-battle); color: #4d4358; }
-  #feedBtn:active, #restBtn:active, #playBtn:active, #battleBtn:active { transform: scale(0.96); }
-  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #battleBtn.is-locked {
+  #feedBtn:active, #restBtn:active, #playBtn:active, #walkBtn:active, #battleBtn:active { transform: scale(0.96); }
+  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked {
     opacity: 0.58;
     filter: saturate(0.72);
   }
@@ -60,5 +63,6 @@
     #memoryLine { max-width: calc(100vw - 20px); }
     .g { gap: 4px; }
     .bar { width: 48px; }
-    #feedBtn, #restBtn, #playBtn, #battleBtn { padding: 10px 9px; font-size: 12px; }
+    #actions { gap: 6px; max-width: 300px; }
+    #feedBtn, #restBtn, #playBtn, #walkBtn, #battleBtn { min-height: 40px; padding: 9px 10px; font-size: 12px; }
   }

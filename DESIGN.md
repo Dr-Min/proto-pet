@@ -28,11 +28,16 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Care/warm | --care-warm | #e8b87f | n/a | Feed button |
 | Care/cool | --care-cool | #b8c7d7 | n/a | Rest button |
 | Care/play | --care-play | #dba6b4 | n/a | Play/fetch button |
+| Care/walk | --care-walk | #b9cfa6 | n/a | Walk and return-home button |
 | Care/battle | --care-battle | #c7b1d8 | n/a | Battle and cheer button |
 | Play/ball | --play-ball | #d98f7a | n/a | Fetch ball body |
 | Play/ball-seam | --play-ball-seam | rgba(96,74,56,0.4) | n/a | Fetch ball stitch line |
 | Battle/foe | --battle-foe | #c9b7a2 | n/a | Small sparring opponent body |
 | Battle/foe-dark | --battle-foe-dark | rgba(90,70,55,0.32) | n/a | Opponent outline and face |
+| World/walk-floor | --world-walk-floor | #e1e7d1 | n/a | Outdoor walk ground plane |
+| World/walk-path | --world-walk-path | #d7ccb7 | n/a | Outdoor walk path |
+| World/battle-floor | --world-battle-floor | #e2d8c7 | n/a | Training ground plane |
+| World/battle-ring | --world-battle-ring | rgba(120,96,72,0.22) | n/a | Subtle sparring ring marks |
 | Pet/grime | --pet-grime | rgba(96,74,56,0.18) | n/a | Subtle dust marks after long absence |
 | Food/kibble-base | --food-kibble-base | #f0c98b | n/a | Default round food bowl |
 | Food/kibble-top | --food-kibble-top | #d59b57 | n/a | Default round food mound |
@@ -168,12 +173,21 @@ All spacing derives from a base of 4px.
 
 ### Battle Loop
 
-- **Structure**: a single action button starts adult-only auto battle, then becomes cheer while a battle is active.
-- **Variants**: unavailable before adult, start battle, cheer, ignored cheer, win, tired return.
+- **Structure**: a single action button sends the adult pet out of the home scene, changes to a training-ground location, starts auto battle there, then becomes cheer while a battle is active.
+- **Variants**: unavailable before adult, walking to battle, start battle, cheer, ignored cheer, win, tired return.
 - **Spacing**: no new gauge; battle uses canvas-only opponent and keeps the bottom control cluster compact on 320px+ mobile.
 - **States**: inactive, active, cheered, won, tired.
 - **Accessibility**: battle and cheer are native button actions, and every battle outcome has a visible pet caption and memory line.
 - **Motion**: opponent is a simple procedural blob; pet movement, dust, hearts, squash, and wobble reuse the existing simulation.
+
+### Place Travel
+
+- **Structure**: canvas-only location state with `home`, `walk`, and `battle`; action buttons change labels instead of opening menus.
+- **Variants**: home, leaving home, arriving outdoors, arriving at training ground, returning home.
+- **Spacing**: no extra panel; the bottom controls may wrap to two lines on narrow mobile widths.
+- **States**: idle at home, traveling, walking place, battle place, active battle.
+- **Accessibility**: native buttons expose the same actions; captions confirm movement and arrival.
+- **Motion**: the pet physically walks toward the screen edge before the background changes, then walks in from the opposite edge.
 
 ### AI Line Fallback
 
