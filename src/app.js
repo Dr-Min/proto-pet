@@ -180,12 +180,13 @@ function makeWalkGrass(rng, count) {
   const clusters = [];
   for (let i = 0; i < count; i++) {
     const blades = [];
-    const bladeCount = 3 + Math.floor(rng() * 3);
+    const bladeCount = 4 + Math.floor(rng() * 3);
     for (let j = 0; j < bladeCount; j++) {
       blades.push({
-        ox: (j - (bladeCount - 1) / 2) * (0.012 + rng() * 0.006),
-        h: 0.038 + rng() * 0.026,
-        lean: -0.45 + rng() * 0.9,
+        ox: (j - (bladeCount - 1) / 2) * (0.009 + rng() * 0.004),
+        h: 0.024 + rng() * 0.016,
+        lean: -0.22 + rng() * 0.44,
+        root: -0.006 + rng() * 0.012,
       });
     }
     clusters.push({

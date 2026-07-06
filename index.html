@@ -21,10 +21,35 @@
     <button id="feedBtn">밥주기</button>
     <button id="restBtn">재우기</button>
     <button id="playBtn">공놀이</button>
-    <button id="walkBtn">산책</button>
-    <button id="battleBtn">전투</button>
+    <button id="moreBtn" aria-expanded="false" aria-controls="moreSheet">⋯</button>
+    <button id="returnBtn" class="is-context">귀가</button>
   </div>
 </div>
+<div id="sheetScrim" class="overlay-scrim" hidden></div>
+<div id="moreSheet" class="bottom-sheet" hidden>
+  <button id="walkBtn">산책</button>
+  <button id="battleBtn">전투</button>
+  <button id="notebookBtn">수첩</button>
+</div>
+<div id="notebookScrim" class="overlay-scrim" hidden></div>
+<section id="notebookPanel" class="notebook-panel" aria-label="수첩" hidden>
+  <button id="notebookCloseBtn" class="notebook-close" aria-label="닫기">닫기</button>
+  <div class="notebook-content">
+    <h2>수첩</h2>
+    <section>
+      <h3>자람</h3>
+      <p id="notebookStage"></p>
+    </section>
+    <section id="notebookTraitsSection">
+      <h3>성격</h3>
+      <ul id="notebookTraits"></ul>
+    </section>
+    <section>
+      <h3>기억들</h3>
+      <ul id="notebookMemories"></ul>
+    </section>
+  </div>
+</section>
 <script src="./src/render.js" defer></script>
 <script src="./src/app.js" defer></script>
 <script src="./src/care.js" defer></script>

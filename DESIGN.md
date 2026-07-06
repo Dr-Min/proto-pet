@@ -30,6 +30,9 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Care/play | --care-play | #dba6b4 | n/a | Play/fetch button |
 | Care/walk | --care-walk | #b9cfa6 | n/a | Walk and return-home button |
 | Care/battle | --care-battle | #c7b1d8 | n/a | Battle and cheer button |
+| Surface/panel | --surface-panel | #e8dfcb | n/a | Tonal-shift bottom sheet and notebook overlay |
+| Surface/panel-deep | --surface-panel-deep | #ded3bd | n/a | Pressed/locked tonal-shift panel controls |
+| Surface/scrim | --surface-scrim | rgba(116,96,72,0.14) | n/a | Quiet outside-tap layer behind overlays |
 | Play/ball | --play-ball | #d98f7a | n/a | Fetch ball body |
 | Play/ball-seam | --play-ball-seam | rgba(96,74,56,0.4) | n/a | Fetch ball stitch line |
 | Battle/foe | --battle-foe | #c9b7a2 | n/a | Small sparring opponent body |

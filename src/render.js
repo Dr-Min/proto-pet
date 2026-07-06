@@ -189,11 +189,12 @@ function drawWalkGrass(t) {
     ctx.lineWidth = Math.max(1.2, 1.5 * s);
     for (const blade of cluster.blades) {
       const ox = blade.ox * W;
-      const sway = Math.sin(t * 1.8 + cluster.phase + ox * 0.02) * 7 * s;
+      const root = blade.root * W;
+      const sway = Math.sin(t * 1.8 + cluster.phase + ox * 0.02) * 3.2 * s;
       const h = blade.h * H * s;
       ctx.beginPath();
-      ctx.moveTo(bx + ox, by);
-      ctx.quadraticCurveTo(bx + ox + blade.lean * 8 * s + sway * 0.3, by - h * 0.55, bx + ox + sway, by - h);
+      ctx.moveTo(bx + root, by);
+      ctx.quadraticCurveTo(bx + ox + blade.lean * 4 * s + sway * 0.35, by - h * 0.52, bx + ox + blade.lean * 7 * s + sway, by - h);
       ctx.stroke();
     }
   }

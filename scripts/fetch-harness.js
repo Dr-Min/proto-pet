@@ -15,9 +15,14 @@ function makeContext() {
       const listeners = {};
       elements.set(id, {
         id,
+        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+        dataset: {},
         style: {},
+        hidden: false,
         listeners,
         textContent: '',
+        appendChild() {},
+        setAttribute() {},
         addEventListener(type, handler) {
           listeners[type] = handler;
         },
@@ -55,7 +60,11 @@ function makeContext() {
       addEventListener() {},
     },
     document: {
+      body: { dataset: {} },
       getElementById: element,
+      createElement(tag) {
+        return { tagName: tag.toUpperCase(), textContent: '', appendChild() {} };
+      },
       addEventListener() {},
       hidden: false,
     },

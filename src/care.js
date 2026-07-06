@@ -22,6 +22,7 @@ const careStats = {
   battleWins: 0,
   lastBattleAt: 0,
   grime: 0,
+  memoryLog: ['아직 세상 구경 전'],
 };
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
@@ -143,6 +144,7 @@ function saveCareState() {
       battleWins: careStats.battleWins,
       lastBattleAt: careStats.lastBattleAt,
       grime: careStats.grime,
+      memoryLog: careStats.memoryLog,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -187,6 +189,7 @@ function loadCareState() {
     careStats.petStrokes = Math.max(0, Number.isFinite(savedPetStrokes) ? savedPetStrokes : careStats.petStrokes);
     careStats.lastPetAt = Math.max(0, Number.isFinite(savedLastPetAt) ? savedLastPetAt : careStats.lastPetAt);
     careStats.lastCareLine = typeof saved.lastCareLine === 'string' ? saved.lastCareLine : careStats.lastCareLine;
+    careStats.memoryLog = migrateMemoryLog(saved.memoryLog, careStats.lastCareLine);
     careStats.lastCareAt = Math.max(0, Number.isFinite(savedLastCareAt) ? savedLastCareAt : careStats.lastCareAt);
     careStats.favoriteMeals = Math.max(0, Math.floor(Number.isFinite(savedFavoriteMeals) ? savedFavoriteMeals : careStats.favoriteMeals));
     careStats.routineBits = Math.floor(clamp(Number.isFinite(savedRoutineBits) ? savedRoutineBits : careStats.routineBits, 0, 7));
@@ -229,6 +232,10 @@ function migrateStage(savedStage, saved) {
   const hasHistory = Number(saved.mealsFed) > 0 || Number(saved.napsTaken) > 0 || Number(saved.petStrokes) > 0 || Number(saved.fetchCount) > 0;
   if (!hasHistory) return 'egg';
   return adultConditionCount() >= 2 ? 'adult' : 'baby';
+}
+function migrateMemoryLog(savedLog, currentLine) {
+  if (!Array.isArray(savedLog)) return currentLine ? [currentLine] : [];
+  return savedLog.filter(line => typeof line === 'string' && line.trim()).slice(-30);
 }
 function isEggStage() { return currentStage() === 'egg'; }
 function isBabyStage() { return currentStage() === 'baby'; }
@@ -916,6 +923,8 @@ function careMood() {
 function rememberCare(line) {
   careStats.lastCareLine = line;
   careStats.lastCareAt = Date.now();
+  careStats.memoryLog.push(line);
+  if (careStats.memoryLog.length > 30) careStats.memoryLog.splice(0, careStats.memoryLog.length - 30);
 }
 function hasCareTrait(name) {
   return Boolean(careStats.traitMask & CARE_TRAITS[name].bit);

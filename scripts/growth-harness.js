@@ -15,10 +15,13 @@ function makeContext(search = '?seed=12345') {
       const listeners = {};
       elements.set(id, {
         id,
-        classList: { toggle() {} },
+        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+        dataset: {},
         style: {},
+        hidden: false,
         listeners,
         textContent: '',
+        appendChild() {},
         setAttribute() {},
         addEventListener(type, handler) {
           listeners[type] = handler;
@@ -59,6 +62,9 @@ function makeContext(search = '?seed=12345') {
     document: {
       body: { dataset: {} },
       getElementById: element,
+      createElement(tag) {
+        return { tagName: tag.toUpperCase(), textContent: '', appendChild() {} };
+      },
       addEventListener() {},
       hidden: false,
     },
@@ -119,8 +125,20 @@ function testBabyPlayIsLocked() {
   assert(state.caption === '아직 공 몰라', 'baby play lock uses the planned caption');
 }
 
+function testMemoryLogMigratesAndKeepsRecentLines() {
+  const context = makeContext();
+  run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, lastCareLine: '손길을 기억함', ts: Date.now() })); loadCareState();`);
+  let state = run(context, '({ memoryLog: careStats.memoryLog.slice(), memory: careStats.lastCareLine })');
+  assert(state.memoryLog.length === 1 && state.memoryLog[0] === '손길을 기억함', 'old saves seed memoryLog from lastCareLine');
+  run(context, 'for (let i = 0; i < 35; i++) rememberCare(`기억 ${i}`);');
+  state = run(context, '({ length: careStats.memoryLog.length, first: careStats.memoryLog[0], last: careStats.memoryLog[careStats.memoryLog.length - 1] })');
+  assert(state.length === 30, 'memoryLog keeps the recent 30 lines');
+  assert(state.first === '기억 5' && state.last === '기억 34', 'memoryLog drops oldest lines first');
+}
+
 testEggActionsStayInEgg();
 testWarmEggHatchesAfterAgeGate();
 testBabyGrowsOnNextSleepWhenReady();
 testBabyPlayIsLocked();
+testMemoryLogMigratesAndKeepsRecentLines();
 console.log('growth harness passed');

@@ -12,6 +12,9 @@
     --care-play: #dba6b4;
     --care-walk: #b9cfa6;
     --care-battle: #c7b1d8;
+    --surface-panel: #e8dfcb;
+    --surface-panel-deep: #ded3bd;
+    --surface-scrim: rgba(116,96,72,0.14);
   }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
   canvas { display: block; touch-action: none; }
@@ -29,7 +32,7 @@
     user-select: none;
   }
   #gauges, #actions { display: flex; align-items: center; justify-content: center; gap: 10px; }
-  #actions { flex-wrap: wrap; max-width: min(480px, calc(100vw - 24px)); }
+  #actions { width: min(420px, calc(100vw - 24px)); }
   #memoryLine {
     max-width: min(360px, calc(100vw - 24px));
     min-height: 14px;
@@ -42,27 +45,90 @@
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .bar { width: clamp(56px, 17vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 50%; background: var(--care-hunger); border-radius: 5px; }
-  #feedBtn, #restBtn, #playBtn, #walkBtn, #battleBtn {
+  #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #notebookBtn, #notebookCloseBtn {
     min-height: 44px; padding: 10px 14px; border: none; border-radius: 22px;
     background: var(--care-warm); color: #5a4632;
     font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
     cursor: pointer; touch-action: manipulation; white-space: nowrap;
   }
+  #feedBtn, #restBtn, #playBtn, #moreBtn { flex: 1 1 0; min-width: 0; }
   #restBtn { background: var(--care-cool); color: #3f4d58; }
   #playBtn { background: var(--care-play); color: #5b3f49; }
+  #moreBtn { background: var(--surface-panel); color: var(--text-ui); font-size: 18px; line-height: 1; }
+  #returnBtn { display: none; width: 100%; background: var(--care-walk); color: #46573d; }
   #walkBtn { background: var(--care-walk); color: #46573d; }
   #battleBtn { background: var(--care-battle); color: #4d4358; }
-  #feedBtn:active, #restBtn:active, #playBtn:active, #walkBtn:active, #battleBtn:active { transform: scale(0.96); }
-  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked {
+  #notebookBtn, #notebookCloseBtn { background: transparent; color: var(--text-ui); }
+  #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #notebookBtn:active, #notebookCloseBtn:active { transform: scale(0.96); }
+  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #notebookBtn.is-locked {
     opacity: 0.58;
     filter: saturate(0.72);
   }
+  body[data-away="true"] #feedBtn, body[data-away="true"] #restBtn, body[data-away="true"] #playBtn, body[data-away="true"] #moreBtn { display: none; }
+  body[data-away="true"] #returnBtn { display: block; }
+  .overlay-scrim {
+    position: fixed; inset: 0;
+    background: var(--surface-scrim);
+    touch-action: manipulation;
+  }
+  #sheetScrim { z-index: 4; }
+  #notebookScrim { z-index: 6; }
+  .bottom-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    box-sizing: border-box;
+    padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
+    background: var(--surface-panel);
+    display: flex; flex-direction: column; gap: 4px;
+    transform: translateY(110%);
+    transition: transform 180ms ease-out;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .bottom-sheet.is-open {
+    transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .bottom-sheet[hidden] { display: flex; }
+  .notebook-panel[hidden], .overlay-scrim[hidden] { display: none; }
+  .bottom-sheet button {
+    width: 100%;
+    background: transparent;
+    color: var(--text-ui);
+    text-align: left;
+    border-radius: 0;
+    padding: 12px 10px;
+  }
+  .bottom-sheet button:active { background: var(--surface-panel-deep); }
+  .notebook-panel {
+    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 7;
+    max-height: min(560px, calc(100dvh - 56px));
+    box-sizing: border-box;
+    padding: 12px 14px 16px;
+    overflow: auto;
+    background: var(--surface-panel);
+    color: var(--text-ui);
+    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+  }
+  .notebook-close {
+    float: right;
+    min-height: 44px;
+    padding: 8px 4px;
+  }
+  .notebook-content { clear: both; }
+  .notebook-panel h2, .notebook-panel h3, .notebook-panel p { margin: 0; }
+  .notebook-panel h2 { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--text-ui); }
+  .notebook-panel h3 { margin-top: 16px; font-size: 12px; line-height: 1.4; font-weight: 600; color: var(--text-muted); }
+  .notebook-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
+  .notebook-panel li { padding: 5px 0; color: var(--text-ui); }
+  .notebook-panel li + li { margin-top: 2px; }
   @media (max-width: 380px) {
     #ui { gap: 7px; padding-left: 10px; padding-right: 10px; font-size: 11px; }
     #gauges, #actions { gap: 7px; }
     #memoryLine { max-width: calc(100vw - 20px); }
     .g { gap: 4px; }
     .bar { width: 48px; }
-    #actions { gap: 6px; max-width: 300px; }
-    #feedBtn, #restBtn, #playBtn, #walkBtn, #battleBtn { min-height: 40px; padding: 9px 10px; font-size: 12px; }
+    #actions { gap: 6px; width: min(340px, calc(100vw - 20px)); }
+    #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #notebookBtn { min-height: 44px; padding: 9px 10px; font-size: 12px; }
+    #moreBtn { font-size: 18px; }
   }

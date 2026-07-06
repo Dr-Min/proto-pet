@@ -15,11 +15,14 @@ function makeContext(search = '?seed=12345') {
       const listeners = {};
       elements.set(id, {
         id,
-        classList: { toggle() {}, contains() { return false; } },
+        classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
         dataset: {},
         style: {},
+        hidden: false,
         listeners,
         textContent: '',
+        appendChild() {},
+        setAttribute() {},
         addEventListener(type, handler) {
           listeners[type] = handler;
         },
@@ -59,6 +62,9 @@ function makeContext(search = '?seed=12345') {
     document: {
       body: { dataset: {} },
       getElementById: element,
+      createElement(tag) {
+        return { tagName: tag.toUpperCase(), textContent: '', appendChild() {} };
+      },
       addEventListener() {},
       hidden: false,
     },
@@ -148,6 +154,21 @@ function testWalkTravelsOutAndReturnsHome() {
   assert(state.place === 'home', 'walk button returns home outside');
 }
 
+function testBottomBarSwitchesToReturnAwayFromHome() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; updateGauges(); __elements.get("moreBtn").listeners.click();');
+  let state = run(context, '({ sheetOpen: !__elements.get("moreSheet").hidden, away: document.body.dataset.away })');
+  assert(state.sheetOpen === true, 'more button opens the bottom sheet at home');
+  assert(state.away === 'false', 'home context keeps care actions visible');
+  run(context, 'requestWalk();');
+  tickUntil(context, 'currentPlace() === "walk" && !isTraveling()', 'walk arrival');
+  run(context, 'updateGauges();');
+  state = run(context, '({ away: document.body.dataset.away, returnText: __elements.get("returnBtn").textContent, sheetOpen: !__elements.get("moreSheet").hidden })');
+  assert(state.away === 'true', 'away context replaces the care action bar');
+  assert(state.returnText === '귀가', 'away context shows a return-home action');
+  assert(state.sheetOpen === false, 'leaving home closes the bottom sheet');
+}
+
 function testLongAbsenceAddsGrime() {
   const context = makeContext();
   run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, grime: 0, ts: Date.now() - 4 * 3600 * 1000 })); loadCareState();`);
@@ -159,5 +180,6 @@ testBattleRequiresAdult();
 testBattleCanWin();
 testCheerCanBeIgnoredWhenBondLow();
 testWalkTravelsOutAndReturnsHome();
+testBottomBarSwitchesToReturnAwayFromHome();
 testLongAbsenceAddsGrime();
 console.log('battle harness passed');
