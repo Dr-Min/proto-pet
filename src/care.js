@@ -23,6 +23,10 @@ const careStats = {
   lastBattleAt: 0,
   grime: 0,
   memoryLog: ['아직 세상 구경 전'],
+  pebbles: 0,
+  lastWalkPebbleDay: -1,
+  furnitureOwned: [],
+  stats: { tough: 0, quick: 0, power: 0 },
 };
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
@@ -58,12 +62,30 @@ const WALK_ARRIVE_LINES = ['바깥 냄새 남', '풀 냄새 발견', '여기 넓
 const RETURN_HOME_LINES = ['집이다', '돌아옴', '바닥 익숙함'];
 const WALK_DISCOVERY_LINES = ['풀 냄새 좋은 데 찾음', '냄새 좋은 바닥 찾음'];
 const WALK_DISCOVERY_CAPTIONS = ['여기 냄새 좋음', '킁킁 성공'];
+const SHINY_PEBBLE_CAPTIONS = ['반짝이는 거 주움', '반짝 하나 물고 옴'];
+const ROUTINE_PEBBLE_CAPTIONS = ['어디서 반짝 물어옴', '반짝 놓고 감'];
+const WHEEL_FALL_CAPTIONS = ['바퀴가 이김'];
+const WHEEL_RUN_CAPTIONS = ['다리 빠름', '바퀴 안에 있음'];
+const CUSHION_SLEEP_CAPTIONS = ['푹신한 데 있음', '여기 잠 잘 옴'];
 const BUTTERFLY_START_LINES = ['저거 움직임', '잡으러 감'];
 const BUTTERFLY_MISS_LINES = ['놓쳤다'];
 const BUTTERFLY_NOSE_LINES = ['코에 뭐 있음'];
 const AI_LINE_COOLDOWN = 12000;
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
+const STAT_KEYS = ['tough', 'quick', 'power'];
+const STAT_LABELS = { tough: '튼튼', quick: '빠름', power: '힘' };
+const STAT_OBSERVATIONS = {
+  tough: ['아직 평범함', '산책 뒤 덜 헉헉거림', '요즘 오래 버팀'],
+  quick: ['아직 평범함', '요즘 눈에 띄게 빨라짐', '발이 먼저 나감'],
+  power: ['아직 평범함', '부딪히면 제법 묵직함', '힘 쓰는 법 조금 앎'],
+};
+const furnitureState = {
+  wheelRunT: 0,
+  wheelSpin: 0,
+  wheelRewarded: false,
+  wheelCheered: false,
+};
 const CARE_TRAITS = {
   cuddly: { bit: 1, line: '손길 없으면 허전해짐', caption: '손 찾는 중' },
   foodie: { bit: 2, line: '나 밥 좋아하는 거 들킴', caption: '밥 냄새 기억함' },
@@ -143,9 +165,13 @@ function saveCareState() {
       hatchWarmth: careStats.hatchWarmth,
       battleWins: careStats.battleWins,
       lastBattleAt: careStats.lastBattleAt,
-      grime: careStats.grime,
-      memoryLog: careStats.memoryLog,
-      bondMilestone,
+	      grime: careStats.grime,
+	      memoryLog: careStats.memoryLog,
+	      pebbles: careStats.pebbles,
+	      lastWalkPebbleDay: careStats.lastWalkPebbleDay,
+	      furnitureOwned: careStats.furnitureOwned,
+	      stats: careStats.stats,
+	      bondMilestone,
       ts: Date.now(),
     }));
   } catch (_) {}
@@ -177,9 +203,11 @@ function loadCareState() {
     const savedStageChangedAt = Number(saved.stageChangedAt);
     const savedHatchWarmth = Number(saved.hatchWarmth);
     const savedBattleWins = Number(saved.battleWins);
-    const savedLastBattleAt = Number(saved.lastBattleAt);
-    const savedGrime = Number(saved.grime);
-    needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
+	    const savedLastBattleAt = Number(saved.lastBattleAt);
+	    const savedGrime = Number(saved.grime);
+	    const savedPebbles = Number(saved.pebbles);
+	    const savedLastWalkPebbleDay = Number(saved.lastWalkPebbleDay);
+	    needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
     careStats.mealsFed = Math.max(0, Math.floor(Number.isFinite(savedMealsFed) ? savedMealsFed : careStats.mealsFed));
@@ -202,9 +230,13 @@ function loadCareState() {
     careStats.stageChangedAt = Math.max(0, Number.isFinite(savedStageChangedAt) ? savedStageChangedAt : Date.now());
     careStats.hatchWarmth = clamp(Number.isFinite(savedHatchWarmth) ? savedHatchWarmth : (careStats.stage === 'egg' ? 0 : 1), 0, 1);
     careStats.battleWins = Math.max(0, Math.floor(Number.isFinite(savedBattleWins) ? savedBattleWins : careStats.battleWins));
-    careStats.lastBattleAt = Math.max(0, Number.isFinite(savedLastBattleAt) ? savedLastBattleAt : careStats.lastBattleAt);
-    careStats.grime = clamp((Number.isFinite(savedGrime) ? savedGrime : careStats.grime) + (away > 3 * 3600 ? away * 0.000012 : 0), 0, 1);
-    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
+	    careStats.lastBattleAt = Math.max(0, Number.isFinite(savedLastBattleAt) ? savedLastBattleAt : careStats.lastBattleAt);
+	    careStats.grime = clamp((Number.isFinite(savedGrime) ? savedGrime : careStats.grime) + (away > 3 * 3600 ? away * 0.000012 : 0), 0, 1);
+	    careStats.pebbles = Math.max(0, Math.floor(Number.isFinite(savedPebbles) ? savedPebbles : 0));
+	    careStats.lastWalkPebbleDay = Math.floor(Number.isFinite(savedLastWalkPebbleDay) ? savedLastWalkPebbleDay : -1);
+	    careStats.furnitureOwned = migrateFurnitureOwned(saved.furnitureOwned);
+	    careStats.stats = migrateStats(saved.stats, careStats.fetchCount);
+	    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
       pet.caption = careStats.grime > 0.55 ? '먼지 좀 붙음' : '기다렸어…';
       pet.captionT = 0;
@@ -237,6 +269,19 @@ function migrateMemoryLog(savedLog, currentLine) {
   if (!Array.isArray(savedLog)) return currentLine ? [currentLine] : [];
   return savedLog.filter(line => typeof line === 'string' && line.trim()).slice(-30);
 }
+function migrateFurnitureOwned(savedOwned) {
+  if (!Array.isArray(savedOwned)) return [];
+  return savedOwned.filter(id => furnitureItemById(id)).filter((id, index, owned) => owned.indexOf(id) === index);
+}
+function migrateStats(savedStats, fetchCount) {
+  const stats = { tough: 0, quick: clamp((fetchCount / 8) * 5, 0, 5), power: 0 };
+  if (!savedStats || typeof savedStats !== 'object') return stats;
+  for (const key of STAT_KEYS) {
+    const value = Number(savedStats[key]);
+    stats[key] = clamp(Number.isFinite(value) ? value : stats[key], 0, 5);
+  }
+  return stats;
+}
 function isEggStage() { return currentStage() === 'egg'; }
 function isBabyStage() { return currentStage() === 'baby'; }
 function canPlayBallNow() { return currentStage() === 'adult'; }
@@ -244,6 +289,147 @@ function currentPlace() { return place; }
 function isTraveling() { return Boolean(travel); }
 function travelState() { return travel ? { ...travel } : null; }
 function awayFromHome() { return place !== 'home'; }
+function dayStamp(time) {
+  const date = new Date(time);
+  return Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86400000);
+}
+function addStat(name, amount) {
+  if (!STAT_KEYS.includes(name)) return;
+  careStats.stats[name] = clamp(careStats.stats[name] + amount, 0, 5);
+}
+function addBattleStats(amount) {
+  addStat('tough', amount);
+  addStat('power', amount);
+}
+function hasFurniture(id) {
+  return careStats.furnitureOwned.includes(id);
+}
+function furnitureUsePoint(id) {
+  const anchor = furnitureAnchor(id);
+  if (id === 'window') return { x: clamp(anchor.x - 42, 90, W - 90), y: H * 0.58 };
+  return anchor;
+}
+function buyFurniture(id) {
+  const item = furnitureItemById(id);
+  if (!item || hasFurniture(id) || careStats.pebbles < item.price) return false;
+  careStats.pebbles -= item.price;
+  careStats.furnitureOwned.push(id);
+  pet.caption = `${item.name} 여기 둠`;
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.5);
+  saveCareState();
+  return true;
+}
+function resetWheelState() {
+  furnitureState.wheelRunT = 0;
+  furnitureState.wheelRewarded = false;
+  furnitureState.wheelCheered = false;
+}
+function setFurnitureBehaviorTarget(name) {
+  furnitureState.moveTargetId = '';
+  if (place !== 'home' || travel || battle) return;
+  if (name === 'sleep' && hasFurniture('cushion')) {
+    furnitureState.moveTargetId = 'cushion';
+    const target = furnitureUsePoint('cushion');
+    pet.target.x = target.x;
+    pet.target.y = target.y;
+    pet.caption = randomLine(CUSHION_SLEEP_CAPTIONS);
+    return;
+  }
+  if (name === 'sniff' && hasFurniture('plant') && Math.random() < 0.65) {
+    furnitureState.moveTargetId = 'plant';
+    const target = furnitureUsePoint('plant');
+    pet.target.x = target.x;
+    pet.target.y = target.y;
+    return;
+  }
+  if (name === 'stare' && hasFurniture('window') && Math.random() < 0.45) {
+    furnitureState.moveTargetId = 'window';
+    const target = furnitureUsePoint('window');
+    pet.target.x = target.x;
+    pet.target.y = target.y;
+    pet.dir = furnitureAnchor('window').x > pet.x ? 1 : -1;
+  }
+  if (name === 'wheel' && hasFurniture('wheel')) {
+    resetWheelState();
+    furnitureState.moveTargetId = 'wheel';
+    const target = furnitureUsePoint('wheel');
+    pet.target.x = target.x;
+    pet.target.y = target.y;
+  }
+}
+function furnitureMoveTarget() {
+  if (!furnitureState.moveTargetId || place !== 'home' || travel || battle || input.mode === 'drag') return null;
+  if (pet.behavior === 'sleep' && furnitureState.moveTargetId === 'cushion') return furnitureUsePoint('cushion');
+  if (pet.behavior === 'stare' && furnitureState.moveTargetId === 'window') return furnitureUsePoint('window');
+  if (pet.behavior === 'wheel' && furnitureState.moveTargetId === 'wheel') return furnitureUsePoint('wheel');
+  return null;
+}
+function isUsingCushion() {
+  return pet.behavior === 'sleep' && hasFurniture('cushion') && dist(pet.x, pet.y, furnitureUsePoint('cushion').x, furnitureUsePoint('cushion').y) < 42;
+}
+function recordWheelSession(fell) {
+  if (furnitureState.wheelRewarded || furnitureState.wheelRunT < 2) return;
+  furnitureState.wheelRewarded = true;
+  addStat('quick', furnitureState.wheelCheered ? 0.1 : 0.08);
+  affectNeed('energy', furnitureState.wheelCheered ? -0.06 : -0.05);
+  pet.caption = fell ? randomLine(WHEEL_FALL_CAPTIONS) : randomLine(WHEEL_RUN_CAPTIONS);
+  pet.captionT = 0;
+  if (!fell) pet.happy = Math.max(pet.happy, 0.55);
+}
+function cheerWheelAt(x, y) {
+  if (place !== 'home' || pet.behavior !== 'wheel' || !hasFurniture('wheel')) return false;
+  const anchor = furnitureAnchor('wheel');
+  const s = depthScaleAt(anchor.y);
+  if (dist(x, y, anchor.x, anchor.y - 28 * s) > 54 * s) return false;
+  furnitureState.wheelCheered = true;
+  pet.happy = Math.max(pet.happy, 0.8);
+  affectNeed('bond', 0.006);
+  for (let i = 0; i < 3; i++) spawn('heart', anchor.x + rand(-18, 18), anchor.y - 52 * s + rand(-8, 8));
+  pet.caption = '보고 있음';
+  pet.captionT = 0;
+  return true;
+}
+function updateFurnitureUse(dt) {
+  if (pet.behavior !== 'wheel') {
+    recordWheelSession(false);
+    furnitureState.wheelRunT = 0;
+    return;
+  }
+  if (place !== 'home' || !hasFurniture('wheel') || needs.energy < 0.18) {
+    pet.behavior = 'stare';
+    pet.behaviorT = 1.5;
+    pet.caption = '다리 쉬는 중';
+    pet.captionT = 0;
+    return;
+  }
+  const target = furnitureUsePoint('wheel');
+  if (dist(pet.x, pet.y, target.x, target.y) > 26) return;
+  furnitureState.wheelRunT += dt;
+  furnitureState.wheelSpin += dt * (7.2 + furnitureState.wheelRunT * 0.55);
+  pet.walkPhase += dt * 28;
+  pet.squashVel = clamp(pet.squashVel + Math.sin(pet.wobblePhase * 8) * 0.08, -10, 10);
+  affectNeed('energy', -dt * 0.006);
+  if (!furnitureState.wheelRewarded && furnitureState.wheelRunT > 2.6 && Math.random() < dt * 0.08) {
+    recordWheelSession(true);
+    pet.tripT = 0.95;
+    pet.squashVel = clamp(pet.squashVel - 5.5, -12, 12);
+    pet.behavior = 'stare';
+    pet.behaviorT = 2;
+    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-22, 22), pet.y + rand(-6, 8));
+  } else if (pet.behaviorT < 0.25) {
+    recordWheelSession(false);
+  }
+}
+function grantPebbles(count, captions) {
+  careStats.pebbles = Math.max(0, careStats.pebbles + count);
+  pet.caption = randomLine(captions);
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.62);
+  for (let i = 0; i < Math.min(6, count + 2); i++) spawn('spark', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(0.7, 1.45));
+  saveCareState();
+  return count;
+}
 function clearPlaceObjects() {
   food = null;
   ball = null;
@@ -296,9 +482,10 @@ function startTravel(to, options = {}) {
   const exitSide = pet.x < W / 2 ? -1 : 1;
   const targetY = clamp(pet.y + rand(-24, 24), H * 0.5, H * 0.78);
   if (to !== 'walk') endWalkVisit();
-  travel = {
-    to,
-    phase: 'leaving',
+	  travel = {
+	    to,
+	    from: place,
+	    phase: 'leaving',
     exitSide,
     y: targetY,
     t: 0,
@@ -338,9 +525,10 @@ function completeTravelStep() {
     pet.captionT = 0;
     return;
   }
-  const destination = travel.to;
-  const shouldStartBattle = travel.startBattle;
-  travel = null;
+	  const destination = travel.to;
+	  const origin = travel.from;
+	  const shouldStartBattle = travel.startBattle;
+	  travel = null;
   if (destination === 'walk') {
     beginWalkVisit();
     rememberCare('밖 냄새 맡은 날');
@@ -355,8 +543,9 @@ function completeTravelStep() {
     pet.behaviorT = rand(BEHAVIORS.sniff.dur[0], BEHAVIORS.sniff.dur[1]);
   } else if (destination === 'battle' && shouldStartBattle) {
     startBattleHere();
-  } else {
-    pet.caption = randomLine(RETURN_HOME_LINES);
+	  } else {
+	    if (destination === 'home' && origin === 'walk') addStat('tough', 0.04);
+	    pet.caption = randomLine(RETURN_HOME_LINES);
     pet.captionT = 0;
     pet.behavior = 'stare';
     pet.behaviorT = rand(BEHAVIORS.stare.dur[0], BEHAVIORS.stare.dur[1]);
@@ -368,7 +557,7 @@ function updateTravel(dt) {
   if (travel.t > 5) completeTravelStep();
 }
 function fetchSkillLevel() {
-  return clamp(careStats.fetchCount / 8, 0, 1);
+  return clamp(careStats.stats.quick / 5, 0, 1);
 }
 function fetchChaseSpeed(baseSpeed) {
   return baseSpeed * (1 + fetchSkillLevel() * 0.32);
@@ -377,14 +566,18 @@ function fetchTripMultiplier() {
   return 1 - fetchSkillLevel() * 0.55;
 }
 function battleFocusChance() {
-  return clamp(0.35 + needs.bond * 0.42 + careStats.fetchCount * 0.018 + (hasCareTrait('mellow') ? 0.04 : 0), 0.2, 0.92);
+  return clamp(0.35 + needs.bond * 0.42 + careStats.stats.quick * 0.035 + (hasCareTrait('mellow') ? 0.04 : 0), 0.2, 0.92);
 }
 function battlePower() {
   const foodBoost = hasCareTrait('foodie') && needs.hunger > 0.5 ? 0.08 : 0;
-  return 0.86 + fetchSkillLevel() * 0.2 + needs.energy * 0.18 + needs.bond * 0.18 + foodBoost;
+  return 0.86 + fetchSkillLevel() * 0.2 + careStats.stats.power * 0.025 + needs.energy * 0.18 + needs.bond * 0.18 + foodBoost;
 }
 function grantWalkDiscoveryShinyPebble() {
-  return 0;
+  const today = dayStamp(Date.now());
+  const firstToday = careStats.lastWalkPebbleDay !== today;
+  const count = firstToday ? 2 + ((today + genes.seed) % 2) : 1;
+  careStats.lastWalkPebbleDay = today;
+  return grantPebbles(count, SHINY_PEBBLE_CAPTIONS);
 }
 function walkSniffSpot() {
   const spots = placeWorld.walk.sniffSpots;
@@ -396,13 +589,13 @@ function completeWalkDiscovery() {
   walkVisit.sniffT = 0;
   walkVisit.targetSpot += 1;
   walkVisit.nextDiscoveryAt = rand(8, 15);
-  rememberCare(randomLine(WALK_DISCOVERY_LINES));
-  grantWalkDiscoveryShinyPebble();
-  pet.caption = randomLine(WALK_DISCOVERY_CAPTIONS);
-  pet.captionT = 0;
-  pet.happy = Math.max(pet.happy, 0.55);
-  pet.behaviorT = Math.max(pet.behaviorT, 1.4);
-  for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-14, 14), pet.y + rand(-4, 8));
+	  rememberCare(randomLine(WALK_DISCOVERY_LINES));
+	  pet.caption = randomLine(WALK_DISCOVERY_CAPTIONS);
+	  pet.captionT = 0;
+	  pet.happy = Math.max(pet.happy, 0.55);
+	  pet.behaviorT = Math.max(pet.behaviorT, 1.4);
+	  for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-14, 14), pet.y + rand(-4, 8));
+	  grantWalkDiscoveryShinyPebble();
 }
 function updateWalkDiscovery(dt) {
   if (!walkVisit.active || walkVisit.discoveries >= walkVisit.maxDiscoveries) return;
@@ -731,7 +924,8 @@ function clearBallIfTimedOut() {
 function recordFetchComplete() {
   const firstFetch = careStats.fetchCount === 0;
   careStats.fetchCount += 1;
-  careStats.lastPlayAt = Date.now();
+	  careStats.lastPlayAt = Date.now();
+	  addStat('quick', 0.05);
   affectNeed('bond', 0.02);
   affectNeed('energy', -0.03);
   if (firstFetch) rememberCare('공 물어오기 배움');
@@ -858,19 +1052,23 @@ function finishBattle(won) {
   pet.behaviorT = 2.4;
   careStats.lastBattleAt = Date.now();
   affectNeed('energy', won ? -0.08 : -0.14);
-  if (won) {
-    careStats.battleWins += 1;
-    affectNeed('bond', 0.028);
-    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
-    pet.caption = randomLine(BATTLE_WIN_LINES);
-    pet.happy = Math.max(pet.happy, 0.85);
-    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
-  } else {
-    rememberCare('싸우고 푹 쉬는 날');
-    pet.caption = randomLine(BATTLE_LOSE_LINES);
-    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
-    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
-  }
+	  if (won) {
+	    careStats.battleWins += 1;
+	    addBattleStats(0.06);
+	    affectNeed('bond', 0.028);
+	    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
+	    pet.caption = randomLine(BATTLE_WIN_LINES);
+	    pet.happy = Math.max(pet.happy, 0.85);
+	    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
+	    grantPebbles(4, SHINY_PEBBLE_CAPTIONS);
+	  } else {
+	    addBattleStats(0.03);
+	    rememberCare('싸우고 푹 쉬는 날');
+	    pet.caption = randomLine(BATTLE_LOSE_LINES);
+	    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
+	    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
+	    grantPebbles(1, ['지긴 했는데 이거 주움']);
+	  }
   pet.captionT = 0;
   requestAiLine(won ? 'battle_win' : 'battle_tired', false);
 }
@@ -964,14 +1162,15 @@ function noteCareAction(kind) {
   if (careStats.routineBits !== 7) return false;
   careStats.routineBits = 0;
   careStats.routineCount += 1;
-  careStats.lastRoutineAt = Date.now();
-  affectNeed('bond', 0.045);
-  rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
-  pet.caption = careStats.routineCount > 1 ? '또 챙겨줬다' : '나 챙겨줬네';
+	  careStats.lastRoutineAt = Date.now();
+	  affectNeed('bond', 0.045);
+	  rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
+	  pet.caption = careStats.routineCount > 1 ? '또 챙겨줬다' : '나 챙겨줬네';
   pet.captionT = 0;
-  pet.happy = 1;
-  for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
-  return true;
+	  pet.happy = 1;
+	  for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
+	  grantPebbles(1, ROUTINE_PEBBLE_CAPTIONS);
+	  return true;
 }
 function isFavoriteFood(foodType) {
   return foodType.id === genes.favoriteFoodId;
@@ -1068,15 +1267,16 @@ function updateCare(dt, { airborne, speed }) {
   }
   if (pet.hatchFxT > 0) pet.hatchFxT = Math.max(0, pet.hatchFxT - dt);
   if (pet.eggShakeT > 0) pet.eggShakeT = Math.max(0, pet.eggShakeT - dt);
-  if (isEggStage()) {
+	  if (isEggStage()) {
     if (tryHatchEgg()) return;
     if (!isStagePreview()) careStats.hatchWarmth = clamp(careStats.hatchWarmth - dt * 0.004, 0, 1);
     return;
-  }
-  updateWalkPlace(dt);
-  roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);
-  affectNeed('hunger', -dt * (0.00042 + speed * 0.000003) * stageScale('hunger'));
-  affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012) * stageScale('energy'));
+	  }
+	  updateWalkPlace(dt);
+	  updateFurnitureUse(dt);
+	  roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);
+	  affectNeed('hunger', -dt * (0.00042 + speed * 0.000003) * stageScale('hunger'));
+	  affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 * (isUsingCushion() ? 1.3 : 1) : -dt * (0.0014 + speed * 0.000012) * stageScale('energy'));
   if (!airborne && input.mode !== 'drag' && !food && pet.behavior !== 'sleep' && needs.energy < 0.1) {
     setBehavior('sleep');
     pet.caption = '스르륵…';
@@ -1099,10 +1299,11 @@ function behaviorWeight(name, base) {
   if (name === 'sleep') w *= needs.energy < 0.3 ? 5 : needs.energy < 0.6 ? 2 : 1;
   if (name === 'plop') w *= needs.energy < 0.4 ? 2.2 : 1;
   if (name === 'zoomies' || name === 'wiggle') w *= needs.energy < 0.35 ? 0.15 : 1;
-  if (name === 'zoomies') w *= stageScale('zoomies');
-  if (name === 'sniff') w *= needs.hunger < 0.5 ? 2.2 : 1;
-  if (name === 'stare') w *= 1 + needs.bond * 1.8;
-  if (name === 'wiggle') w *= 1 + needs.bond * 1.2;
+	  if (name === 'zoomies') w *= stageScale('zoomies');
+	  if (name === 'sniff') w *= needs.hunger < 0.5 ? 2.2 : 1;
+	  if (name === 'stare') w *= 1 + needs.bond * 1.8;
+	  if (name === 'wheel') w *= place === 'home' && hasFurniture('wheel') && needs.energy > 0.42 && !food && !ball ? 1 : 0;
+	  if (name === 'wiggle') w *= 1 + needs.bond * 1.2;
   if (hasCareTrait('cuddly') && (name === 'stare' || name === 'wiggle')) w *= 1.45;
   if (hasCareTrait('foodie') && name === 'sniff') w *= 1.55;
   if (hasCareTrait('mellow') && (name === 'plop' || name === 'sleep')) w *= 1.35;

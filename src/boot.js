@@ -8,6 +8,7 @@ const moreBtn = document.getElementById('moreBtn');
 const returnBtn = document.getElementById('returnBtn');
 const walkBtn = document.getElementById('walkBtn');
 const battleBtn = document.getElementById('battleBtn');
+const shopBtn = document.getElementById('shopBtn');
 const notebookBtn = document.getElementById('notebookBtn');
 const sheetScrim = document.getElementById('sheetScrim');
 const moreSheet = document.getElementById('moreSheet');
@@ -17,7 +18,14 @@ const notebookCloseBtn = document.getElementById('notebookCloseBtn');
 const notebookStage = document.getElementById('notebookStage');
 const notebookTraitsSection = document.getElementById('notebookTraitsSection');
 const notebookTraits = document.getElementById('notebookTraits');
+const notebookPebbles = document.getElementById('notebookPebbles');
+const notebookBodyStats = document.getElementById('notebookBodyStats');
 const notebookMemories = document.getElementById('notebookMemories');
+const shopScrim = document.getElementById('shopScrim');
+const shopPanel = document.getElementById('shopPanel');
+const shopCloseBtn = document.getElementById('shopCloseBtn');
+const shopBalance = document.getElementById('shopBalance');
+const shopList = document.getElementById('shopList');
 const STAGE_NOTEBOOK_LABELS = { egg: '알', baby: '아기', adult: '어른' };
 const TRAIT_NOTEBOOK_LABELS = {
   cuddly: '손길 좋아함',
@@ -26,6 +34,7 @@ const TRAIT_NOTEBOOK_LABELS = {
 };
 closeMoreSheet();
 closeNotebook();
+closeShop();
 feedBtn.addEventListener('click', () => {
   if (isTraveling()) {
     pet.caption = '가는 중이라 안 됨';
@@ -88,12 +97,17 @@ battleBtn.addEventListener('click', () => {
   requestBattle();
   closeMoreSheet();
 });
+shopBtn.addEventListener('click', () => {
+  openShop();
+});
 notebookBtn.addEventListener('click', () => {
   openNotebook();
 });
 sheetScrim.addEventListener('click', closeMoreSheet);
 notebookScrim.addEventListener('click', closeNotebook);
 notebookCloseBtn.addEventListener('click', closeNotebook);
+shopScrim.addEventListener('click', closeShop);
+shopCloseBtn.addEventListener('click', closeShop);
 function openMoreSheet() {
   if (currentPlace() !== 'home' || isTraveling()) return;
   sheetScrim.hidden = false;
@@ -117,10 +131,37 @@ function closeNotebook() {
   notebookScrim.hidden = true;
   notebookPanel.hidden = true;
 }
+function openShop() {
+  closeMoreSheet();
+  renderShop();
+  shopScrim.hidden = false;
+  shopPanel.hidden = false;
+}
+function closeShop() {
+  shopScrim.hidden = true;
+  shopPanel.hidden = true;
+}
 function appendNotebookItem(list, text) {
   const item = document.createElement('li');
   item.textContent = text;
   list.appendChild(item);
+}
+function renderPawScale(value) {
+  const scale = document.createElement('div');
+  scale.className = 'paw-scale';
+  const filled = Math.round(clamp(value, 0, 5));
+  for (let i = 0; i < 5; i++) {
+    const mark = document.createElement('span');
+    mark.className = `paw-mark${i < filled ? ' is-filled' : ''}`;
+    scale.appendChild(mark);
+  }
+  return scale;
+}
+function statObservation(key, value) {
+  const lines = STAT_OBSERVATIONS[key];
+  if (value <= 1) return lines[0];
+  if (value <= 3) return lines[1];
+  return lines[2];
 }
 function renderNotebook() {
   notebookStage.textContent = STAGE_NOTEBOOK_LABELS[currentStage()] || '알';
@@ -128,9 +169,57 @@ function renderNotebook() {
   const traits = careTraitNames();
   notebookTraitsSection.hidden = traits.length === 0;
   for (const trait of traits) appendNotebookItem(notebookTraits, TRAIT_NOTEBOOK_LABELS[trait] || trait);
+  notebookPebbles.textContent = `주워온 반짝 ${careStats.pebbles}개`;
+  notebookBodyStats.textContent = '';
+  for (const key of STAT_KEYS) {
+    const row = document.createElement('div');
+    row.className = 'body-stat';
+    const label = document.createElement('div');
+    label.textContent = STAT_LABELS[key];
+    const observation = document.createElement('div');
+    observation.className = 'body-observation';
+    observation.textContent = statObservation(key, careStats.stats[key]);
+    row.appendChild(label);
+    row.appendChild(renderPawScale(careStats.stats[key]));
+    row.appendChild(observation);
+    notebookBodyStats.appendChild(row);
+  }
   notebookMemories.textContent = '';
   const memories = careStats.memoryLog.length ? careStats.memoryLog : [careStats.lastCareLine];
   for (const line of memories.slice().reverse()) appendNotebookItem(notebookMemories, line);
+}
+function renderShop() {
+  shopBalance.textContent = `주워온 반짝 ${careStats.pebbles}개`;
+  shopList.textContent = '';
+  for (const item of FURNITURE_ITEMS) {
+    const row = document.createElement('div');
+    row.className = 'shop-item';
+    const preview = document.createElement('canvas');
+    preview.className = 'shop-preview';
+    preview.setAttribute('aria-hidden', 'true');
+    if (typeof preview.getContext === 'function') drawFurniturePreviewCanvas(preview, item.id);
+    const text = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'shop-name';
+    name.textContent = item.name;
+    const note = document.createElement('div');
+    note.className = 'shop-note';
+    note.textContent = item.note;
+    text.appendChild(name);
+    text.appendChild(note);
+    const button = document.createElement('button');
+    button.className = 'shop-buy';
+    const owned = hasFurniture(item.id);
+    button.textContent = owned ? '집에 있음' : `${item.price}개`;
+    button.disabled = owned || careStats.pebbles < item.price;
+    button.addEventListener('click', () => {
+      if (buyFurniture(item.id)) renderShop();
+    });
+    row.appendChild(preview);
+    row.appendChild(text);
+    row.appendChild(button);
+    shopList.appendChild(row);
+  }
 }
 function setButtonLocked(button, locked) {
   button.classList.toggle('is-locked', locked);
@@ -157,6 +246,7 @@ function updateGauges() {
   setButtonLocked(playBtn, stage !== 'adult');
   setButtonLocked(walkBtn, stage === 'egg' || Boolean(battle));
   setButtonLocked(battleBtn, stage !== 'adult');
+  setButtonLocked(shopBtn, false);
   setButtonLocked(notebookBtn, false);
   returnBtn.textContent = traveling ? '이동중' : '귀가';
   setButtonLocked(returnBtn, traveling);

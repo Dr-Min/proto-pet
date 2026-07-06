@@ -161,6 +161,10 @@ function finishPointer(e) {
 
 cv.addEventListener('pointerdown', e => {
   mouse.x = e.clientX; mouse.y = e.clientY;
+  if (typeof cheerWheelAt === 'function' && cheerWheelAt(e.clientX, e.clientY)) {
+    e.preventDefault();
+    return;
+  }
   if (!petHitTest(e.clientX, e.clientY, 1.85)) return;
   input.active = true;
   input.pointerId = e.pointerId;

@@ -22,6 +22,20 @@ const FOOD_TYPES = [
   { id: 'berry', name: '베리 간식', fill: '#eeb0b7', top: '#ce7084', bits: '#89495b' },
   { id: 'leaf', name: '풀내음 밥', fill: '#c9d99a', top: '#94ad68', bits: '#5f7446' },
 ];
+const FURNITURE_ITEMS = [
+  { id: 'wheel', name: '쳇바퀴', price: 14, anchor: { x: 0.26, y: 0.66 }, note: '달리다 굴러도 진지함' },
+  { id: 'window', name: '창문', price: 10, anchor: { x: 0.76, y: 0.34 }, note: '멍하니 바깥 봄' },
+  { id: 'cushion', name: '쿠션', price: 8, anchor: { x: 0.56, y: 0.72 }, note: '잠이 더 푹신함' },
+  { id: 'plant', name: '화분', price: 6, anchor: { x: 0.16, y: 0.7 }, note: '냄새 맡을 거리' },
+];
+function furnitureItemById(id) {
+  return FURNITURE_ITEMS.find(item => item.id === id) || null;
+}
+function furnitureAnchor(id) {
+  const item = furnitureItemById(id);
+  if (!item) return { x: W / 2, y: H * 0.65 };
+  return { x: item.anchor.x * W, y: item.anchor.y * H };
+}
 function foodTypeById(id) {
   return FOOD_TYPES.find(type => type.id === id) || FOOD_TYPES[0];
 }
@@ -199,9 +213,17 @@ function makeWalkGrass(rng, count) {
   return clusters;
 }
 function makePlaceWorld() {
+  const homeRng = makeGeneRng(0xC0A51E);
   const walkRng = makeGeneRng(0x2A11CE);
   const battleRng = makeGeneRng(0xBA771E);
   return {
+    home: {
+      furnitureLumps: {
+        wheel: makeLumps(homeRng, 16, 0.06),
+        cushion: makeLumps(homeRng, 12, 0.08),
+        plant: makeLumps(homeRng, 9, 0.12),
+      },
+    },
     walk: {
       clouds: [
         { x: 0.2, y: 0.16, rx: 0.09, ry: 0.026, speed: 7, phase: walkRng() * 9, lumps: makeLumps(walkRng, 9, 0.16) },
@@ -394,7 +416,7 @@ function drawTail(ch, baseR) {
 // ---------- 파티클 (하트, Zzz, 먼지) ----------
 const particles = [];
 function spawn(type, x, y) {
-  particles.push({ type, x, y, vx: rand(-14, 14), vy: rand(-46, -26), life: 1.4, t: 0 });
+  particles.push({ type, x, y, vx: rand(-14, 14), vy: rand(-46, -26), life: type === 'spark' ? 1.05 : 1.4, t: 0 });
 }
 function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -415,6 +437,7 @@ const BEHAVIORS = {
   sleep:   { w: 0.6, dur: [6, 10] },
   eat:     { w: 0, dur: [60, 60] },
   fetch:   { w: 0, dur: [60, 60] },
+  wheel:   { w: 0.85, dur: [4.5, 6.5] },
   butterfly: { w: 0, dur: [60, 60] },
   battle:  { w: 0, dur: [60, 60] },
   travel:  { w: 0, dur: [60, 60] },
@@ -429,6 +452,7 @@ const CAPTIONS = {
   sleep: ['Zzz…', '꿈나라'],
   eat: ['밥이다!!', '우걱우걱'],
   fetch: ['공이다!!', '잡으러 감'],
+  wheel: ['달려봄', '쳇바퀴 봄'],
   butterfly: ['잡으러 감', '저거 움직임'],
   battle: ['진지해짐', '나가봄'],
   travel: ['나감', '어디 가는 중'],
@@ -451,6 +475,7 @@ function setBehavior(name) {
   pet.captionT = 0;
   if (name === 'wander' || name === 'zoomies') pickTarget();
   if (name === 'plop') pet.squashVel -= 3.5;
+  if (typeof setFurnitureBehaviorTarget === 'function') setFurnitureBehaviorTarget(name);
 }
 function pickTarget() {
   pet.target.x = rand(90, W - 90);
@@ -496,6 +521,7 @@ window.__petDebug = {
         ball: typeof ball === 'undefined' || !ball ? null : { ...ball },
         butterfly: typeof butterfly === 'undefined' ? null : { ...butterfly },
         walkVisit: typeof walkVisit === 'undefined' ? null : { ...walkVisit },
+        furnitureState: typeof furnitureState === 'undefined' ? null : { ...furnitureState },
         place: typeof currentPlace === 'function' ? currentPlace() : 'home',
         travel: typeof travelState === 'function' ? travelState() : null,
       },

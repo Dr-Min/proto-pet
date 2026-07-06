@@ -141,12 +141,12 @@ function testFetchAbandon() {
 
 function testFetchPracticeChangesMovement() {
   const context = makeContext();
-  run(context, 'careStats.stage = "adult"; careStats.fetchCount = 0;');
+  run(context, 'careStats.stage = "adult"; careStats.stats.quick = 0;');
   const fresh = run(context, '({ speed: fetchChaseSpeed(220), trip: fetchTripMultiplier() })');
-  run(context, 'careStats.fetchCount = 8;');
+  run(context, 'careStats.stats.quick = 5;');
   const practiced = run(context, '({ speed: fetchChaseSpeed(220), trip: fetchTripMultiplier() })');
-  assert(practiced.speed > fresh.speed, 'fetch practice increases chase speed');
-  assert(practiced.trip < fresh.trip, 'fetch practice lowers fetch-trip chance');
+  assert(practiced.speed > fresh.speed, 'quick practice increases chase speed');
+  assert(practiced.trip < fresh.trip, 'quick practice lowers fetch-trip chance');
 }
 
 function testFetchPracticeCaptionCanAppear() {

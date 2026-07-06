@@ -29,6 +29,7 @@
 <div id="moreSheet" class="bottom-sheet" hidden>
   <button id="walkBtn">산책</button>
   <button id="battleBtn">전투</button>
+  <button id="shopBtn">상점</button>
   <button id="notebookBtn">수첩</button>
 </div>
 <div id="notebookScrim" class="overlay-scrim" hidden></div>
@@ -45,9 +46,26 @@
       <ul id="notebookTraits"></ul>
     </section>
     <section>
+      <h3>반짝</h3>
+      <p id="notebookPebbles"></p>
+    </section>
+    <section>
+      <h3>몸</h3>
+      <div id="notebookBodyStats"></div>
+    </section>
+    <section>
       <h3>기억들</h3>
       <ul id="notebookMemories"></ul>
     </section>
+  </div>
+</section>
+<div id="shopScrim" class="overlay-scrim" hidden></div>
+<section id="shopPanel" class="shop-panel" aria-label="상점" hidden>
+  <button id="shopCloseBtn" class="shop-close" aria-label="닫기">닫기</button>
+  <div class="shop-content">
+    <h2>상점</h2>
+    <p id="shopBalance" class="shop-balance"></p>
+    <div id="shopList" class="shop-list"></div>
   </div>
 </section>
 <script src="./src/render.js" defer></script>

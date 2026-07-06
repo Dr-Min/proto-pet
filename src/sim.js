@@ -12,6 +12,7 @@ function update(dt) {
   // 이동
   let desiredVX = 0, desiredVY = 0;
   const movingToPlace = !eggStage && !dragging && !airborne && typeof travelTarget === 'function' ? travelTarget() : null;
+  const movingToFurniture = !movingToPlace && !eggStage && !dragging && !airborne && typeof furnitureMoveTarget === 'function' ? furnitureMoveTarget() : null;
   if (!movingToPlace && !eggStage && !dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
     if (ball && ball.phase === 'carried') {
       const mouth = carriedBallPoint();
@@ -100,17 +101,31 @@ function update(dt) {
       }
     }
   }
-  if (movingToPlace && pet.tripT <= 0) {
-    const dx = movingToPlace.x - pet.x, dy = movingToPlace.y - pet.y;
+	  if (movingToPlace && pet.tripT <= 0) {
+	    const dx = movingToPlace.x - pet.x, dy = movingToPlace.y - pet.y;
     const d = Math.hypot(dx, dy) || 1;
     if (d > 18) {
       desiredVX = dx / d * 168 * stageScale('speed');
       desiredVY = dy / d * 148 * stageScale('speed');
     } else {
-      completeTravelStep();
-    }
-  }
-  const moving = !movingToPlace && !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
+	      completeTravelStep();
+	    }
+	  }
+	  if (movingToFurniture && pet.tripT <= 0) {
+	    const dx = movingToFurniture.x - pet.x, dy = movingToFurniture.y - pet.y;
+	    const d = Math.hypot(dx, dy) || 1;
+	    if (d > 18) {
+	      const targetSpeed = pet.behavior === 'wheel' ? 132 : pet.behavior === 'sleep' ? 74 : 58;
+	      desiredVX = dx / d * targetSpeed * stageScale('speed');
+	      desiredVY = dy / d * targetSpeed * stageScale('speed');
+	    } else if (pet.behavior === 'wheel') {
+	      desiredVX = Math.sin(pet.wobblePhase * 10) * 10;
+	      desiredVY = Math.cos(pet.wobblePhase * 8) * 4;
+	    } else if (pet.behavior === 'stare') {
+	      pet.dir = furnitureAnchor('window').x > pet.x ? 1 : -1;
+	    }
+	  }
+	  const moving = !movingToPlace && !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
   if (moving && pet.tripT <= 0) {
     const speed = (pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62) * stageScale('speed');
     const dx = pet.target.x - pet.x, dy = pet.target.y - pet.y;

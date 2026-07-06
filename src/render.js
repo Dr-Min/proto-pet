@@ -20,6 +20,13 @@ const WALK_STONE = '#c8c1ae';
 const WALK_CLOUD = 'rgba(255,251,240,0.72)';
 const WALK_BUTTERFLY = '#d8b0a3';
 const WALK_SPARK = 'rgba(232,184,127,0.55)';
+const FURNITURE_WHEEL = '#d2bda5';
+const FURNITURE_WHEEL_DARK = 'rgba(104,82,62,0.34)';
+const FURNITURE_CUSHION = '#d9a6a0';
+const FURNITURE_WINDOW = '#bac9c6';
+const FURNITURE_WINDOW_LIGHT = '#eef0e8';
+const FURNITURE_POT = '#c79b78';
+const FURNITURE_LEAF = '#8faf77';
 const BATTLE_FLOOR = '#e2d8c7';
 const BATTLE_SKY = '#eee8dc';
 const BATTLE_SAND = '#d8c8b1';
@@ -45,6 +52,11 @@ function drawParticlesLayer() {
       ctx.fillStyle = `rgba(140,125,105,${a})`;
       ctx.font = `${10 + (1 - a) * 8}px sans-serif`;
       ctx.fillText('z', p.x + (1 - a) * 14, p.y - (1 - a) * 20);
+    } else if (p.type === 'spark') {
+      ctx.fillStyle = `rgba(232,184,127,${a * 0.9})`;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, 3.8 * a, 1.5 * a, p.t * 4, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       ctx.fillStyle = `rgba(170,150,120,${a * 0.6})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, 3 * a, 0, Math.PI * 2); ctx.fill();
@@ -140,12 +152,196 @@ function drawLumpyBlobShape(cx, cy, rx, ry, lumps, t, wobble) {
   ctx.closePath();
 }
 
-function drawHomeWorld() {
+function drawHomeWorld(t) {
   const floorY = H * 0.38;
   ctx.fillStyle = SURFACE_PAGE;
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = SURFACE_FLOOR;
   ctx.fillRect(0, floorY, W, H - floorY);
+  drawOwnedFurniture(t);
+}
+
+function drawWheelFurniture(x, y, s, t) {
+  const spin = typeof furnitureState === 'undefined' ? t * 0.8 : furnitureState.wheelSpin;
+  const r = 32 * s;
+  ctx.save();
+  ctx.translate(x, y - r * 0.55);
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.lineWidth = Math.max(2, 3 * s);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.64, r * 0.88);
+  ctx.lineTo(-r * 0.22, r * 0.24);
+  ctx.moveTo(r * 0.64, r * 0.88);
+  ctx.lineTo(r * 0.22, r * 0.24);
+  ctx.stroke();
+  ctx.rotate(spin);
+  drawLumpyBlobShape(0, 0, r, r * 0.96, placeWorld.home.furnitureLumps.wheel, t * 0.6, 0.006);
+  ctx.strokeStyle = FURNITURE_WHEEL;
+  ctx.lineWidth = Math.max(5, 7 * s);
+  ctx.stroke();
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.lineWidth = Math.max(1.4, 1.8 * s);
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a) * r * 0.74, Math.sin(a) * r * 0.74);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, 4.2 * s, 0, Math.PI * 2);
+  ctx.fillStyle = FURNITURE_WHEEL_DARK;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCushionFurniture(x, y, s, t) {
+  const wobble = Math.sin(t * 1.6) * 0.018;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(1 + wobble, 1 - wobble);
+  ctx.fillStyle = 'rgba(115,95,70,0.13)';
+  ctx.beginPath();
+  ctx.ellipse(0, 7 * s, 42 * s, 11 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawLumpyBlobShape(0, -2 * s, 38 * s, 17 * s, placeWorld.home.furnitureLumps.cushion, t * 0.5, 0.01);
+  ctx.fillStyle = FURNITURE_CUSHION;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = outlineWidth(36 * s);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlantFurniture(x, y, s, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(115,95,70,0.13)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4 * s, 20 * s, 6 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = FURNITURE_LEAF;
+  ctx.lineWidth = Math.max(2, 2.4 * s);
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 5; i++) {
+    const side = i - 2;
+    const sway = Math.sin(t * 1.8 + i) * 4 * s;
+    ctx.beginPath();
+    ctx.moveTo(0, -16 * s);
+    ctx.quadraticCurveTo(side * 5 * s + sway * 0.3, -29 * s, side * 11 * s + sway, -40 * s + Math.abs(side) * 3 * s);
+    ctx.stroke();
+  }
+  drawLumpyBlobShape(0, -7 * s, 16 * s, 12 * s, placeWorld.home.furnitureLumps.plant, t * 0.4, 0.012);
+  ctx.fillStyle = FURNITURE_POT;
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = outlineWidth(24 * s);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWindowFurniture(x, y, s, t) {
+  const wave = Math.sin(t * 0.8) * 1.5 * s;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = FURNITURE_WINDOW_LIGHT;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 44 * s, 30 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = FURNITURE_WINDOW;
+  ctx.lineWidth = Math.max(4, 5 * s);
+  ctx.stroke();
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.lineWidth = Math.max(1.2, 1.5 * s);
+  ctx.beginPath();
+  ctx.moveTo(-32 * s, wave);
+  ctx.quadraticCurveTo(0, -5 * s, 32 * s, wave);
+  ctx.moveTo(0, -25 * s);
+  ctx.lineTo(0, 25 * s);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawFurnitureItem(id, t) {
+  const anchor = furnitureAnchor(id);
+  const s = depthScaleAt(anchor.y);
+  if (id === 'wheel') drawWheelFurniture(anchor.x, anchor.y, s, t);
+  else if (id === 'cushion') drawCushionFurniture(anchor.x, anchor.y, s, t);
+  else if (id === 'plant') drawPlantFurniture(anchor.x, anchor.y, s, t);
+  else if (id === 'window') drawWindowFurniture(anchor.x, anchor.y, s, t);
+}
+
+function drawOwnedFurniture(t) {
+  if (typeof careStats === 'undefined' || !Array.isArray(careStats.furnitureOwned)) return;
+  for (const id of careStats.furnitureOwned) drawFurnitureItem(id, t);
+}
+
+function drawFurniturePreviewCanvas(canvas, id) {
+  const pctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = 72;
+  const height = 56;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  pctx.clearRect(0, 0, width, height);
+  pctx.fillStyle = 'rgba(116,96,72,0.08)';
+  pctx.beginPath();
+  pctx.ellipse(width / 2, 46, 26, 6, 0, 0, Math.PI * 2);
+  pctx.fill();
+  pctx.lineCap = 'round';
+  if (id === 'wheel') {
+    pctx.strokeStyle = FURNITURE_WHEEL;
+    pctx.lineWidth = 6;
+    pctx.beginPath();
+    pctx.arc(36, 27, 17, 0, Math.PI * 2);
+    pctx.stroke();
+    pctx.strokeStyle = FURNITURE_WHEEL_DARK;
+    pctx.lineWidth = 2;
+    pctx.beginPath();
+    pctx.moveTo(26, 46); pctx.lineTo(32, 32);
+    pctx.moveTo(46, 46); pctx.lineTo(40, 32);
+    pctx.moveTo(36, 27); pctx.lineTo(51, 27);
+    pctx.moveTo(36, 27); pctx.lineTo(36, 12);
+    pctx.stroke();
+  } else if (id === 'cushion') {
+    pctx.fillStyle = FURNITURE_CUSHION;
+    pctx.beginPath();
+    pctx.ellipse(36, 33, 25, 12, 0, 0, Math.PI * 2);
+    pctx.fill();
+    pctx.strokeStyle = OUTLINE;
+    pctx.lineWidth = 2;
+    pctx.stroke();
+  } else if (id === 'plant') {
+    pctx.strokeStyle = FURNITURE_LEAF;
+    pctx.lineWidth = 3;
+    for (let i = 0; i < 5; i++) {
+      const side = i - 2;
+      pctx.beginPath();
+      pctx.moveTo(36, 34);
+      pctx.quadraticCurveTo(36 + side * 4, 23, 36 + side * 8, 14 + Math.abs(side) * 2);
+      pctx.stroke();
+    }
+    pctx.fillStyle = FURNITURE_POT;
+    pctx.beginPath();
+    pctx.ellipse(36, 39, 12, 9, 0, 0, Math.PI * 2);
+    pctx.fill();
+  } else if (id === 'window') {
+    pctx.fillStyle = FURNITURE_WINDOW_LIGHT;
+    pctx.beginPath();
+    pctx.ellipse(36, 27, 25, 17, 0, 0, Math.PI * 2);
+    pctx.fill();
+    pctx.strokeStyle = FURNITURE_WINDOW;
+    pctx.lineWidth = 5;
+    pctx.stroke();
+    pctx.strokeStyle = FURNITURE_WHEEL_DARK;
+    pctx.lineWidth = 1.5;
+    pctx.beginPath();
+    pctx.moveTo(36, 13);
+    pctx.lineTo(36, 41);
+    pctx.stroke();
+  }
 }
 
 function drawWalkHill(floorY, y, h, alpha) {
@@ -360,7 +556,7 @@ function drawWorld(t) {
     drawBattleWorld(t);
     return;
   }
-  drawHomeWorld();
+  drawHomeWorld(t);
 }
 
 function drawBlob(cx, cy, rx, ry) {

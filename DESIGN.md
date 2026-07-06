@@ -47,6 +47,13 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | World/walk-cloud | --world-walk-cloud | rgba(255,251,240,0.72) | n/a | Soft drifting walk cloud blobs |
 | World/walk-butterfly | --world-walk-butterfly | #d8b0a3 | n/a | Small uncatchable walk butterfly |
 | World/walk-spark | --world-walk-spark | rgba(232,184,127,0.55) | n/a | Subtle discovery spot glint |
+| Furniture/wheel | --furniture-wheel | #d2bda5 | n/a | Soft wooden exercise wheel body |
+| Furniture/wheel-dark | --furniture-wheel-dark | rgba(104,82,62,0.34) | n/a | Wheel stand, axle, and outlines |
+| Furniture/cushion | --furniture-cushion | #d9a6a0 | n/a | Squashy nap cushion |
+| Furniture/window | --furniture-window | #bac9c6 | n/a | Quiet wall window frame |
+| Furniture/window-light | --furniture-window-light | #eef0e8 | n/a | Pale outside light in window |
+| Furniture/pot | --furniture-pot | #c79b78 | n/a | Small clay plant pot |
+| Furniture/leaf | --furniture-leaf | #8faf77 | n/a | Low-saturation plant leaves |
 | World/battle-floor | --world-battle-floor | #e2d8c7 | n/a | Training ground plane |
 | World/battle-sky | --world-battle-sky | #eee8dc | n/a | Dimmer training-ground sky |
 | World/battle-sand | --world-battle-sand | #d8c8b1 | n/a | Inner sand band for training ring |
@@ -203,6 +210,33 @@ All spacing derives from a base of 4px.
 - **States**: idle at home, traveling, walking place, battle place, active battle.
 - **Accessibility**: native buttons expose the same actions; captions confirm movement and arrival.
 - **Motion**: the pet physically walks toward the screen edge before the background changes, then walks in from the opposite edge.
+
+### Shiny Pebble Shop
+
+- **Structure**: more-sheet entry opens a tonal overlay panel matching the notebook; pebble count appears only inside shop and notebook.
+- **Variants**: wheel, window, cushion, and plant rows with procedural canvas previews, item note, and pebble cost.
+- **Spacing**: list rows keep 44px minimum purchase targets and compact mobile-safe columns.
+- **States**: not enough pebbles disables the row action; owned furniture reads as already at home. No error popup.
+- **Accessibility**: native buttons purchase furniture, and the visible count explains affordance.
+- **Motion**: panel motion reuses the bottom overlay language; furniture itself animates only on canvas after placement.
+
+### Home Furniture
+
+- **Structure**: bought furniture is stored in care state and drawn at fixed home anchors from place terrain data.
+- **Variants**: wheel, window, cushion, plant. All use lumpy blob or tapered curve canvas grammar and the furniture color tokens.
+- **Spacing**: anchors live in the home scene, not the bottom UI; furniture never adds a persistent home counter.
+- **States**: owned, placed, and autonomously used by the pet.
+- **Accessibility**: furniture effects are reflected by pet captions and notebook observations.
+- **Motion**: wheel rotates while used, cushion gently breathes, plant leaves sway, window line drifts subtly.
+
+### Body Notebook Scale
+
+- **Structure**: notebook-only body section for tough, quick, and power using five procedural DOM paw marks.
+- **Variants**: each stat pairs marks with one observation sentence.
+- **Spacing**: two-column compact rows fit narrow mobile panels.
+- **States**: 0 to 5 filled marks, with no numeric stat text.
+- **Accessibility**: text observation accompanies the non-numeric visual scale.
+- **Motion**: static in the panel; body change is shown through pet movement.
 
 ### AI Line Fallback
 

@@ -12,10 +12,17 @@
     --care-play: #dba6b4;
     --care-walk: #b9cfa6;
     --care-battle: #c7b1d8;
-    --surface-panel: #e8dfcb;
-    --surface-panel-deep: #ded3bd;
-    --surface-scrim: rgba(116,96,72,0.14);
-  }
+	    --surface-panel: #e8dfcb;
+	    --surface-panel-deep: #ded3bd;
+	    --surface-scrim: rgba(116,96,72,0.14);
+	    --furniture-wheel: #d2bda5;
+	    --furniture-wheel-dark: rgba(104,82,62,0.34);
+	    --furniture-cushion: #d9a6a0;
+	    --furniture-window: #bac9c6;
+	    --furniture-window-light: #eef0e8;
+	    --furniture-pot: #c79b78;
+	    --furniture-leaf: #8faf77;
+	  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
   canvas { display: block; touch-action: none; }
   #hint {
@@ -45,7 +52,7 @@
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .bar { width: clamp(56px, 17vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 50%; background: var(--care-hunger); border-radius: 5px; }
-  #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #notebookBtn, #notebookCloseBtn {
+	  #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn, #notebookCloseBtn, #shopCloseBtn {
     min-height: 44px; padding: 10px 14px; border: none; border-radius: 22px;
     background: var(--care-warm); color: #5a4632;
     font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
@@ -56,14 +63,14 @@
   #playBtn { background: var(--care-play); color: #5b3f49; }
   #moreBtn { background: var(--surface-panel); color: var(--text-ui); font-size: 18px; line-height: 1; }
   #returnBtn { display: none; width: 100%; background: var(--care-walk); color: #46573d; }
-  #walkBtn { background: var(--care-walk); color: #46573d; }
-  #battleBtn { background: var(--care-battle); color: #4d4358; }
-  #notebookBtn, #notebookCloseBtn { background: transparent; color: var(--text-ui); }
-  #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #notebookBtn:active, #notebookCloseBtn:active { transform: scale(0.96); }
-  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #notebookBtn.is-locked {
-    opacity: 0.58;
-    filter: saturate(0.72);
-  }
+	  #walkBtn { background: var(--care-walk); color: #46573d; }
+	  #battleBtn { background: var(--care-battle); color: #4d4358; }
+	  #shopBtn, #notebookBtn, #notebookCloseBtn, #shopCloseBtn { background: transparent; color: var(--text-ui); }
+	  #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #shopCloseBtn:active, .shop-buy:active { transform: scale(0.96); }
+	  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #notebookBtn.is-locked, .shop-buy:disabled {
+	    opacity: 0.58;
+	    filter: saturate(0.72);
+	  }
   body[data-away="true"] #feedBtn, body[data-away="true"] #restBtn, body[data-away="true"] #playBtn, body[data-away="true"] #moreBtn { display: none; }
   body[data-away="true"] #returnBtn { display: block; }
   .overlay-scrim {
@@ -72,7 +79,7 @@
     touch-action: manipulation;
   }
   #sheetScrim { z-index: 4; }
-  #notebookScrim { z-index: 6; }
+	  #notebookScrim, #shopScrim { z-index: 6; }
   .bottom-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
     box-sizing: border-box;
@@ -90,7 +97,7 @@
     pointer-events: auto;
   }
   .bottom-sheet[hidden] { display: flex; }
-  .notebook-panel[hidden], .overlay-scrim[hidden] { display: none; }
+	  .notebook-panel[hidden], .shop-panel[hidden], .overlay-scrim[hidden] { display: none; }
   .bottom-sheet button {
     width: 100%;
     background: transparent;
@@ -100,28 +107,56 @@
     padding: 12px 10px;
   }
   .bottom-sheet button:active { background: var(--surface-panel-deep); }
-  .notebook-panel {
-    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 7;
-    max-height: min(560px, calc(100dvh - 56px));
-    box-sizing: border-box;
+	  .notebook-panel, .shop-panel {
+	    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 7;
+	    max-height: min(560px, calc(100dvh - 56px));
+	    box-sizing: border-box;
     padding: 12px 14px 16px;
     overflow: auto;
     background: var(--surface-panel);
-    color: var(--text-ui);
-    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
-  }
-  .notebook-close {
-    float: right;
-    min-height: 44px;
-    padding: 8px 4px;
-  }
-  .notebook-content { clear: both; }
-  .notebook-panel h2, .notebook-panel h3, .notebook-panel p { margin: 0; }
-  .notebook-panel h2 { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--text-ui); }
-  .notebook-panel h3 { margin-top: 16px; font-size: 12px; line-height: 1.4; font-weight: 600; color: var(--text-muted); }
-  .notebook-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
-  .notebook-panel li { padding: 5px 0; color: var(--text-ui); }
-  .notebook-panel li + li { margin-top: 2px; }
+	    color: var(--text-ui);
+	    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+	  }
+	  .notebook-close, .shop-close {
+	    float: right;
+	    min-height: 44px;
+	    padding: 8px 4px;
+	  }
+	  .notebook-content, .shop-content { clear: both; }
+	  .notebook-panel h2, .notebook-panel h3, .notebook-panel p, .shop-panel h2, .shop-panel h3, .shop-panel p { margin: 0; }
+	  .notebook-panel h2, .shop-panel h2 { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--text-ui); }
+	  .notebook-panel h3, .shop-panel h3 { margin-top: 16px; font-size: 12px; line-height: 1.4; font-weight: 600; color: var(--text-muted); }
+	  .notebook-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
+	  .notebook-panel li { padding: 5px 0; color: var(--text-ui); }
+	  .notebook-panel li + li { margin-top: 2px; }
+	  .body-stat { display: grid; grid-template-columns: 48px 1fr; gap: 6px 10px; align-items: baseline; padding: 6px 0; }
+	  .paw-scale { display: flex; gap: 5px; align-items: center; }
+	  .paw-mark {
+	    position: relative; width: 11px; height: 9px; opacity: 0.28;
+	  }
+	  .paw-mark::before {
+	    content: ""; position: absolute; left: 3px; bottom: 0; width: 6px; height: 4px;
+	    border-radius: 50%; background: var(--text-ui); transform: rotate(-12deg);
+	  }
+	  .paw-mark::after {
+	    content: ""; position: absolute; left: 1px; top: 0; width: 3px; height: 3px;
+	    border-radius: 50%; background: var(--text-ui);
+	    box-shadow: 4px -1px 0 var(--text-ui), 8px 1px 0 var(--text-ui);
+	  }
+	  .paw-mark.is-filled { opacity: 0.9; }
+	  .body-observation { grid-column: 2; color: var(--text-muted); }
+	  .shop-balance { color: var(--text-muted); }
+	  .shop-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+	  .shop-item { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; min-height: 62px; }
+	  .shop-preview { width: 72px; height: 56px; display: block; }
+	  .shop-name { font-weight: 600; color: var(--text-ui); }
+	  .shop-note { color: var(--text-muted); }
+	  .shop-buy {
+	    min-height: 44px; min-width: 72px; padding: 8px 10px; border: none; border-radius: 22px;
+	    background: var(--surface-panel-deep); color: var(--text-ui);
+	    font: 600 13px -apple-system, "Apple SD Gothic Neo", sans-serif;
+	    cursor: pointer; touch-action: manipulation;
+	  }
   @media (max-width: 380px) {
     #ui { gap: 7px; padding-left: 10px; padding-right: 10px; font-size: 11px; }
     #gauges, #actions { gap: 7px; }
@@ -129,6 +164,8 @@
     .g { gap: 4px; }
     .bar { width: 48px; }
     #actions { gap: 6px; width: min(340px, calc(100vw - 20px)); }
-    #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #notebookBtn { min-height: 44px; padding: 9px 10px; font-size: 12px; }
-    #moreBtn { font-size: 18px; }
-  }
+	    #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn { min-height: 44px; padding: 9px 10px; font-size: 12px; }
+	    #moreBtn { font-size: 18px; }
+	    .shop-item { grid-template-columns: 62px 1fr auto; gap: 8px; }
+	    .shop-preview { width: 62px; }
+	  }
