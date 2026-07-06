@@ -26,8 +26,10 @@ const careStats = {
   pebbles: 0,
   lastWalkPebbleDay: -1,
   furnitureOwned: [],
+  furniturePlaced: {},
   stats: { tough: 0, quick: 0, power: 0 },
 };
+careStats.furniturePlaced = migrateFurniturePlaced(null);
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
 let battle = null;
@@ -175,6 +177,7 @@ function saveCareState() {
 	      pebbles: careStats.pebbles,
 	      lastWalkPebbleDay: careStats.lastWalkPebbleDay,
 	      furnitureOwned: careStats.furnitureOwned,
+	      furniturePlaced: careStats.furniturePlaced,
 	      stats: careStats.stats,
 	      bondMilestone,
       ts: Date.now(),
@@ -241,6 +244,7 @@ function loadCareState() {
 	    careStats.pebbles = Math.max(0, Math.floor(Number.isFinite(savedPebbles) ? savedPebbles : 0));
 	    careStats.lastWalkPebbleDay = Math.floor(Number.isFinite(savedLastWalkPebbleDay) ? savedLastWalkPebbleDay : -1);
 	    careStats.furnitureOwned = migrateFurnitureOwned(saved.furnitureOwned);
+	    careStats.furniturePlaced = migrateFurniturePlaced(saved.furniturePlaced);
 	    careStats.stats = migrateStats(saved.stats, careStats.fetchCount);
 	    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
@@ -288,6 +292,24 @@ function migrateFurnitureOwned(savedOwned) {
   if (!Array.isArray(savedOwned)) return [];
   return savedOwned.filter(id => furnitureItemById(id)).filter((id, index, owned) => owned.indexOf(id) === index);
 }
+function migrateFurniturePlaced(savedPlaced) {
+  const placed = {};
+  for (const item of FURNITURE_ITEMS) {
+    const saved = savedPlaced && typeof savedPlaced === 'object' ? savedPlaced[item.id] : null;
+    placed[item.id] = normalizeFurnitureRatio(item.id, saved);
+  }
+  return placed;
+}
+function normalizeFurnitureRatio(id, value) {
+  const fallback = defaultFurnitureRatio(id);
+  if (!value || typeof value !== 'object') return fallback;
+  const xr = Number(value.xr);
+  const yr = Number(value.yr);
+  return {
+    xr: clamp(Number.isFinite(xr) ? xr : fallback.xr, 0, 1),
+    yr: clamp(Number.isFinite(yr) ? yr : fallback.yr, 0, 1),
+  };
+}
 function migrateStats(savedStats, fetchCount) {
   const stats = { tough: 0, quick: clamp((fetchCount / 8) * 5, 0, 5), power: 0 };
   if (!savedStats || typeof savedStats !== 'object') return stats;
@@ -319,9 +341,37 @@ function addBattleStats(amount) {
 function hasFurniture(id) {
   return careStats.furnitureOwned.includes(id);
 }
+function ensureFurniturePlacement(id) {
+  if (!furnitureItemById(id)) return;
+  careStats.furniturePlaced[id] = normalizeFurnitureRatio(id, careStats.furniturePlaced[id]);
+}
+function setFurniturePlacement(id, x, y) {
+  if (!hasFurniture(id)) return false;
+  const point = constrainedFurniturePoint(id, x, y);
+  careStats.furniturePlaced[id] = furnitureRatioFromPoint(id, point.x, point.y);
+  return true;
+}
+function finishFurniturePlacement(id, x, y) {
+  if (!setFurniturePlacement(id, x, y)) return false;
+  const anchor = furnitureAnchor(id);
+  furnitureMotion.heldId = '';
+  furnitureMotion.settleId = id;
+  furnitureMotion.settleT = furnitureMotion.settleDur;
+  pet.squashVel = clamp(pet.squashVel - 0.6, -8, 8);
+  for (let i = 0; i < 5; i++) spawn('dust', anchor.x + rand(-18, 18), anchor.y + rand(-5, 7));
+  saveCareState();
+  return true;
+}
 function furnitureUsePoint(id) {
   const anchor = furnitureAnchor(id);
-  if (id === 'window') return { x: clamp(anchor.x - 42, 90, W - 90), y: H * 0.58 };
+  if (id === 'window') return { x: clamp(anchor.x - 42, 90, W - 90), y: H * 0.48 };
+  if (id === 'wheel') {
+    const wheelR = furniturePrimarySize('wheel', anchor.y);
+    return {
+      x: anchor.x,
+      y: clamp(anchor.y - wheelR * 0.55 + stagedRadius() * 0.92, H * 0.4, H * 0.83),
+    };
+  }
   return anchor;
 }
 function buyFurniture(id) {
@@ -329,6 +379,7 @@ function buyFurniture(id) {
   if (!item || hasFurniture(id) || careStats.pebbles < item.price) return false;
   careStats.pebbles -= item.price;
   careStats.furnitureOwned.push(id);
+  ensureFurniturePlacement(id);
   pet.caption = `${item.name} 여기 둠`;
   pet.captionT = 0;
   pet.happy = Math.max(pet.happy, 0.5);
@@ -374,10 +425,11 @@ function setFurnitureBehaviorTarget(name) {
   }
 }
 function furnitureMoveTarget() {
-  if (!furnitureState.moveTargetId || place !== 'home' || travel || battle || input.mode === 'drag') return null;
+  if (!furnitureState.moveTargetId || place !== 'home' || travel || battle || input.mode === 'drag' || input.mode === 'furniture-drag') return null;
   if (pet.behavior === 'sleep' && furnitureState.moveTargetId === 'cushion') return furnitureUsePoint('cushion');
   if (pet.behavior === 'stare' && furnitureState.moveTargetId === 'window') return furnitureUsePoint('window');
   if (pet.behavior === 'wheel' && furnitureState.moveTargetId === 'wheel') return furnitureUsePoint('wheel');
+  if (pet.behavior === 'sniff' && furnitureState.moveTargetId === 'plant') return furnitureUsePoint('plant');
   return null;
 }
 function isUsingCushion() {

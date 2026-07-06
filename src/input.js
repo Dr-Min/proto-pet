@@ -14,6 +14,8 @@ const input = {
   downAt: 0,
   lastMoveAt: 0,
   dragOffsetX: 0, dragOffsetY: 0,
+  furnitureId: '',
+  furnitureCancelled: false,
   dragTalkT: 0,
   releaseVX: 0, releaseVY: 0,
   tapCooldown: 0,
@@ -38,6 +40,7 @@ function isTouchPointer(e) { return e.pointerType === 'touch' || e.pointerType =
 function isTouchType(type) { return type === 'touch' || type === 'pen'; }
 function dragThreshold(e) { return isTouchPointer(e) ? 18 : 12; }
 function rubThreshold(e) { return isTouchPointer(e) ? 7 : 4; }
+function furniturePressThreshold() { return isTouchType(input.pointerType) ? 24 : 18; }
 
 function surprisePet() {
   if (isEggStage()) {
@@ -106,6 +109,48 @@ function updateDrag(dt) {
   }
 }
 
+function startFurnitureDrag() {
+  if (!input.furnitureId || input.mode !== 'furniture-pending') return;
+  const anchor = furnitureAnchor(input.furnitureId);
+  input.mode = 'furniture-drag';
+  input.dragOffsetX = anchor.x - input.x;
+  input.dragOffsetY = anchor.y - input.y;
+  furnitureMotion.heldId = input.furnitureId;
+  furnitureMotion.x = anchor.x;
+  furnitureMotion.y = anchor.y;
+  pet.behavior = 'stare';
+  pet.behaviorT = Math.max(pet.behaviorT, 1.4);
+  pet.vx = 0;
+  pet.vy = 0;
+  if (!furnitureMotion.sessionCaptionShown) {
+    furnitureMotion.sessionCaptionShown = true;
+    pet.caption = '그거 옮기나';
+    pet.captionT = 0;
+  }
+}
+
+function updateFurnitureInput(dt) {
+  if (furnitureMotion.settleT > 0) {
+    furnitureMotion.settleT = Math.max(0, furnitureMotion.settleT - dt);
+    if (furnitureMotion.settleT <= 0) furnitureMotion.settleId = '';
+  }
+  if (!input.active || !input.furnitureId) return;
+  if (input.mode === 'furniture-pending') {
+    const elapsed = performance.now() - input.downAt;
+    const moved = dist(input.startX, input.startY, input.x, input.y);
+    if (moved > furniturePressThreshold() * 1.5 && elapsed < 350) {
+      input.furnitureCancelled = true;
+      return;
+    }
+    if (!input.furnitureCancelled && elapsed >= 350) startFurnitureDrag();
+  } else if (input.mode === 'furniture-drag') {
+    const target = constrainedFurniturePoint(input.furnitureId, input.x + input.dragOffsetX, input.y + input.dragOffsetY);
+    furnitureMotion.x = lerp(furnitureMotion.x, target.x, 1 - Math.exp(-24 * dt));
+    furnitureMotion.y = lerp(furnitureMotion.y, target.y, 1 - Math.exp(-24 * dt));
+    pet.dir = furnitureMotion.x > pet.x ? 1 : -1;
+  }
+}
+
 function bounceReact({ lines, strength, x, y }) {
   if (pet.captionT > 0.14) {
     pet.caption = randomLine(lines);
@@ -124,6 +169,8 @@ function finishPointer(e) {
   const moved = dist(input.startX, input.startY, e.clientX, e.clientY);
   const wasDrag = input.mode === 'drag';
   const wasPetting = input.mode === 'pet';
+  const wasFurnitureDrag = input.mode === 'furniture-drag';
+  const wasFurniturePending = input.mode === 'furniture-pending';
   if (wasDrag) {
     if (isEggStage()) {
       pet.vx = 0;
@@ -149,6 +196,10 @@ function finishPointer(e) {
     pet.behavior = 'stare';
     pet.behaviorT = Math.max(pet.behaviorT, 2.2);
     }
+  } else if (wasFurnitureDrag) {
+    finishFurniturePlacement(input.furnitureId, furnitureMotion.x, furnitureMotion.y);
+  } else if (wasFurniturePending && !input.furnitureCancelled && elapsed < 300 && moved < furniturePressThreshold()) {
+    cheerWheelAt(e.clientX, e.clientY);
   } else if (!wasPetting && elapsed < 260 && moved < rubThreshold(e) * 1.4 && petHitTest(e.clientX, e.clientY, 1.8)) {
     surprisePet();
   }
@@ -156,20 +207,22 @@ function finishPointer(e) {
   input.pointerId = null;
   input.pointerType = '';
   input.mode = 'idle';
+  input.furnitureId = '';
+  input.furnitureCancelled = false;
   try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
 }
 
 cv.addEventListener('pointerdown', e => {
   mouse.x = e.clientX; mouse.y = e.clientY;
-  if (typeof cheerWheelAt === 'function' && cheerWheelAt(e.clientX, e.clientY)) {
-    e.preventDefault();
-    return;
-  }
-  if (!petHitTest(e.clientX, e.clientY, 1.85)) return;
+  const hitsPet = petHitTest(e.clientX, e.clientY, 1.85);
+  const hitFurniture = hitsPet || currentPlace() !== 'home' || isTraveling() ? '' : furnitureHitTest(e.clientX, e.clientY);
+  if (!hitsPet && !hitFurniture) return;
   input.active = true;
   input.pointerId = e.pointerId;
   input.pointerType = e.pointerType;
-  input.mode = 'pending';
+  input.mode = hitsPet ? 'pending' : 'furniture-pending';
+  input.furnitureId = hitFurniture;
+  input.furnitureCancelled = false;
   input.startX = e.clientX; input.startY = e.clientY;
   input.x = e.clientX; input.y = e.clientY;
   input.px = e.clientX; input.py = e.clientY;
@@ -192,6 +245,13 @@ cv.addEventListener('pointermove', e => {
   input.x = e.clientX; input.y = e.clientY;
   input.lastMoveAt = e.timeStamp || performance.now();
 
+  if (input.mode === 'furniture-pending' || input.mode === 'furniture-drag') {
+    if (input.mode === 'furniture-pending' && fromStart > furniturePressThreshold() * 1.5 && elapsed < 350) {
+      input.furnitureCancelled = true;
+    }
+    e.preventDefault();
+    return;
+  }
   if (input.mode === 'pending' && (fromStart > dragThreshold(e) || (elapsed > 180 && fromStart > rubThreshold(e)))) startDrag(e);
   else if (input.mode === 'pending' && frameMove > rubThreshold(e)) input.mode = 'pet';
   else if (input.mode === 'pet' && fromStart > dragThreshold(e) * 1.45 && elapsed > 120) startDrag(e);
@@ -203,7 +263,7 @@ cv.addEventListener('pointercancel', finishPointer);
 
 function updatePetting(dt) {
   const s = depthScale();
-  if (input.mode === 'drag') {
+  if (input.mode === 'drag' || input.mode === 'furniture-drag' || input.mode === 'furniture-pending') {
     mouse.px = mouse.x; mouse.py = mouse.y;
     return;
   }

@@ -1,6 +1,7 @@
 // ---------- 메인 업데이트 ----------
 function update(dt) {
   input.tapCooldown = Math.max(0, input.tapCooldown - dt);
+  if (typeof updateFurnitureInput === 'function') updateFurnitureInput(dt);
   const dragging = input.mode === 'drag';
   const airborne = !dragging && (Math.abs(pet.jy) > 0.01 || Math.abs(pet.jvy) > 0.01);
   const eggStage = currentStage() === 'egg';
@@ -228,7 +229,10 @@ function update(dt) {
   // 시선: 커서가 가까우면 커서를, 아니면 허공을 본다
   const md = Math.hypot(mouse.x - pet.x, mouse.y - pet.y);
   let gx, gy;
-  if (md < 300 && pet.behavior !== 'sleep') {
+  if (typeof furnitureMotion !== 'undefined' && furnitureMotion.heldId) {
+    gx = clamp((furnitureMotion.x - pet.x) / 200, -1, 1);
+    gy = clamp((furnitureMotion.y - pet.y + 60) / 200, -1, 1);
+  } else if (md < 300 && pet.behavior !== 'sleep') {
     gx = clamp((mouse.x - pet.x) / 200, -1, 1); gy = clamp((mouse.y - pet.y + 60) / 200, -1, 1);
   } else {
     gx = Math.sin(pet.wobblePhase * 0.23) * 0.6; gy = Math.cos(pet.wobblePhase * 0.31) * 0.3;

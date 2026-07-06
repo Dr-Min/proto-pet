@@ -158,41 +158,54 @@ function drawHomeWorld(t) {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = SURFACE_FLOOR;
   ctx.fillRect(0, floorY, W, H - floorY);
-  drawOwnedFurniture(t);
+  drawWallFurniture(t);
 }
 
-function drawWheelFurniture(x, y, s, t) {
+function drawWheelFurniture(x, y, s, t, part = 'full') {
   const spin = typeof furnitureState === 'undefined' ? t * 0.8 : furnitureState.wheelSpin;
   const r = 32 * s;
   ctx.save();
   ctx.translate(x, y - r * 0.55);
-  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
-  ctx.lineWidth = Math.max(2, 3 * s);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.64, r * 0.88);
-  ctx.lineTo(-r * 0.22, r * 0.24);
-  ctx.moveTo(r * 0.64, r * 0.88);
-  ctx.lineTo(r * 0.22, r * 0.24);
-  ctx.stroke();
-  ctx.rotate(spin);
-  drawLumpyBlobShape(0, 0, r, r * 0.96, placeWorld.home.furnitureLumps.wheel, t * 0.6, 0.006);
-  ctx.strokeStyle = FURNITURE_WHEEL;
-  ctx.lineWidth = Math.max(5, 7 * s);
-  ctx.stroke();
-  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
-  ctx.lineWidth = Math.max(1.4, 1.8 * s);
-  for (let i = 0; i < 4; i++) {
-    const a = i * Math.PI / 2;
+  if (part !== 'front') {
+    ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+    ctx.lineWidth = Math.max(2, 3 * s);
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(Math.cos(a) * r * 0.74, Math.sin(a) * r * 0.74);
+    ctx.moveTo(-r * 0.64, r * 0.88);
+    ctx.lineTo(-r * 0.22, r * 0.24);
+    ctx.moveTo(r * 0.64, r * 0.88);
+    ctx.lineTo(r * 0.22, r * 0.24);
     ctx.stroke();
+    ctx.save();
+    ctx.rotate(spin + Math.PI / 5);
+    drawLumpyBlobShape(0, 0, r * 0.86, r * 0.82, placeWorld.home.furnitureLumps.wheel, t * 0.6 + 1.4, 0.005);
+    ctx.globalAlpha = 0.48;
+    ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+    ctx.lineWidth = Math.max(3, 4.5 * s);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
-  ctx.beginPath();
-  ctx.arc(0, 0, 4.2 * s, 0, Math.PI * 2);
-  ctx.fillStyle = FURNITURE_WHEEL_DARK;
-  ctx.fill();
+  if (part !== 'back') {
+    ctx.rotate(spin);
+    drawLumpyBlobShape(0, 0, r, r * 0.96, placeWorld.home.furnitureLumps.wheel, t * 0.6, 0.006);
+    ctx.strokeStyle = FURNITURE_WHEEL;
+    ctx.lineWidth = Math.max(5, 7 * s);
+    ctx.stroke();
+    ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+    ctx.lineWidth = Math.max(1.4, 1.8 * s);
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a) * r * 0.74, Math.sin(a) * r * 0.74);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.2 * s, 0, Math.PI * 2);
+    ctx.fillStyle = FURNITURE_WHEEL_DARK;
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -263,18 +276,98 @@ function drawWindowFurniture(x, y, s, t) {
   ctx.restore();
 }
 
-function drawFurnitureItem(id, t) {
+function furnitureDrawEffect(id, t) {
+  const held = typeof furnitureMotion !== 'undefined' && furnitureMotion.heldId === id;
+  const settling = typeof furnitureMotion !== 'undefined' && furnitureMotion.settleId === id && furnitureMotion.settleT > 0;
+  if (held) {
+    return {
+      lift: 8,
+      sx: 1.04 + Math.sin(t * 18) * 0.018,
+      sy: 0.97 + Math.cos(t * 15) * 0.014,
+      rot: Math.sin(t * 12) * 0.035,
+      shadow: 1.45,
+    };
+  }
+  if (settling) {
+    const p = clamp(furnitureMotion.settleT / furnitureMotion.settleDur, 0, 1);
+    const spring = Math.sin((1 - p) * Math.PI * 2.2) * p;
+    return {
+      lift: 0,
+      sx: 1 + spring * 0.16,
+      sy: 1 - spring * 0.12,
+      rot: 0,
+      shadow: 1,
+    };
+  }
+  return { lift: 0, sx: 1, sy: 1, rot: 0, shadow: 1 };
+}
+
+function drawFurnitureGroundShadow(id, anchor, size, effect) {
+  if (furnitureZone(id) === 'wall') return;
+  const w = id === 'wheel' ? 1.24 : id === 'cushion' ? 1.38 : 0.72;
+  const h = id === 'wheel' ? 0.22 : id === 'cushion' ? 0.28 : 0.2;
+  ctx.save();
+  ctx.fillStyle = `rgba(115,95,70,${0.11 + (effect.shadow - 1) * 0.05})`;
+  ctx.beginPath();
+  ctx.ellipse(anchor.x, anchor.y + 6, size * w * effect.shadow, size * h * effect.shadow, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawFurnitureItem(id, t, part = 'full') {
   const anchor = furnitureAnchor(id);
-  const s = depthScaleAt(anchor.y);
-  if (id === 'wheel') drawWheelFurniture(anchor.x, anchor.y, s, t);
-  else if (id === 'cushion') drawCushionFurniture(anchor.x, anchor.y, s, t);
-  else if (id === 'plant') drawPlantFurniture(anchor.x, anchor.y, s, t);
-  else if (id === 'window') drawWindowFurniture(anchor.x, anchor.y, s, t);
+  const s = furnitureDrawScale(id, anchor.y);
+  const size = furniturePrimarySize(id, anchor.y);
+  const effect = furnitureDrawEffect(id, t);
+  if (part !== 'front') drawFurnitureGroundShadow(id, anchor, size, effect);
+  ctx.save();
+  ctx.translate(anchor.x, anchor.y - effect.lift);
+  ctx.rotate(effect.rot);
+  ctx.scale(effect.sx, effect.sy);
+  if (id === 'wheel') drawWheelFurniture(0, 0, s, t, part);
+  else if (id === 'cushion') drawCushionFurniture(0, 0, s, t);
+  else if (id === 'plant') drawPlantFurniture(0, 0, s, t);
+  else if (id === 'window') drawWindowFurniture(0, 0, s, t);
+  ctx.restore();
 }
 
 function drawOwnedFurniture(t) {
-  if (typeof careStats === 'undefined' || !Array.isArray(careStats.furnitureOwned)) return;
-  for (const id of careStats.furnitureOwned) drawFurnitureItem(id, t);
+  for (const id of ownedFurnitureIds()) drawFurnitureItem(id, t);
+}
+
+function drawWallFurniture(t) {
+  for (const id of wallFurnitureIds()) drawFurnitureItem(id, t);
+}
+
+function wheelHasPetInside() {
+  if (typeof careStats === 'undefined' || !hasFurniture('wheel')) return false;
+  if (pet.behavior !== 'wheel') return false;
+  const target = furnitureUsePoint('wheel');
+  return dist(pet.x, pet.y, target.x, target.y) < 48;
+}
+
+function drawFloorFurnitureBehindPet(t) {
+  const ids = floorFurnitureIds().slice().sort((a, b) => furnitureGroundY(a) - furnitureGroundY(b));
+  const wheelInside = wheelHasPetInside();
+  for (const id of ids) {
+    if (id === 'wheel' && wheelInside) {
+      drawFurnitureItem(id, t, 'back');
+      continue;
+    }
+    if (furnitureGroundY(id) <= pet.y) drawFurnitureItem(id, t);
+  }
+}
+
+function drawFloorFurnitureInFrontOfPet(t) {
+  const ids = floorFurnitureIds().slice().sort((a, b) => furnitureGroundY(a) - furnitureGroundY(b));
+  const wheelInside = wheelHasPetInside();
+  for (const id of ids) {
+    if (id === 'wheel' && wheelInside) {
+      drawFurnitureItem(id, t, 'front');
+      continue;
+    }
+    if (furnitureGroundY(id) > pet.y) drawFurnitureItem(id, t);
+  }
 }
 
 function drawFurniturePreviewCanvas(canvas, id) {
@@ -665,11 +758,15 @@ function draw(t) {
   drawWorld(t);
 
   if (currentStage() === 'egg') {
+    if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);
     drawEgg(t);
+    if (currentPlace() === 'home') drawFloorFurnitureInFrontOfPet(t);
     drawParticlesLayer();
     drawPetCaption();
     return;
   }
+
+  if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);
 
   const s = depthScale(), r = stagedRadius();
   const sy = pet.squash, sx = 1 + (1 - sy) * 0.85;
@@ -836,6 +933,7 @@ function draw(t) {
   }
   if (ball && ball.phase === 'carried') drawBallObject(1);
   if (butterfly && butterfly.noseT > 0) drawButterfly(t);
+  if (currentPlace() === 'home') drawFloorFurnitureInFrontOfPet(t);
 
   drawParticlesLayer();
   drawPetCaption();

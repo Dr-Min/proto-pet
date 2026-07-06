@@ -23,18 +23,166 @@ const FOOD_TYPES = [
   { id: 'leaf', name: '풀내음 밥', fill: '#c9d99a', top: '#94ad68', bits: '#5f7446' },
 ];
 const FURNITURE_ITEMS = [
-  { id: 'wheel', name: '쳇바퀴', price: 14, anchor: { x: 0.26, y: 0.66 }, note: '달리다 굴러도 진지함' },
-  { id: 'window', name: '창문', price: 10, anchor: { x: 0.76, y: 0.34 }, note: '멍하니 바깥 봄' },
-  { id: 'cushion', name: '쿠션', price: 8, anchor: { x: 0.56, y: 0.72 }, note: '잠이 더 푹신함' },
-  { id: 'plant', name: '화분', price: 6, anchor: { x: 0.16, y: 0.7 }, note: '냄새 맡을 거리' },
+  { id: 'wheel', name: '쳇바퀴', price: 14, anchor: { x: 0.26, y: 0.66 }, zone: 'floor', scale: 1.7, baseRadius: 32, note: '달리다 굴러도 진지함' },
+  { id: 'window', name: '창문', price: 10, anchor: { x: 0.76, y: 0.26 }, zone: 'wall', scale: 1.5, baseRadius: 44, note: '멍하니 바깥 봄' },
+  { id: 'cushion', name: '쿠션', price: 8, anchor: { x: 0.56, y: 0.72 }, zone: 'floor', scale: 1.3, baseRadius: 38, note: '잠이 더 푹신함' },
+  { id: 'plant', name: '화분', price: 6, anchor: { x: 0.16, y: 0.7 }, zone: 'floor', scale: 0.8, baseRadius: 36, note: '냄새 맡을 거리' },
 ];
 function furnitureItemById(id) {
   return FURNITURE_ITEMS.find(item => item.id === id) || null;
 }
-function furnitureAnchor(id) {
+function defaultFurnitureRatio(id) {
   const item = furnitureItemById(id);
-  if (!item) return { x: W / 2, y: H * 0.65 };
-  return { x: item.anchor.x * W, y: item.anchor.y * H };
+  if (!item) return { xr: 0.5, yr: 0.65 };
+  return { xr: item.anchor.x, yr: item.anchor.y };
+}
+function furnitureZone(id) {
+  const item = furnitureItemById(id);
+  return item && item.zone === 'wall' ? 'wall' : 'floor';
+}
+function furniturePrimarySize(id, y) {
+  const item = furnitureItemById(id);
+  const bodyR = pet.r * depthScaleAt(y) * stageScale('body');
+  return bodyR * (item ? item.scale : 1);
+}
+function furnitureDrawScale(id, y) {
+  const item = furnitureItemById(id);
+  if (!item) return depthScaleAt(y);
+  return furniturePrimarySize(id, y) / item.baseRadius;
+}
+function furnitureMinGap(y) {
+  return pet.r * depthScaleAt(y) * stageScale('body') * 1.2;
+}
+function furnitureClampPoint(id, x, y) {
+  const zone = furnitureZone(id);
+  const clampedY = zone === 'wall'
+    ? clamp(y, H * 0.16, H * 0.34)
+    : clamp(y, H * 0.42, H * 0.83);
+  const margin = clamp(furniturePrimarySize(id, clampedY) * 0.72, 34, Math.min(112, W * 0.24));
+  return {
+    x: clamp(x, margin, W - margin),
+    y: clampedY,
+  };
+}
+function furnitureRatioFromPoint(id, x, y) {
+  const point = furnitureClampPoint(id, x, y);
+  return {
+    xr: clamp(point.x / Math.max(1, W), 0, 1),
+    yr: clamp(point.y / Math.max(1, H), 0, 1),
+  };
+}
+function furniturePointFromRatio(id, ratio) {
+  const fallback = defaultFurnitureRatio(id);
+  const xr = ratio && Number.isFinite(Number(ratio.xr)) ? Number(ratio.xr) : fallback.xr;
+  const yr = ratio && Number.isFinite(Number(ratio.yr)) ? Number(ratio.yr) : fallback.yr;
+  return furnitureClampPoint(id, clamp(xr, 0, 1) * W, clamp(yr, 0, 1) * H);
+}
+function furnitureRawAnchor(id) {
+  if (typeof careStats === 'undefined') return furniturePointFromRatio(id, defaultFurnitureRatio(id));
+  return furniturePointFromRatio(id, careStats.furniturePlaced && careStats.furniturePlaced[id]);
+}
+function furnitureDragAnchor(id) {
+  if (typeof furnitureMotion !== 'undefined' && furnitureMotion.heldId === id) {
+    return furnitureClampPoint(id, furnitureMotion.x, furnitureMotion.y);
+  }
+  return null;
+}
+function furnitureAnchor(id) {
+  return furnitureDragAnchor(id) || furnitureRawAnchor(id);
+}
+function furnitureGroundY(id) {
+  const anchor = furnitureAnchor(id);
+  if (furnitureZone(id) === 'wall') return anchor.y - H;
+  return anchor.y;
+}
+function ownedFurnitureIds() {
+  if (typeof careStats === 'undefined' || !Array.isArray(careStats.furnitureOwned)) return [];
+  return careStats.furnitureOwned.filter(id => furnitureItemById(id));
+}
+function floorFurnitureIds() {
+  return ownedFurnitureIds().filter(id => furnitureZone(id) === 'floor');
+}
+function wallFurnitureIds() {
+  return ownedFurnitureIds().filter(id => furnitureZone(id) === 'wall');
+}
+function constrainedFurniturePoint(id, x, y) {
+  const origin = furnitureClampPoint(id, x, y);
+  let point = { ...origin };
+  const ids = ownedFurnitureIds().filter(otherId => otherId !== id && furnitureZone(otherId) === furnitureZone(id));
+  for (let pass = 0; pass < 6; pass++) {
+    let moved = false;
+    for (let i = 0; i < ids.length; i++) {
+      const other = furnitureRawAnchor(ids[i]);
+      const dx = point.x - other.x;
+      const dy = point.y - other.y;
+      const d = Math.hypot(dx, dy);
+      const minD = furnitureMinGap((point.y + other.y) / 2);
+      if (d >= minD) continue;
+      const a = d > 0.001 ? Math.atan2(dy, dx) : (i + 1) * 1.91;
+      const push = (minD - d) * 0.62;
+      point = furnitureClampPoint(id, point.x + Math.cos(a) * push, point.y + Math.sin(a) * push);
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  let best = point;
+  let bestScore = furnitureSeparationScore(id, point, ids);
+  const minTarget = furnitureMinGap(point.y);
+  if (bestScore < minTarget) {
+    for (let radiusStep = 1; radiusStep <= 5; radiusStep++) {
+      const radius = minTarget * radiusStep * 0.52;
+      for (let i = 0; i < 16; i++) {
+        const a = i / 16 * Math.PI * 2 + radiusStep * 0.37;
+        const candidate = furnitureClampPoint(id, origin.x + Math.cos(a) * radius, origin.y + Math.sin(a) * radius);
+        const score = furnitureSeparationScore(id, candidate, ids) - dist(origin.x, origin.y, candidate.x, candidate.y) * 0.04;
+        if (score > bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+    }
+  }
+  return best;
+}
+function furnitureSeparationScore(id, point, otherIds) {
+  if (!otherIds.length) return Infinity;
+  let score = Infinity;
+  for (const otherId of otherIds) {
+    const other = furnitureRawAnchor(otherId);
+    score = Math.min(score, dist(point.x, point.y, other.x, other.y));
+  }
+  return score;
+}
+function furnitureHitTest(x, y) {
+  const ids = ownedFurnitureIds().slice().sort((a, b) => furnitureGroundY(b) - furnitureGroundY(a));
+  for (const id of ids) {
+    const anchor = furnitureAnchor(id);
+    const size = furniturePrimarySize(id, anchor.y);
+    let cx = anchor.x;
+    let cy = anchor.y;
+    let rx = size * 0.95;
+    let ry = size * 0.72;
+    if (id === 'wheel') {
+      cx = anchor.x;
+      cy = anchor.y - size * 0.55;
+      rx = size * 1.2;
+      ry = size * 1.36;
+    } else if (id === 'cushion') {
+      rx = size * 1.28;
+      ry = size * 0.62;
+    } else if (id === 'plant') {
+      cy = anchor.y - size * 0.42;
+      rx = size * 0.76;
+      ry = size * 1.15;
+    } else if (id === 'window') {
+      rx = size * 1.05;
+      ry = size * 0.82;
+    }
+    const dx = (x - cx) / Math.max(1, rx);
+    const dy = (y - cy) / Math.max(1, ry);
+    if (dx * dx + dy * dy <= 1) return id;
+  }
+  return '';
 }
 function foodTypeById(id) {
   return FOOD_TYPES.find(type => type.id === id) || FOOD_TYPES[0];
@@ -165,6 +313,16 @@ for (let i = 0; i < 3; i++) {
     r: genePick(0.055, 0.105),
   });
 }
+
+const furnitureMotion = {
+  heldId: '',
+  x: 0,
+  y: 0,
+  settleId: '',
+  settleT: 0,
+  settleDur: 0.34,
+  sessionCaptionShown: false,
+};
 
 // PC에서 보이는 현재 비율을 기준으로 모바일에서도 같은 체감 크기를 유지한다.
 function applySize() { pet.r = 46; }

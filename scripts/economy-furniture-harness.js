@@ -10,6 +10,7 @@ const sourceFiles = ['src/render.js', 'src/app.js', 'src/care.js', 'src/input.js
 function makeContext(search = '?seed=12345') {
   const elements = new Map();
   const ctx = new Proxy({}, { get: () => () => {} });
+  let now = 0;
   function element(id) {
     if (!elements.has(id)) elements.set(id, makeElement(id, ctx));
     return elements.get(id);
@@ -21,7 +22,10 @@ function makeContext(search = '?seed=12345') {
     Math: math,
     Date,
     URLSearchParams,
-    performance: { now: () => 0 },
+    performance: { now: () => now },
+    __setNow(value) {
+      now = value;
+    },
     location: { search },
     localStorage: {
       data: new Map(),
@@ -100,14 +104,75 @@ function assert(condition, message) {
 function near(actual, expected) {
   return Math.abs(actual - expected) < 0.000001;
 }
+function distance(ax, ay, bx, by) {
+  return Math.hypot(ax - bx, ay - by);
+}
 
 function testMigrationDefaultsAndFetchCarryover() {
   const context = makeContext();
   run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, fetchCount: 8, ts: Date.now() })); loadCareState();`);
-  const state = run(context, '({ pebbles: careStats.pebbles, owned: careStats.furnitureOwned.slice(), quick: careStats.stats.quick })');
+  const state = run(context, '({ pebbles: careStats.pebbles, owned: careStats.furnitureOwned.slice(), quick: careStats.stats.quick, placed: careStats.furniturePlaced })');
   assert(state.pebbles === 0, 'old saves migrate pebbles to zero');
   assert(state.owned.length === 0, 'old saves migrate furniture to empty list');
   assert(state.quick === 5, 'old fetchCount carries over into quick movement');
+  assert(state.placed.wheel.xr === 0.26 && state.placed.window.yr === 0.26, 'old saves initialize furniture placement anchors');
+}
+
+function testFurniturePlacementMigrationPersistenceAndResize() {
+  const context = makeContext();
+  run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, furnitureOwned: ['wheel', 'window'], furniturePlaced: { wheel: { xr: 0.7, yr: 0.72 }, window: { xr: 0.2, yr: 0.24 } }, ts: Date.now() })); loadCareState();`);
+  let state = run(context, '({ wheel: furnitureAnchor("wheel"), window: furnitureAnchor("window"), placed: careStats.furniturePlaced })');
+  assert(near(state.placed.wheel.xr, 0.7) && near(state.placed.window.yr, 0.24), 'saved furniture ratios migrate without losing coordinates');
+  assert(near(state.wheel.x, 560) && near(state.window.x, 160), 'saved ratios map to the initial viewport');
+  run(context, 'W = 400; H = 900;');
+  state = run(context, '({ wheel: furnitureAnchor("wheel"), window: furnitureAnchor("window") })');
+  assert(near(state.wheel.x, 280), 'furniture x position survives resize through ratio coordinates');
+  assert(state.window.y >= 900 * 0.16 && state.window.y <= 900 * 0.34, 'window is clamped to the wall band after resize');
+  run(context, 'finishFurniturePlacement("wheel", W * 0.48, H * 0.8);');
+  const saved = run(context, 'JSON.parse(localStorage.getItem("protopet-care-v1"))');
+  assert(saved.furniturePlaced && saved.furniturePlaced.wheel && Number.isFinite(saved.furniturePlaced.wheel.xr), 'dropping furniture persists ratio coordinates');
+}
+
+function testFurniturePlacementClampsAndSeparates() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; careStats.furnitureOwned = ["wheel", "cushion", "plant", "window"]; careStats.furniturePlaced = migrateFurniturePlaced(null); setFurniturePlacement("wheel", W * 0.5, H * 0.7); setFurniturePlacement("cushion", W * 0.5, H * 0.7); setFurniturePlacement("plant", W * 0.5, H * 0.7); setFurniturePlacement("window", W * 0.5, H * 0.8);');
+  const state = run(context, '({ wheel: furnitureAnchor("wheel"), cushion: furnitureAnchor("cushion"), plant: furnitureAnchor("plant"), window: furnitureAnchor("window"), gap: furnitureMinGap(H * 0.7) })');
+  assert(state.window.y >= 720 * 0.16 && state.window.y <= 720 * 0.34, 'window placement clamps into the wall band');
+  assert(state.wheel.y >= 720 * 0.42 && state.wheel.y <= 720 * 0.83, 'floor furniture clamps into the floor band');
+  assert(distance(state.wheel.x, state.wheel.y, state.cushion.x, state.cushion.y) >= state.gap * 0.92, 'overlapping floor furniture is pushed apart');
+  assert(distance(state.cushion.x, state.cushion.y, state.plant.x, state.plant.y) >= state.gap * 0.82, 'multiple floor furniture placements keep usable spacing');
+}
+
+function testFurnitureBehaviorTargetsPlacedPosition() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; careStats.furnitureOwned = ["wheel", "plant", "window"]; careStats.furniturePlaced = migrateFurniturePlaced(null); setFurniturePlacement("wheel", W * 0.68, H * 0.73); setFurniturePlacement("plant", W * 0.22, H * 0.76); setFurniturePlacement("window", W * 0.82, H * 0.2); needs.energy = 0.9; setBehavior("wheel");');
+  let state = run(context, '({ target: furnitureMoveTarget(), use: furnitureUsePoint("wheel"), anchor: furnitureAnchor("wheel") })');
+  assert(Math.abs(state.target.x - state.use.x) < 0.001 && Math.abs(state.target.y - state.use.y) < 0.001, 'wheel behavior moves to the placed wheel point');
+  assert(state.use.y < state.anchor.y, 'wheel use point places the pet visibly inside the wheel');
+  run(context, 'setBehavior("sniff");');
+  state = run(context, '({ target: furnitureMoveTarget(), plant: furnitureUsePoint("plant") })');
+  assert(state.target && Math.abs(state.target.x - state.plant.x) < 0.001, 'plant behavior target follows custom placement');
+}
+
+function testFurnitureLongPressDragAndPetPriority() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; careStats.furnitureOwned = ["plant", "wheel"]; careStats.furniturePlaced = migrateFurniturePlaced(null); setFurniturePlacement("plant", W * 0.18, H * 0.7); setFurniturePlacement("wheel", pet.x, pet.y);');
+  let state = run(context, '({ petX: pet.x, petY: pet.y, petTop: pet.y - stagedRadius(), plant: furnitureAnchor("plant"), before: { ...careStats.furniturePlaced.plant } })');
+  run(context, '__setNow(0); __elements.get("c").listeners.pointerdown({ clientX: pet.x, clientY: pet.y - stagedRadius(), pointerId: 7, pointerType: "mouse", timeStamp: 0, preventDefault() {} });');
+  state = run(context, '({ mode: input.mode, furnitureId: input.furnitureId })');
+  assert(state.mode === 'pending' && state.furnitureId === '', 'pet hit testing has priority over furniture dragging');
+  run(context, '__elements.get("c").listeners.pointerup({ clientX: pet.x, clientY: pet.y - stagedRadius(), pointerId: 7, pointerType: "mouse", timeStamp: 20, preventDefault() {} });');
+  run(context, '__setNow(0); const p = furnitureAnchor("plant"); __elements.get("c").listeners.pointerdown({ clientX: p.x, clientY: p.y, pointerId: 8, pointerType: "mouse", timeStamp: 0, preventDefault() {} });');
+  run(context, '__setNow(360); update(1 / 60);');
+  state = run(context, '({ mode: input.mode, held: furnitureMotion.heldId, caption: pet.caption })');
+  assert(state.mode === 'furniture-drag' && state.held === 'plant', 'long press lifts furniture into drag mode');
+  assert(state.caption === '그거 옮기나', 'first furniture lift uses the required session caption');
+  run(context, '__setNow(420); __elements.get("c").listeners.pointermove({ clientX: W * 0.62, clientY: H * 0.76, pointerId: 8, pointerType: "mouse", timeStamp: 420, preventDefault() {} }); for (let i = 0; i < 24; i++) update(1 / 60); __elements.get("c").listeners.pointerup({ clientX: W * 0.62, clientY: H * 0.76, pointerId: 8, pointerType: "mouse", timeStamp: 840, preventDefault() {} });');
+  state = run(context, '({ placed: careStats.furniturePlaced.plant, saved: JSON.parse(localStorage.getItem("protopet-care-v1")).furniturePlaced.plant, held: furnitureMotion.heldId, settling: furnitureMotion.settleId, particles: particles.length })');
+  assert(state.held === '' && state.settling === 'plant', 'dropping furniture clears held state and starts settle motion');
+  assert(Math.abs(state.placed.xr - state.saved.xr) < 0.000001 && Math.abs(state.placed.yr - state.saved.yr) < 0.000001, 'dropped furniture placement is saved');
+  assert(state.placed.xr > 0.4 && state.placed.yr > 0.6, 'dragged furniture moves to the intended floor area');
+  assert(state.particles >= 5, 'dropping furniture emits dust particles');
 }
 
 function testWalkDiscoveryPebblesAreDaily() {
@@ -184,6 +249,10 @@ function testFurnitureDrawAndPanelsDoNotThrow() {
 }
 
 testMigrationDefaultsAndFetchCarryover();
+testFurniturePlacementMigrationPersistenceAndResize();
+testFurniturePlacementClampsAndSeparates();
+testFurnitureBehaviorTargetsPlacedPosition();
+testFurnitureLongPressDragAndPetPriority();
 testWalkDiscoveryPebblesAreDaily();
 testBattlePebblesAndStats();
 testRoutinePebbleAndBuyingFurniture();
