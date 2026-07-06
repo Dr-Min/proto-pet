@@ -152,7 +152,7 @@ function testCheerCanBeIgnoredWhenBondLow() {
   setRandom(context, [0.99]);
   run(context, 'cheerBattle();');
   const state = run(context, '({ caption: pet.caption, hp: battle && battle.hp })');
-  assert(state.caption === '못 들은 척함' || state.caption === '내 맘대로 함', 'low-bond cheer can be ignored');
+  assert(['못 들은 척함', '내 맘대로 함', '지금 바쁨', '귀 닫힘'].includes(state.caption), 'low-bond cheer can be ignored');
   assert(state.hp === 1, 'ignored cheer does not damage opponent');
 }
 
@@ -219,6 +219,19 @@ function testWalkTravelsOutAndReturnsHome() {
   assert(state.place === 'home', 'walk button returns home outside');
 }
 
+function testWalkFindsThingsAndReturnsHome() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.9; requestWalk();');
+  tickUntil(context, 'currentPlace() === "walk" && !isTraveling()', 'walk arrival');
+  tickUntil(context, 'walkVisit.discoveries >= 2 && currentPlace() === "home" && !isTraveling()', 'walk discoveries and return');
+  const state = run(context, '({ place: currentPlace(), discoveries: walkVisit.discoveries, pebbles: careStats.pebbles, memory: careStats.lastCareLine, tough: careStats.stats.tough })');
+  assert(state.place === 'home', 'walk returns home after outdoor discoveries');
+  assert(state.discoveries >= 2, 'walk completes multiple outdoor discoveries');
+  assert(state.pebbles >= 3, 'walk discoveries bring back shiny pebbles');
+  assert(state.tough > 0, 'returning from walk trains toughness');
+  assert(state.memory !== '밖 냄새 맡은 날', 'walk discovery writes a more specific memory');
+}
+
 function testBottomBarSwitchesToReturnAwayFromHome() {
   const context = makeContext();
   run(context, 'careStats.stage = "adult"; updateGauges(); __elements.get("moreBtn").listeners.click();');
@@ -249,6 +262,7 @@ testBattleCanWin();
 testCheerCanBeIgnoredWhenBondLow();
 testLeagueClearAndRivalMemory();
 testWalkTravelsOutAndReturnsHome();
+testWalkFindsThingsAndReturnsHome();
 testBottomBarSwitchesToReturnAwayFromHome();
 testLongAbsenceAddsGrime();
 console.log('battle harness passed');

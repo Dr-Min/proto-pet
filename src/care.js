@@ -40,6 +40,7 @@ let battle = null;
 let place = 'home';
 let travel = null;
 let battleReturnT = 0;
+let walkReturnT = 0;
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const ROUGHNESS_THROW_GAIN = 0.34;
@@ -49,34 +50,35 @@ const ROUGHNESS_PENALTY_THRESHOLD = 0.5;
 const ROUGHNESS_CLOSE_BOND = 0.55;
 const ROUGHNESS_BOND_PENALTY = -0.012;
 const ROUGHNESS_CLOSE_BOND_PENALTY = -0.006;
-const ROUGH_HURT_LINES = ['…', '어지러워', '무서웠어', '잠깐 내려놔 줘', '나 공 아님'];
-const ROUGH_FUN_LINES = ['한 번 더!!', '재밌다!!', '날았다!!'];
-const FETCH_START_LINES = ['공이다!!', '잡으러 감'];
-const FETCH_CAUGHT_LINES = ['잡았다', '입에 넣음'];
-const FETCH_DONE_LINES = ['가져왔다', '나 잘했지'];
-const FETCH_REFUSE_LINES = ['지금은 패스…', '공은 내일'];
-const FETCH_SKILL_LINES = ['이제 좀 익숙함'];
-const EGG_LINES = ['콩', '아직 안 나감', '안에서 듣는 중'];
-const HATCH_WARM_LINES = ['따뜻함 저장 중', '안쪽이 포근함'];
-const BATTLE_START_LINES = ['나가봄', '앞에 뭐 있음', '진지해짐'];
-const BATTLE_WIN_LINES = ['이겼나 봄', '나 좀 했음', '앞에 없어짐'];
-const BATTLE_LOSE_LINES = ['좀 누울래', '오늘은 여기까지', '다리 쉬는 중'];
-const BATTLE_CHEER_LINES = ['들었음', '힘 조금 남', '나 해봄'];
-const BATTLE_IGNORE_LINES = ['못 들은 척함', '내 맘대로 함'];
-const TRAVEL_BATTLE_LINES = ['싸움터 감', '밖에 일 있음', '진지하게 나감'];
-const TRAVEL_WALK_LINES = ['밖에 감', '냄새 맡으러 감', '발 바쁨'];
-const WALK_ARRIVE_LINES = ['바깥 냄새 남', '풀 냄새 발견', '여기 넓다'];
-const RETURN_HOME_LINES = ['집이다', '돌아옴', '바닥 익숙함'];
-const WALK_DISCOVERY_LINES = ['풀 냄새 좋은 데 찾음', '냄새 좋은 바닥 찾음'];
-const WALK_DISCOVERY_CAPTIONS = ['여기 냄새 좋음', '킁킁 성공'];
-const SHINY_PEBBLE_CAPTIONS = ['반짝이는 거 주움', '반짝 하나 물고 옴'];
-const ROUTINE_PEBBLE_CAPTIONS = ['어디서 반짝 물어옴', '반짝 놓고 감'];
-const WHEEL_FALL_CAPTIONS = ['바퀴가 이김'];
-const WHEEL_RUN_CAPTIONS = ['다리 빠름', '바퀴 안에 있음'];
-const CUSHION_SLEEP_CAPTIONS = ['푹신한 데 있음', '여기 잠 잘 옴'];
-const BUTTERFLY_START_LINES = ['저거 움직임', '잡으러 감'];
-const BUTTERFLY_MISS_LINES = ['놓쳤다'];
-const BUTTERFLY_NOSE_LINES = ['코에 뭐 있음'];
+const ROUGH_HURT_LINES = ['…', '어지러워', '무서웠어', '잠깐 내려놔 줘', '나 공 아님', '눈 돌아감', '바닥 원함', '나 조금 놀람', '몸 흔들림', '잠깐 멈춤'];
+const ROUGH_FUN_LINES = ['한 번 더!!', '재밌다!!', '날았다!!', '또 하늘!!', '몸이 뜸!!', '통통 좋음!!'];
+const FETCH_START_LINES = ['공이다!!', '잡으러 감', '공 봄!!', '입 준비함'];
+const FETCH_CAUGHT_LINES = ['잡았다', '입에 넣음', '공 잡힘', '물고 있음'];
+const FETCH_DONE_LINES = ['가져왔다', '나 잘했지', '공 돌려줌', '입에서 나옴'];
+const FETCH_REFUSE_LINES = ['지금은 패스…', '공은 내일', '다리 휴식중', '공 멀리 있음'];
+const FETCH_SKILL_LINES = ['이제 좀 익숙함', '공 길 외움'];
+const EGG_LINES = ['콩', '아직 안 나감', '안에서 듣는 중', '안쪽 조용함', '조금 흔들림', '밖 소리 남'];
+const HATCH_WARM_LINES = ['따뜻함 저장 중', '안쪽이 포근함', '껍질이 간질함', '조금 나갈 듯'];
+const BATTLE_START_LINES = ['나가봄', '앞에 뭐 있음', '진지해짐', '발에 힘 줌', '앞을 봄', '먼지 많음'];
+const BATTLE_WIN_LINES = ['이겼나 봄', '나 좀 했음', '앞에 없어짐', '몸이 해냄', '나 안 밀림', '발이 이김'];
+const BATTLE_LOSE_LINES = ['좀 누울래', '오늘은 여기까지', '다리 쉬는 중', '바닥 보고 옴', '잠깐 작아짐', '다음에 봄'];
+const BATTLE_CHEER_LINES = ['들었음', '힘 조금 남', '나 해봄', '귀에 들어옴', '발 다시 감', '조금 세짐'];
+const BATTLE_IGNORE_LINES = ['못 들은 척함', '내 맘대로 함', '지금 바쁨', '귀 닫힘'];
+const TRAVEL_BATTLE_LINES = ['싸움터 감', '밖에 일 있음', '진지하게 나감', '발에 힘 줌', '흙 밟으러 감', '앞 보러 감'];
+const TRAVEL_WALK_LINES = ['밖에 감', '냄새 맡으러 감', '발 바쁨', '바깥 확인함', '코 쓰러 감', '동네 봄'];
+const WALK_ARRIVE_LINES = ['바깥 냄새 남', '풀 냄새 발견', '여기 넓다', '바람 조금 있음', '발밑 다름', '코 바쁨'];
+const RETURN_HOME_LINES = ['집이다', '돌아옴', '바닥 익숙함', '아는 냄새 남', '집 바닥 좋음', '다시 여기'];
+const WALK_DISCOVERY_LINES = ['풀 냄새 좋은 데 찾음', '냄새 좋은 바닥 찾음', '작은 반짝 주운 날', '바깥 냄새 외운 날', '풀 옆에서 오래 킁킁함', '돌 밑을 궁금해한 날'];
+const WALK_DISCOVERY_CAPTIONS = ['여기 냄새 좋음', '킁킁 성공', '뭐 있음', '코가 찾음', '바닥 수상함', '작은 거 봄'];
+const WALK_DONE_LINES = ['이제 집 생각', '냄새 다 봄', '발 좀 쉬자', '집 냄새 원함'];
+const SHINY_PEBBLE_CAPTIONS = ['반짝이는 거 주움', '반짝 하나 물고 옴', '작은 반짝 있음', '이거 반짝임'];
+const ROUTINE_PEBBLE_CAPTIONS = ['어디서 반짝 물어옴', '반짝 놓고 감', '작은 거 줌', '입에서 반짝 나옴'];
+const WHEEL_FALL_CAPTIONS = ['바퀴가 이김', '바퀴 빠름'];
+const WHEEL_RUN_CAPTIONS = ['다리 빠름', '바퀴 안에 있음', '발이 많아짐', '계속 굴러감'];
+const CUSHION_SLEEP_CAPTIONS = ['푹신한 데 있음', '여기 잠 잘 옴', '몸이 녹음', '쿠션이 잡음'];
+const BUTTERFLY_START_LINES = ['저거 움직임', '잡으러 감', '작은 거 봄', '날아다님'];
+const BUTTERFLY_MISS_LINES = ['놓쳤다', '눈으로 잡음'];
+const BUTTERFLY_NOSE_LINES = ['코에 뭐 있음', '코가 잡힘'];
 const AI_LINE_COOLDOWN = 12000;
 const DAILY_GREETING_CAPTIONS = {
   morning: '왔다!!',
@@ -725,11 +727,12 @@ function clearPlaceObjects() {
 function beginWalkVisit() {
   walkVisit.active = true;
   walkVisit.discoveries = 0;
-  walkVisit.maxDiscoveries = Math.random() < 0.55 ? 1 : 2;
-  walkVisit.nextDiscoveryAt = rand(3.5, 7.5);
-  walkVisit.targetSpot = Math.random() < 0.5 ? 0 : 1;
+  walkVisit.maxDiscoveries = Math.random() < 0.65 ? 2 : 3;
+  walkVisit.nextDiscoveryAt = rand(1.2, 2.6);
+  walkVisit.targetSpot = Math.floor(Math.random() * placeWorld.walk.sniffSpots.length);
   walkVisit.sniffing = false;
   walkVisit.sniffT = 0;
+  walkReturnT = 0;
   butterfly.active = false;
   butterfly.noseT = 0;
   butterfly.chaseT = 0;
@@ -738,6 +741,7 @@ function beginWalkVisit() {
 function endWalkVisit() {
   walkVisit.active = false;
   walkVisit.sniffing = false;
+  walkReturnT = 0;
   butterfly.active = false;
   butterfly.noseT = 0;
   butterfly.chaseT = 0;
@@ -782,6 +786,7 @@ function startTravel(to, options = {}) {
   };
   clearPlaceObjects();
   battleReturnT = 0;
+  walkReturnT = 0;
   pet.behavior = 'travel';
   pet.behaviorT = 60;
   pet.target.x = exitSide < 0 ? -70 : W + 70;
@@ -907,15 +912,22 @@ function completeWalkDiscovery() {
   walkVisit.discoveries += 1;
   walkVisit.sniffing = false;
   walkVisit.sniffT = 0;
-  walkVisit.targetSpot += 1;
-  walkVisit.nextDiscoveryAt = rand(8, 15);
-	  rememberCare(randomLine(WALK_DISCOVERY_LINES));
-	  pet.caption = randomLine(WALK_DISCOVERY_CAPTIONS);
-	  pet.captionT = 0;
-	  pet.happy = Math.max(pet.happy, 0.55);
-	  pet.behaviorT = Math.max(pet.behaviorT, 1.4);
-	  for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-14, 14), pet.y + rand(-4, 8));
-	  grantWalkDiscoveryShinyPebble();
+  walkVisit.targetSpot = (walkVisit.targetSpot + 1 + Math.floor(Math.random() * 2)) % placeWorld.walk.sniffSpots.length;
+  walkVisit.nextDiscoveryAt = rand(3.2, 6.2);
+  rememberCare(randomLine(WALK_DISCOVERY_LINES));
+  pet.caption = randomLine(WALK_DISCOVERY_CAPTIONS);
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.55);
+  pet.behaviorT = Math.max(pet.behaviorT, 1.4);
+  for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-14, 14), pet.y + rand(-4, 8));
+  grantWalkDiscoveryShinyPebble();
+  if (walkVisit.discoveries >= walkVisit.maxDiscoveries) {
+    walkReturnT = 2.2;
+    if (pet.captionT > 0.2) {
+      pet.caption = randomLine(WALK_DONE_LINES);
+      pet.captionT = 0;
+    }
+  }
 }
 function updateWalkDiscovery(dt) {
   if (!walkVisit.active || walkVisit.discoveries >= walkVisit.maxDiscoveries) return;
@@ -939,6 +951,16 @@ function updateWalkDiscovery(dt) {
   pet.target.x = sx;
   pet.target.y = sy;
   if (dist(pet.x, pet.y, sx, sy) < 34 || walkVisit.sniffT > 5.2) completeWalkDiscovery();
+}
+function updateWalkReturn(dt) {
+  if (walkReturnT <= 0) return;
+  if (travel || battle || place !== 'walk') {
+    walkReturnT = 0;
+    return;
+  }
+  if (input.mode === 'drag') return;
+  walkReturnT = Math.max(0, walkReturnT - dt);
+  if (walkReturnT <= 0) startTravel('home');
 }
 function updateButterflyPosition() {
   const spec = placeWorld.walk.butterfly;
@@ -1678,6 +1700,7 @@ function updateCare(dt, { airborne, speed }) {
     return;
 	  }
 	  updateWalkPlace(dt);
+  updateWalkReturn(dt);
 	  updateFurnitureUse(dt);
 	  if (pet.behavior !== 'belly') bellyState.rewarded = false;
 	  roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);

@@ -289,7 +289,7 @@ const STAGE_PREVIEW = new URLSearchParams(location.search).get('stage');
 const FAST_PREVIEW = new URLSearchParams(location.search).get('fast') === '1';
 const STAGE_SCALES = {
   egg: { body: 0.74, eye: 1, eyeYOffset: 0, ear: 0, tail: 0, leg: 0, speed: 0, trip: 0, hunger: 0, energy: 0, zoomies: 0 },
-  baby: { body: 0.62, eye: 1.35, eyeYOffset: 0.06, ear: 0.85, tail: 0.7, leg: 0.6, speed: 0.85, trip: 1.8, hunger: 1.2, energy: 1.25, zoomies: 1.3 },
+  baby: { body: 0.62, eye: 1.08, eyeYOffset: 0.06, ear: 0.85, tail: 0.7, leg: 0.6, speed: 0.85, trip: 1.8, hunger: 1.2, energy: 1.25, zoomies: 1.3 },
   adult: { body: 1.12, eye: 1, eyeYOffset: 0, ear: 1, tail: 1.1, leg: 1.15, speed: 1.1, trip: 0.7, hunger: 1, energy: 1, zoomies: 1 },
 };
 function validStage(stage) { return STAGES.includes(stage); }
@@ -442,6 +442,8 @@ function makePlaceWorld() {
       sniffSpots: [
         { x: 0.26, y: 0.62, phase: walkRng() * 8 },
         { x: 0.68, y: 0.73, phase: walkRng() * 8 },
+        { x: 0.42, y: 0.56, phase: walkRng() * 8 },
+        { x: 0.82, y: 0.61, phase: walkRng() * 8 },
       ],
       butterfly: { x: 0.56, y: 0.44, rx: 0.18, ry: 0.09, phase: walkRng() * 8 },
     },
@@ -648,28 +650,28 @@ const BEHAVIORS = {
   travel:  { w: 0, dur: [60, 60] },
 };
 const CAPTIONS = {
-  wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름'],
-  stare: ['멍…', '아무것도 안 보는 중', '생각이 없다'],
-  sniff: ['킁킁', '바닥에서 뭔가 발견', '킁킁킁…'],
-  plop: ['철푸덕', '움직이기 싫음', '녹는 중'],
-  zoomies: ['갑자기 신남!!', '우다다다!!'],
-  wiggle: ['꼬물꼬물', '춤(본인 생각)'],
-  sleep: ['Zzz…', '꿈나라'],
-  belly: ['배 보임', '누워 있음'],
-  eat: ['밥이다!!', '우걱우걱'],
-  fetch: ['공이다!!', '잡으러 감'],
-  wheel: ['달려봄', '쳇바퀴 봄'],
-  butterfly: ['잡으러 감', '저거 움직임'],
-  battle: ['진지해짐', '나가봄'],
-  travel: ['나감', '어디 가는 중'],
+  wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름', '발이 먼저 감', '바닥 순찰함', '괜히 돌아봄'],
+  stare: ['멍…', '아무것도 안 보는 중', '생각이 없다', '눈만 켜짐', '그냥 있음', '조금 봄'],
+  sniff: ['킁킁', '바닥에서 뭔가 발견', '킁킁킁…', '냄새 확인함', '코가 일함', '여기 수상함'],
+  plop: ['철푸덕', '움직이기 싫음', '녹는 중', '바닥 됨', '납작해짐', '잠깐 퍼짐'],
+  zoomies: ['갑자기 신남!!', '우다다다!!', '발 많아짐!!', '빨라짐!!'],
+  wiggle: ['꼬물꼬물', '춤(본인 생각)', '몸이 마음대로 함', '흔들어봄'],
+  sleep: ['Zzz…', '꿈나라', '눈 꺼짐', '잠이 옴'],
+  belly: ['배 보임', '누워 있음', '하늘 보는 중', '배가 먼저 누움'],
+  eat: ['밥이다!!', '우걱우걱', '입 바쁨', '사라지게 함'],
+  fetch: ['공이다!!', '잡으러 감', '공 봄!!', '입 준비함'],
+  wheel: ['달려봄', '쳇바퀴 봄', '발 시험중', '안에 들어감'],
+  butterfly: ['잡으러 감', '저거 움직임', '눈이 따라감', '작은 거 봄'],
+  battle: ['진지해짐', '나가봄', '발에 힘 줌', '앞을 봄'],
+  travel: ['나감', '어디 가는 중', '밖으로 감', '발 이동함'],
 };
-const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐만', '발이 없어짐'];
-const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다'];
-const DROP_LINES = ['어어… 내려간다', '착지 준비…', '후웅', '나 내려놔짐', '바닥 온다'];
-const LAND_LINES = ['착지…', '콩', '살았다', '땅이다', '다리 있음'];
-const BOUNCE_LINES = ['통!', '퐁!', '앗 통통', '말랑반사', '벽이 있었네'];
-const PETTING_LINES = ['좋아…', '거기 좋아', '손이다 손', '나 지금 행복함', '더 해줘'];
-const BOND_LINES = ['옆에 있을래', '너 냄새 안다', '나 너 좋아', '같이 있자'];
+const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐만', '발이 없어짐', '몸이 올라감', '바닥 멀어짐', '손에 잡힘', '나 위에 있음', '하늘 가까움'];
+const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다', '바닥 놓침', '둥둥 상태', '다리 쉬는 중', '아직 들림', '몸이 길어짐'];
+const DROP_LINES = ['어어… 내려간다', '착지 준비…', '후웅', '나 내려놔짐', '바닥 온다', '다리 찾아야 함', '아래 감', '말랑 준비', '땅 가까움', '숨 참음'];
+const LAND_LINES = ['착지…', '콩', '살았다', '땅이다', '다리 있음', '바닥 확인함', '안 터짐', '후우', '내려옴', '다시 서봄'];
+const BOUNCE_LINES = ['통!', '퐁!', '앗 통통', '말랑반사', '벽이 있었네', '또 튐', '몸이 튕김', '벽 확인함', '퉁', '나 돌아옴'];
+const PETTING_LINES = ['좋아…', '거기 좋아', '손이다 손', '나 지금 행복함', '더 해줘', '손 냄새 남', '눈 풀림', '가만히 있을래', '털 정리됨', '기분 저장함'];
+const BOND_LINES = ['옆에 있을래', '너 냄새 안다', '나 너 좋아', '같이 있자', '여기 있을래', '손 기억함', '멀리 안 감', '너 오면 봄'];
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
 function setBehavior(name) {
   if (currentStage() === 'egg' && name !== 'stare') name = 'stare';

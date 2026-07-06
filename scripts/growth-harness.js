@@ -125,6 +125,14 @@ function testBabyPlayIsLocked() {
   assert(state.caption === '아직 공 몰라', 'baby play lock uses the planned caption');
 }
 
+function testBabyEyesUseTunedScale() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "baby";');
+  const state = run(context, '({ babyEye: stageScale("eye"), adultEye: (careStats.stage = "adult", stageScale("eye")) })');
+  assert(state.babyEye === 1.08, 'baby eyes are tuned to 80% of the previous 1.35 scale');
+  assert(state.adultEye === 1, 'adult eye scale stays unchanged');
+}
+
 function testMemoryLogMigratesAndKeepsRecentLines() {
   const context = makeContext();
   run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, lastCareLine: '손길을 기억함', lastCareAt: 1234, ts: Date.now() })); loadCareState();`);
@@ -148,5 +156,6 @@ testEggActionsStayInEgg();
 testWarmEggHatchesAfterAgeGate();
 testBabyGrowsOnNextSleepWhenReady();
 testBabyPlayIsLocked();
+testBabyEyesUseTunedScale();
 testMemoryLogMigratesAndKeepsRecentLines();
 console.log('growth harness passed');

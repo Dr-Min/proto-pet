@@ -180,7 +180,7 @@ function testWalkDiscoveryPebblesAreDaily() {
   run(context, 'careStats.stage = "adult"; grantWalkDiscoveryShinyPebble();');
   let state = run(context, '({ pebbles: careStats.pebbles, caption: pet.caption })');
   assert(state.pebbles === 2 || state.pebbles === 3, 'first daily walk discovery grants two or three pebbles');
-  assert(['반짝이는 거 주움', '반짝 하나 물고 옴'].includes(state.caption), 'walk discovery uses pebble caption');
+  assert(['반짝이는 거 주움', '반짝 하나 물고 옴', '작은 반짝 있음', '이거 반짝임'].includes(state.caption), 'walk discovery uses pebble caption');
   run(context, 'grantWalkDiscoveryShinyPebble();');
   state = run(context, '({ pebbles: careStats.pebbles })');
   assert(state.pebbles === 3 || state.pebbles === 4, 'repeat same-day discovery grants one pebble');
@@ -204,7 +204,7 @@ function testRoutinePebbleAndBuyingFurniture() {
   run(context, 'noteCareAction("meal"); noteCareAction("rest"); noteCareAction("pet");');
   let state = run(context, '({ pebbles: careStats.pebbles, caption: pet.caption })');
   assert(state.pebbles === 1, 'full care round grants one pebble');
-  assert(['어디서 반짝 물어옴', '반짝 놓고 감'].includes(state.caption), 'routine reward uses pebble caption');
+  assert(['어디서 반짝 물어옴', '반짝 놓고 감', '작은 거 줌', '입에서 반짝 나옴'].includes(state.caption), 'routine reward uses pebble caption');
   run(context, 'careStats.pebbles = 5;');
   assert(run(context, 'buyFurniture("plant")') === false, 'cannot buy furniture without enough pebbles');
   run(context, 'careStats.pebbles = 20;');

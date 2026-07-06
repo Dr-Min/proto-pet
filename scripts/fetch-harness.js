@@ -121,7 +121,7 @@ function testFetchRefusal() {
   run(context, 'careStats.stage = "adult"; needs.energy = 0.2; requestPlayBall();');
   tickUntil(context, 'ball && ball.declined === true', 'low-energy refusal');
   const state = run(context, '({ caption: pet.caption, ballStillThere: ball !== null, fetchCount: careStats.fetchCount })');
-  assert(['지금은 패스…', '공은 내일'].includes(state.caption), 'low energy refusal caption is used');
+  assert(['지금은 패스…', '공은 내일', '다리 휴식중', '공 멀리 있음'].includes(state.caption), 'low energy refusal caption is used');
   assert(state.ballStillThere, 'refused ball remains until timeout');
   assert(state.fetchCount === 0, 'refusal does not increment fetchCount');
 }
@@ -155,7 +155,7 @@ function testFetchPracticeCaptionCanAppear() {
   run(context, 'careStats.stage = "adult"; careStats.fetchCount = 4; needs.energy = 0.9; recordFetchComplete();');
   const state = run(context, '({ caption: pet.caption, fetchCount: careStats.fetchCount })');
   assert(state.fetchCount === 5, 'fetch complete still increments count before practice caption');
-  assert(state.caption === '이제 좀 익숙함', 'practice caption can appear after repeated fetch');
+  assert(['이제 좀 익숙함', '공 길 외움'].includes(state.caption), 'practice caption can appear after repeated fetch');
 }
 
 testFetchComplete();
