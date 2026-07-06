@@ -105,7 +105,7 @@ function testWarmEggHatchesAfterAgeGate() {
   const state = run(context, '({ stage: currentStage(), memory: careStats.lastCareLine, caption: pet.caption })');
   assert(state.stage === 'baby', 'warm aged egg hatches into baby');
   assert(state.memory === '알에서 나온 날', 'hatch memory is recorded');
-  assert(state.caption === '…누구세요', 'hatch caption follows PLAN voice');
+  assert(state.caption === '너 누구야?', 'hatch caption follows PLAN voice');
 }
 
 function testBabyGrowsOnNextSleepWhenReady() {
@@ -114,7 +114,7 @@ function testBabyGrowsOnNextSleepWhenReady() {
   const state = run(context, '({ stage: currentStage(), memory: careStats.lastCareLine, caption: pet.caption })');
   assert(state.stage === 'adult', 'ready baby grows on sleep');
   assert(state.memory === '어른이 된 날', 'adult growth memory is recorded');
-  assert(state.caption === '나 좀 큰 듯', 'adult growth caption follows PLAN voice');
+  assert(state.caption === '나 좀 컸어', 'adult growth caption follows PLAN voice');
 }
 
 function testBabyPlayIsLocked() {
@@ -122,7 +122,7 @@ function testBabyPlayIsLocked() {
   run(context, 'careStats.stage = "baby"; requestPlayBall();');
   const state = run(context, '({ ball: ball, caption: pet.caption })');
   assert(state.ball === null, 'baby cannot start fetch');
-  assert(state.caption === '아직 공 몰라', 'baby play lock uses the planned caption');
+  assert(state.caption === '공은 아직 어려워', 'baby play lock uses the planned caption');
 }
 
 function testBabyEyesUseTunedScale() {

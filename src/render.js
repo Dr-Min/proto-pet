@@ -108,21 +108,141 @@ function drawBattleObject() {
   if (!battle) return;
   const bs = depthScaleAt(battle.y);
   const br = 22 * bs;
-  const wobble = Math.sin(battle.t * 9) * 0.08 + battle.hitT * 0.28;
+  const defeated = battle.phase === 'defeated';
+  const physicsAngle = Number.isFinite(battle.angle) ? Math.sin(battle.angle) * 0.34 : 0;
+  const entryRoll = battle.phase === 'entering' ? battle.angle : 0;
+  const wobble = defeated ? physicsAngle : Math.sin(battle.t * 9) * 0.08 + battle.hitT * 0.28 + physicsAngle + entryRoll;
   ctx.save();
-  ctx.translate(battle.x, battle.y - br * 0.7);
-  ctx.rotate(wobble);
   ctx.fillStyle = 'rgba(115,95,70,0.18)';
   ctx.beginPath();
-  ctx.ellipse(0, br * 0.78, br * 0.92, br * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(battle.x, battle.y + br * 0.08, br * 0.92, br * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
-  drawOpponentBlob(0, 0, br, battle.shape || makeBlobGenes(11), battle.t, battle.hitT);
-  ctx.globalAlpha = 0.78;
-  ctx.fillRect(-br * 0.62, -br * 0.95, br * 1.24 * battle.hp, br * 0.08);
+  ctx.translate(battle.x, battle.y - br * 0.7);
+  ctx.rotate(wobble);
+  drawOpponentBlob(0, 0, br, battle.shape || makeBlobGenes(11), battle.t, battle.hitT, ctx, defeated);
+  ctx.restore();
+  if (defeated && battle.haloVisible) drawBattleFoeHalo(battle.x, battle.y - br * 1.76, br, battle.haloT || 0);
+  if (battle.phase === 'active') {
+    ctx.save();
+    ctx.translate(battle.x, battle.y - br * 0.7);
+    ctx.globalAlpha = 0.78;
+    ctx.fillStyle = 'rgba(102,80,62,0.24)';
+    ctx.fillRect(-br * 0.62, -br * 0.95, br * 1.24, br * 0.1);
+    ctx.fillStyle = '#d97883';
+    ctx.fillRect(-br * 0.62, -br * 0.95, br * 1.24 * battle.hp, br * 0.1);
+    ctx.restore();
+    drawBattleHud();
+  }
+}
+
+function drawBattleFoeHalo(x, y, r, t) {
+  const rise = Math.min(t, 1.2) * r * 0.22;
+  const wobble = Math.sin(t * 5.2) * r * 0.04;
+  ctx.save();
+  ctx.globalAlpha = clamp(t * 2.4, 0, 0.92);
+  ctx.translate(x + wobble, y - rise);
+  ctx.strokeStyle = 'rgba(232,184,127,0.78)';
+  ctx.lineWidth = Math.max(2, r * 0.08);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 0.52, r * 0.18, Math.sin(t * 2.1) * 0.08, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,251,240,0.7)';
+  ctx.lineWidth = Math.max(1, r * 0.035);
+  ctx.beginPath();
+  ctx.arc(r * 0.28, -r * 0.02, r * 0.08, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
-function drawOpponentBlob(cx, cy, r, shape, t, hitT = 0, targetCtx = ctx) {
+function drawBattleHud() {
+  if (!battle) return;
+  const panelW = Math.min(268, W - 56);
+  const panelH = 34;
+  const panelX = (W - panelW) / 2;
+  const panelY = Math.max(H * 0.34, 278);
+  const trackX = panelX + 46;
+  const trackY = panelY + panelH / 2;
+  const trackW = panelW - 92;
+  const trackH = 10;
+  const petHp = clamp(Number(battle.petHp) || 0, 0, 1);
+  const foeHp = clamp(Number(battle.hp) || 0, 0, 1);
+  ctx.save();
+  ctx.fillStyle = 'rgba(244,239,228,0.82)';
+  ctx.strokeStyle = 'rgba(111,90,69,0.34)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, 17);
+  ctx.fill();
+  ctx.stroke();
+  drawBattleHudFace(panelX + 23, trackY, 8.5, bodyColor(), OUTLINE, true);
+  drawBattleHudFace(panelX + panelW - 23, trackY, 8.5, BATTLE_FOE, BATTLE_FOE_DARK, false);
+  ctx.fillStyle = 'rgba(102,80,62,0.18)';
+  ctx.beginPath();
+  ctx.roundRect(trackX, trackY - trackH / 2, trackW, trackH, 5);
+  ctx.fill();
+  ctx.fillStyle = '#8fb7d9';
+  ctx.beginPath();
+  ctx.roundRect(trackX, trackY - trackH / 2, trackW * 0.5 * petHp, trackH, 5);
+  ctx.fill();
+  ctx.fillStyle = '#d97883';
+  const foeW = trackW * 0.5 * foeHp;
+  ctx.beginPath();
+  ctx.roundRect(trackX + trackW - foeW, trackY - trackH / 2, foeW, trackH, 5);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(111,90,69,0.22)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(trackX + trackW / 2, trackY - 7);
+  ctx.lineTo(trackX + trackW / 2, trackY + 7);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawBattleHudFace(x, y, r, fill, stroke, petSide) {
+  ctx.save();
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(x, y, r * (petSide ? 1.08 : 0.96), r, petSide ? -0.1 : 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#6f5a45';
+  ctx.beginPath();
+  ctx.arc(x - r * 0.25, y - r * 0.12, 1.2, 0, Math.PI * 2);
+  ctx.arc(x + r * 0.22, y - r * 0.1, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBattleResult() {
+  if (typeof battleResult === 'undefined' || !battleResult || battleResult.t <= 0) return;
+  const a = clamp(Math.min(battleResult.t, 0.6) / 0.6, 0, 1);
+  const w = Math.min(230, W - 64);
+  const x = (W - w) / 2;
+  const y = Math.max(H * 0.275, 226);
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = battleResult.won ? 'rgba(185,207,166,0.78)' : 'rgba(232,223,203,0.84)';
+  ctx.strokeStyle = battleResult.won ? 'rgba(96,116,74,0.34)' : 'rgba(111,90,69,0.34)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, 50, 18);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#6f5a45';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 18px ${HAND_FONT}`;
+  ctx.fillText(battleResult.title, x + w / 2, y + 19);
+  ctx.font = `400 15px ${HAND_FONT}`;
+  ctx.fillStyle = 'rgba(111,90,69,0.78)';
+  ctx.fillText(battleResult.line, x + w / 2, y + 36);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+function drawOpponentBlob(cx, cy, r, shape, t, hitT = 0, targetCtx = ctx, defeated = false) {
   const g = targetCtx;
   const body = shape && shape.body ? shape.body : BATTLE_FOE;
   const bodyDark = shape && shape.bodyDark ? shape.bodyDark : BATTLE_FOE_DARK;
@@ -174,10 +294,24 @@ function drawOpponentBlob(cx, cy, r, shape, t, hitT = 0, targetCtx = ctx) {
   g.fillStyle = bodyDark;
   const eyeL = shape && Number.isFinite(shape.eyeL) ? shape.eyeL : 3.3;
   const eyeR = shape && Number.isFinite(shape.eyeR) ? shape.eyeR : 3.0;
-  g.beginPath();
-  g.arc(-r * 0.23, -r * 0.12, Math.max(1.4, eyeL * r / 28), 0, Math.PI * 2);
-  g.arc(r * 0.22, -r * 0.1, Math.max(1.4, eyeR * r / 28), 0, Math.PI * 2);
-  g.fill();
+  if (defeated) {
+    g.strokeStyle = bodyDark;
+    g.lineWidth = Math.max(1.7, r * 0.06);
+    for (const eye of [{ x: -r * 0.23, y: -r * 0.12 }, { x: r * 0.22, y: -r * 0.1 }]) {
+      const er = Math.max(2.4, r * 0.12);
+      g.beginPath();
+      g.moveTo(eye.x - er, eye.y - er);
+      g.lineTo(eye.x + er, eye.y + er);
+      g.moveTo(eye.x + er, eye.y - er);
+      g.lineTo(eye.x - er, eye.y + er);
+      g.stroke();
+    }
+  } else {
+    g.beginPath();
+    g.arc(-r * 0.23, -r * 0.12, Math.max(1.4, eyeL * r / 28), 0, Math.PI * 2);
+    g.arc(r * 0.22, -r * 0.1, Math.max(1.4, eyeR * r / 28), 0, Math.PI * 2);
+    g.fill();
+  }
   g.beginPath();
   g.arc(-r * 0.05, r * 0.1, r * 0.07, 0.1 * Math.PI, 0.85 * Math.PI);
   g.arc(r * 0.08, r * 0.1, r * 0.07, 0.15 * Math.PI, 0.9 * Math.PI);
@@ -865,6 +999,7 @@ function draw(t) {
 
   const s = depthScale(), r = stagedRadius();
   const bellyPose = pet.behavior === 'belly';
+  const defeatedPose = (pet.defeatT || 0) > 0;
   const sy = pet.squash, sx = 1 + (1 - sy) * 0.85;
   const sp = Math.hypot(pet.vx, pet.vy);
   const bob = bellyPose ? 0 : Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
@@ -896,12 +1031,18 @@ function draw(t) {
   }
   if (ball && ball.phase !== 'carried') drawBallObject(ball.phase === 'fading' ? clamp(ball.fadeT / 1.5, 0, 1) : 1);
   drawBattleObject();
+  drawBattleResult();
 
   // 꼬리 (몸 뒤)
   if (!bellyPose) drawTail(tail, 8);
 
-  ctx.fillStyle = bodyDarkColor();
-  if (bellyPose) {
+  ctx.fillStyle = bodyColor();
+  if (defeatedPose) {
+    ctx.fillStyle = 'rgba(120,100,70,0.11)';
+    ctx.beginPath();
+    ctx.ellipse(pet.x - pet.dir * r * 0.22, cy + r * 0.48, r * 0.46, r * 0.08, -0.15, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (bellyPose) {
     const pawBob = Math.sin(t * 2.3) * r * 0.025;
     for (const paw of [
       { x: -0.56, y: -0.08 },
@@ -915,7 +1056,7 @@ function draw(t) {
     }
   } else {
     // 다리 (뭉툭한 캡슐)
-    ctx.strokeStyle = bodyDarkColor(); ctx.lineWidth = 9 * s * stageScale('leg'); ctx.lineCap = 'round';
+    ctx.strokeStyle = bodyColor(); ctx.lineWidth = 9 * s * stageScale('leg'); ctx.lineCap = 'round';
     for (const f of feet) {
       ctx.beginPath();
       ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * sy);
@@ -929,6 +1070,7 @@ function draw(t) {
   // 몸통 (머리 겸용 한 덩어리)
   ctx.save();
   ctx.translate(pet.x, cy);
+  if (defeatedPose) ctx.rotate(pet.rollSpin || Math.sin(t * 7) * 0.2);
   if (pet.behavior === 'wiggle') ctx.rotate(Math.sin(t * 14) * 0.13);
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
   if (bellyPose) ctx.scale(1.28 + breathe, 0.68 - breathe * 0.45);
@@ -980,13 +1122,26 @@ function draw(t) {
   const shyEyes = mood === 'shy';
   const happyEyes = pet.happy > 0.5 || mood === 'content';
 
+  if (defeatedPose) {
+    ctx.save();
+    ctx.translate(pet.x, cy);
+    ctx.rotate(pet.rollSpin || Math.sin(t * 7) * 0.2);
+    ctx.translate(-pet.x, -cy);
+  }
   ctx.strokeStyle = '#4a3a2c'; ctx.fillStyle = '#4a3a2c'; ctx.lineWidth = 2; ctx.lineCap = 'round';
   // 눈 두 개 — 일부러 크기가 다름 (하찮음 포인트)
   const eyes = [{ ox: -eyeGap, r: geneValue('eyeL', 3.6) * s * stageScale('eye'), oy: 0 }, { ox: eyeGap, r: geneValue('eyeR', 2.9) * s * stageScale('eye'), oy: geneValue('eyeTilt', -1.5) * s }];
   for (const e of eyes) {
     const ex = fx + e.ox + gx;
     const ey = fy + e.oy + gy;
-    if (held || falling || justLanded) {
+    if (defeatedPose) {
+      ctx.beginPath();
+      ctx.moveTo(ex - 4.2 * s, ey - 4.2 * s);
+      ctx.lineTo(ex + 4.2 * s, ey + 4.2 * s);
+      ctx.moveTo(ex + 4.2 * s, ey - 4.2 * s);
+      ctx.lineTo(ex - 4.2 * s, ey + 4.2 * s);
+      ctx.stroke();
+    } else if (held || falling || justLanded) {
       const pinch = e.ox < 0 ? 1 : -1;
       ctx.beginPath();
       ctx.moveTo(ex - 4.2 * pinch * s, ey - 2.6 * s);
@@ -1042,6 +1197,7 @@ function draw(t) {
     ctx.beginPath(); ctx.arc(fx - eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(fx + eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
   }
+  if (defeatedPose) ctx.restore();
   if (ball && ball.phase === 'carried') drawBallObject(1);
   if (butterfly && butterfly.noseT > 0) drawButterfly(t);
   if (currentPlace() === 'home') drawFloorFurnitureInFrontOfPet(t);

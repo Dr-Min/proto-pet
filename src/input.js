@@ -41,6 +41,14 @@ function isTouchType(type) { return type === 'touch' || type === 'pen'; }
 function dragThreshold(e) { return isTouchPointer(e) ? 18 : 12; }
 function rubThreshold(e) { return isTouchPointer(e) ? 7 : 4; }
 function furniturePressThreshold() { return isTouchType(input.pointerType) ? 24 : 18; }
+function furnitureRemovePointerHit(x, y) {
+  const zone = document.getElementById('furnitureRemoveZone');
+  if (zone && typeof zone.getBoundingClientRect === 'function') {
+    const rect = zone.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+  return y >= 92 && y <= 168 && x >= W * 0.28 && x <= W * 0.72;
+}
 
 function surprisePet() {
   if (isEggStage()) {
@@ -206,7 +214,9 @@ function finishPointer(e) {
     pet.behaviorT = Math.max(pet.behaviorT, 2.2);
     }
   } else if (wasFurnitureDrag) {
-    finishFurniturePlacement(input.furnitureId, furnitureMotion.x, furnitureMotion.y);
+    if (!furnitureRemovePointerHit(e.clientX, e.clientY) || !storeFurniture(input.furnitureId)) {
+      finishFurniturePlacement(input.furnitureId, furnitureMotion.x, furnitureMotion.y);
+    }
   } else if (wasFurniturePending && !input.furnitureCancelled && elapsed < 300 && moved < furniturePressThreshold()) {
     cheerWheelAt(e.clientX, e.clientY);
   } else if (!wasPetting && elapsed < 260 && moved < rubThreshold(e) * 1.4 && petHitTest(e.clientX, e.clientY, 1.8)) {

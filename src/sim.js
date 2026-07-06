@@ -13,9 +13,10 @@ function update(dt) {
   // 이동
   let desiredVX = 0, desiredVY = 0;
   const movingToPlace = !eggStage && !dragging && !airborne && typeof travelTarget === 'function' ? travelTarget() : null;
-  const movingToHomecoming = !movingToPlace && !eggStage && !dragging && !airborne && typeof homecomingTarget === 'function' ? homecomingTarget() : null;
-  const movingToFurniture = !movingToPlace && !movingToHomecoming && !eggStage && !dragging && !airborne && typeof furnitureMoveTarget === 'function' ? furnitureMoveTarget() : null;
-  if (!movingToPlace && !eggStage && !dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
+  const movingToBattleDefeat = !movingToPlace && !eggStage && !dragging && !airborne && typeof battleDefeatReturnTarget === 'function' ? battleDefeatReturnTarget() : null;
+  const movingToHomecoming = !movingToPlace && !movingToBattleDefeat && !eggStage && !dragging && !airborne && typeof homecomingTarget === 'function' ? homecomingTarget() : null;
+  const movingToFurniture = !movingToPlace && !movingToBattleDefeat && !movingToHomecoming && !eggStage && !dragging && !airborne && typeof furnitureMoveTarget === 'function' ? furnitureMoveTarget() : null;
+  if (!movingToPlace && !movingToBattleDefeat && !eggStage && !dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
     if (ball && ball.phase === 'carried') {
       const mouth = carriedBallPoint();
       ball.x = mouth.x;
@@ -25,7 +26,7 @@ function update(dt) {
     }
     setBehavior('eat');
   }
-  if (!movingToPlace && !eggStage && !dragging && !airborne && pet.behavior === 'eat' && pet.tripT <= 0) {
+  if (!movingToPlace && !movingToBattleDefeat && !eggStage && !dragging && !airborne && pet.behavior === 'eat' && pet.tripT <= 0) {
     if (!food) setBehavior('stare');
     else {
       const dx = food.x - pet.x, dy = food.y - pet.y, d = Math.hypot(dx, dy);
@@ -56,7 +57,7 @@ function update(dt) {
       }
     }
   }
-  if (!movingToPlace && !eggStage && !dragging && !airborne && pet.behavior === 'fetch' && pet.tripT <= 0 && !food) {
+  if (!movingToPlace && !movingToBattleDefeat && !eggStage && !dragging && !airborne && pet.behavior === 'fetch' && pet.tripT <= 0 && !food) {
     if (!ball) {
       setBehavior('stare');
     } else if (ball.fetchState === 'chase') {
@@ -87,7 +88,7 @@ function update(dt) {
       }
     }
   }
-  if (!movingToPlace && !eggStage && !dragging && !airborne && pet.behavior === 'butterfly' && pet.tripT <= 0) {
+  if (!movingToPlace && !movingToBattleDefeat && !eggStage && !dragging && !airborne && pet.behavior === 'butterfly' && pet.tripT <= 0) {
     if (!butterfly || !butterfly.active) {
       setBehavior('stare');
     } else {
@@ -113,6 +114,18 @@ function update(dt) {
 	      completeTravelStep();
 	    }
 	  }
+  if (movingToBattleDefeat) {
+    const dx = movingToBattleDefeat.x - pet.x, dy = movingToBattleDefeat.y - pet.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d > 20) {
+      const rollSpeed = typeof battleDefeatReturnSpeed === 'function' ? battleDefeatReturnSpeed() : 250;
+      desiredVX = dx / d * rollSpeed;
+      desiredVY = dy / d * rollSpeed * 0.82;
+      pet.rollSpin = (pet.rollSpin || 0) + Math.sign(desiredVX || pet.dir) * dt * 8.5;
+    } else if (typeof completeBattleDefeatReturnStep === 'function') {
+      completeBattleDefeatReturnStep();
+    }
+  }
 	  if (movingToHomecoming && pet.tripT <= 0) {
 	    const dx = movingToHomecoming.x - pet.x, dy = movingToHomecoming.y - pet.y;
 	    const d = Math.hypot(dx, dy) || 1;
@@ -137,7 +150,7 @@ function update(dt) {
 	      pet.dir = furnitureAnchor('window').x > pet.x ? 1 : -1;
 	    }
 	  }
-	  const moving = !movingToPlace && !movingToHomecoming && !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
+	  const moving = !movingToPlace && !movingToBattleDefeat && !movingToHomecoming && !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
   if (moving && pet.tripT <= 0) {
     const speed = (pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62) * stageScale('speed');
     const dx = pet.target.x - pet.x, dy = pet.target.y - pet.y;
@@ -169,7 +182,7 @@ function update(dt) {
       pet.vx = -Math.abs(pet.vx) * 0.84;
       bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.vx), x: pet.x, y: pet.y + pet.jy });
     }
-  } else if (movingToPlace) {
+  } else if (movingToPlace || movingToBattleDefeat) {
     pet.x = clamp(pet.x, -90, W + 90);
   } else {
     pet.x = clamp(pet.x, 80, W - 80);
@@ -179,7 +192,7 @@ function update(dt) {
   // 가끔 자빠짐 (하찮음의 핵심)
   const sp = Math.hypot(pet.vx, pet.vy);
   const fetchTrip = pet.behavior === 'fetch' && typeof fetchTripMultiplier === 'function' ? fetchTripMultiplier() : 1;
-  if (!movingToPlace && !eggStage && !dragging && pet.jy === 0 && sp > 40 && pet.tripT <= 0 && Math.random() < dt * (pet.behavior === 'zoomies' ? 0.35 : 0.07) * stageScale('trip') * fetchTrip) {
+  if (!movingToPlace && !movingToBattleDefeat && !eggStage && !dragging && pet.jy === 0 && sp > 40 && pet.tripT <= 0 && Math.random() < dt * (pet.behavior === 'zoomies' ? 0.35 : 0.07) * stageScale('trip') * fetchTrip) {
     pet.tripT = 0.9;
     pet.squashVel -= 5;
     pet.vx *= 0.15; pet.vy *= 0.15;

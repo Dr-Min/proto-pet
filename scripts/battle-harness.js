@@ -109,7 +109,7 @@ function tickUntil(context, predicate, label) {
 }
 
 function tickBattleArrival(context) {
-  tickUntil(context, 'currentPlace() === "battle" && battle !== null && !isTraveling()', 'battle arrival');
+  tickUntil(context, 'currentPlace() === "battle" && battle !== null && battle.phase === "active" && !isTraveling()', 'battle arrival');
 }
 
 function assert(condition, message) {
@@ -121,7 +121,7 @@ function testBattleRequiresAdult() {
   run(context, 'careStats.stage = "baby"; requestBattle();');
   const state = run(context, '({ battle, caption: pet.caption })');
   assert(state.battle === null, 'baby cannot start battle');
-  assert(state.caption === '아직 싸움 몰라', 'baby battle lock uses pet voice');
+  assert(state.caption === '싸움은 아직 어려워', 'baby battle lock uses pet voice');
 }
 
 function testBattleCanWin() {
@@ -152,7 +152,7 @@ function testCheerCanBeIgnoredWhenBondLow() {
   setRandom(context, [0.99]);
   run(context, 'cheerBattle();');
   const state = run(context, '({ caption: pet.caption, hp: battle && battle.hp })');
-  assert(['못 들은 척함', '내 맘대로 함', '지금 바쁨', '귀 닫힘'].includes(state.caption), 'low-bond cheer can be ignored');
+  assert(['지금 집중 중', '내 맘대로 할래', '조금 바빠', '못 들은 척', '귀 닫는 중', '진지한 척 유지'].includes(state.caption), 'low-bond cheer can be ignored');
   assert(state.hp === 1, 'ignored cheer does not damage opponent');
 }
 

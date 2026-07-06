@@ -1,5 +1,5 @@
 // ---------- 욕구 ----------
-const needs = { hunger: 0.85, energy: 0.9, bond: 0.08 }; // bond는 쓰다듬기로 쌓이는 친밀도
+const needs = { hunger: 0.85, energy: 0.9, bond: 0.08 };
 const careStats = {
   mealsFed: 0,
   lastMealAt: 0,
@@ -29,14 +29,18 @@ const careStats = {
   pebbles: 0,
   lastWalkPebbleDay: -1,
   furnitureOwned: [],
+  furnitureStored: [],
   furniturePlaced: {},
   stats: { tough: 0, quick: 0, power: 0 },
   league: { defeated: [], current: 'yard' },
+  kinship: { daily: 0, walk: 0, battle: 0, xp: 0, lastDailyDay: -1 },
 };
 careStats.furniturePlaced = migrateFurniturePlaced(null);
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
 let battle = null;
+let battleResult = null;
+let battleDefeatReturn = null;
 let place = 'home';
 let travel = null;
 let battleReturnT = 0;
@@ -50,41 +54,41 @@ const ROUGHNESS_PENALTY_THRESHOLD = 0.5;
 const ROUGHNESS_CLOSE_BOND = 0.55;
 const ROUGHNESS_BOND_PENALTY = -0.012;
 const ROUGHNESS_CLOSE_BOND_PENALTY = -0.006;
-const ROUGH_HURT_LINES = ['…', '어지러워', '무서웠어', '잠깐 내려놔 줘', '나 공 아님', '눈 돌아감', '바닥 원함', '나 조금 놀람', '몸 흔들림', '잠깐 멈춤'];
-const ROUGH_FUN_LINES = ['한 번 더!!', '재밌다!!', '날았다!!', '또 하늘!!', '몸이 뜸!!', '통통 좋음!!'];
-const FETCH_START_LINES = ['공이다!!', '잡으러 감', '공 봄!!', '입 준비함'];
-const FETCH_CAUGHT_LINES = ['잡았다', '입에 넣음', '공 잡힘', '물고 있음'];
-const FETCH_DONE_LINES = ['가져왔다', '나 잘했지', '공 돌려줌', '입에서 나옴'];
-const FETCH_REFUSE_LINES = ['지금은 패스…', '공은 내일', '다리 휴식중', '공 멀리 있음'];
-const FETCH_SKILL_LINES = ['이제 좀 익숙함', '공 길 외움'];
-const EGG_LINES = ['콩', '아직 안 나감', '안에서 듣는 중', '안쪽 조용함', '조금 흔들림', '밖 소리 남'];
-const HATCH_WARM_LINES = ['따뜻함 저장 중', '안쪽이 포근함', '껍질이 간질함', '조금 나갈 듯'];
-const BATTLE_START_LINES = ['나가봄', '앞에 뭐 있음', '진지해짐', '발에 힘 줌', '앞을 봄', '먼지 많음'];
-const BATTLE_WIN_LINES = ['이겼나 봄', '나 좀 했음', '앞에 없어짐', '몸이 해냄', '나 안 밀림', '발이 이김'];
-const BATTLE_LOSE_LINES = ['좀 누울래', '오늘은 여기까지', '다리 쉬는 중', '바닥 보고 옴', '잠깐 작아짐', '다음에 봄'];
-const BATTLE_CHEER_LINES = ['들었음', '힘 조금 남', '나 해봄', '귀에 들어옴', '발 다시 감', '조금 세짐'];
-const BATTLE_IGNORE_LINES = ['못 들은 척함', '내 맘대로 함', '지금 바쁨', '귀 닫힘'];
-const TRAVEL_BATTLE_LINES = ['싸움터 감', '밖에 일 있음', '진지하게 나감', '발에 힘 줌', '흙 밟으러 감', '앞 보러 감'];
-const TRAVEL_WALK_LINES = ['밖에 감', '냄새 맡으러 감', '발 바쁨', '바깥 확인함', '코 쓰러 감', '동네 봄'];
-const WALK_ARRIVE_LINES = ['바깥 냄새 남', '풀 냄새 발견', '여기 넓다', '바람 조금 있음', '발밑 다름', '코 바쁨'];
-const RETURN_HOME_LINES = ['집이다', '돌아옴', '바닥 익숙함', '아는 냄새 남', '집 바닥 좋음', '다시 여기'];
-const WALK_DISCOVERY_LINES = ['풀 냄새 좋은 데 찾음', '냄새 좋은 바닥 찾음', '작은 반짝 주운 날', '바깥 냄새 외운 날', '풀 옆에서 오래 킁킁함', '돌 밑을 궁금해한 날'];
-const WALK_DISCOVERY_CAPTIONS = ['여기 냄새 좋음', '킁킁 성공', '뭐 있음', '코가 찾음', '바닥 수상함', '작은 거 봄'];
-const WALK_DONE_LINES = ['이제 집 생각', '냄새 다 봄', '발 좀 쉬자', '집 냄새 원함'];
-const SHINY_PEBBLE_CAPTIONS = ['반짝이는 거 주움', '반짝 하나 물고 옴', '작은 반짝 있음', '이거 반짝임'];
-const ROUTINE_PEBBLE_CAPTIONS = ['어디서 반짝 물어옴', '반짝 놓고 감', '작은 거 줌', '입에서 반짝 나옴'];
-const WHEEL_FALL_CAPTIONS = ['바퀴가 이김', '바퀴 빠름'];
-const WHEEL_RUN_CAPTIONS = ['다리 빠름', '바퀴 안에 있음', '발이 많아짐', '계속 굴러감'];
-const CUSHION_SLEEP_CAPTIONS = ['푹신한 데 있음', '여기 잠 잘 옴', '몸이 녹음', '쿠션이 잡음'];
-const BUTTERFLY_START_LINES = ['저거 움직임', '잡으러 감', '작은 거 봄', '날아다님'];
-const BUTTERFLY_MISS_LINES = ['놓쳤다', '눈으로 잡음'];
-const BUTTERFLY_NOSE_LINES = ['코에 뭐 있음', '코가 잡힘'];
+const ROUGH_HURT_LINES = ['어지러워', '무서웠어', '잠깐 내려놔 줘', '나 공 아니야', '바닥이 좋아', '나 조금 놀랐어', '눈 도는 중', '몸 흔들리는 중', '바닥 찾는 중', '잠깐 정지'];
+const ROUGH_FUN_LINES = ['한 번 더!', '재밌다!', '날았다!', '또 하늘 가자', '나 봤어?', '통통 좋다'];
+const FETCH_START_LINES = ['공이다!', '내가 갈게', '잡아볼래', '공 추격 중', '입 준비 중', '공만 보는 중'];
+const FETCH_CAUGHT_LINES = ['잡았다', '내가 잡았어', '이거 내 거?', '입에 안전 보관', '물고 오는 중', '공 수거 완료'];
+const FETCH_DONE_LINES = ['가져왔어', '나 잘했지', '다시 줄게', '칭찬해 줘', '공 반납 중', '입에서 꺼내는 중'];
+const FETCH_REFUSE_LINES = ['지금은 조금 쉬자', '공은 이따가', '다리 쉬는 중', '나 배터리 없어', '공 멀리 있는 척', '누운 척'];
+const FETCH_SKILL_LINES = ['나 길 알았어', '이제 좀 잘해', '공 냄새 기억해', '공 길 외우는 중'];
+const EGG_LINES = ['콩', '나 여기 있어', '밖에 누구야?', '안에서 듣는 중', '껍질 안 조용해', '조금 흔들리는 중'];
+const HATCH_WARM_LINES = ['따뜻해', '조금만 더', '밖에 갈까', '안쪽이 포근해', '껍질 간질간질', '나갈까 말까 중'];
+const BATTLE_START_LINES = ['나 해볼게', '괜찮아', '보고 있어', '진지한 척', '발에 힘 주는 중', '작은 용기 장착'];
+const BATTLE_WIN_LINES = ['나 이겼어?', '봤지?', '나 좀 했다', '안 밀렸어', '앞이 조용해짐', '발이 이긴 척'];
+const BATTLE_LOSE_LINES = ['좀 누울래', '오늘은 여기까지', '다음엔 할게', '나 괜찮아', '다리 쉬는 중', '작아지는 중'];
+const BATTLE_CHEER_LINES = ['들었어', '나 해볼게', '조금 세졌어', '응원 들어옴', '발 다시 출발', '용기 충전 중'];
+const BATTLE_IGNORE_LINES = ['지금 집중 중', '내 맘대로 할래', '조금 바빠', '못 들은 척', '귀 닫는 중', '진지한 척 유지'];
+const TRAVEL_BATTLE_LINES = ['싸우러 가자', '나 해볼게', '흙 밟으러 가', '싸움터 가는 중', '발에 힘 주는 중', '작은 용기 배송 중'];
+const TRAVEL_WALK_LINES = ['밖에 가자', '냄새 맡으러 가', '같이 가', '산책중', '발 바쁜 중', '동네 구경 가는 중'];
+const WALK_ARRIVE_LINES = ['여기 좋아', '바람 좋다', '풀 냄새 난다', '여기 넓어', '코 바쁜 중', '발밑 낯가리는 중'];
+const RETURN_HOME_LINES = ['집이다', '돌아왔다', '여기 좋아', '아는 냄새다', '집 바닥 좋아', '다시 여기'];
+const WALK_DISCOVERY_LINES = ['풀 냄새 찾은 날', '좋은 바닥 찾은 날', '작은 반짝 주운 날', '바깥 냄새 외운 날', '풀 옆에서 오래 킁킁한 날', '돌 밑이 궁금했던 날'];
+const WALK_DISCOVERY_CAPTIONS = ['여기 좋아', '뭐 찾았어', '이거 봐', '킁킁 성공', '바닥 수상해', '작은 거 발견'];
+const WALK_DONE_LINES = ['집 갈까?', '발 쉬자', '냄새 다 봤어', '집 냄새 생각나', '귀가 생각 중', '발 퇴근 준비'];
+const SHINY_PEBBLE_CAPTIONS = ['이거 줄게', '반짝 찾았어', '작은 거 봐', '반짝 물고 옴', '입에서 선물 나옴', '작은 보물 배송'];
+const ROUTINE_PEBBLE_CAPTIONS = ['이거 줄게', '고마워서 줌', '반짝 놓고 갈게', '입에서 선물 나옴', '작은 보상 배송', '반짝 반납 중'];
+const WHEEL_FALL_CAPTIONS = ['어지러워', '바퀴가 셌어', '나 졌어', '바퀴 승리', '다리 꼬이는 중'];
+const WHEEL_RUN_CAPTIONS = ['나 빨라?', '한 바퀴 더', '멈추는 법 까먹음', '발 시험 중', '바퀴 안 출근', '달리기 하는 척'];
+const CUSHION_SLEEP_CAPTIONS = ['여기 좋아', '잘래…', '푹신해', '몸이 녹는 중', '쿠션에 잡힘', '말랑 충전 중'];
+const BUTTERFLY_START_LINES = ['저거 뭐야?', '잡아볼래', '기다려 봐', '눈 따라가는 중', '작은 거 추적 중', '코까지 출동'];
+const BUTTERFLY_MISS_LINES = ['놓쳤다', '봤으니까 됐어', '눈으로 잡았어', '작은 패배'];
+const BUTTERFLY_NOSE_LINES = ['코에 앉았어', '나 잡힌 거야?', '간지러워', '코 점령당한 중'];
 const AI_LINE_COOLDOWN = 12000;
 const DAILY_GREETING_CAPTIONS = {
-  morning: '왔다!!',
-  day: '기다렸어…',
-  evening: '기다렸어…',
-  night: '안 자고 왔네',
+  morning: '왔어?',
+  day: '기다렸어',
+  evening: '같이 있자',
+  night: '안 자?',
 };
 const ANNIVERSARY_DAYS = [7, 14, 30, 50, 100];
 const BELLY_RUB_BOND_GAIN = 0.018;
@@ -93,15 +97,21 @@ const BATTLE_WIN_PEBBLES = 4;
 const BATTLE_REMATCH_PEBBLES = 2;
 const BATTLE_LOSS_PEBBLES = 1;
 const BATTLE_RETURN_DELAY = 1.7;
+const BATTLE_DEFEAT_RETURN_SPEED = 250;
+const BATTLE_FOE_ENTRY_SPEED = 360;
+const BATTLE_FOE_DEFEAT_SETTLE_SPEED = 0.52;
+const BATTLE_FOE_DEFEAT_MIN_SECONDS = 0.9;
+const BATTLE_FOE_DEFEAT_MAX_SECONDS = 4.2;
+const BATTLE_PHYSICS_STEP_MAX = 1000 / 30;
 const LEAGUES = [
   {
     id: 'yard',
     name: '공터 모임',
     memory: '공터를 평정한 날',
     opponents: [
-      { id: 'yard-mungchi', name: '먼지 뭉치', seed: 0x120F17, personality: '겁쟁이', powerCoeff: 0.08, intro: '먼지가 먼저 봄', winLine: '내가 좀 피했음', loseLine: '먼지가 인정함' },
-      { id: 'yard-kongtteok', name: '콩떡', seed: 0xC0A771, personality: '저돌', powerCoeff: 0.22, intro: '콩떡 굴러감', winLine: '콩떡이 이김', loseLine: '콩떡 납작해짐' },
-      { id: 'yard-dubu', name: '두부 반장', seed: 0xD0B0AA, personality: '침착', powerCoeff: 0.46, rival: true, intro: '너 아직 말랑함', rematchLine: '또 왔네 말랑함', winLine: '두부가 안 밀림', loseLine: '두부가 고개 끄덕임' },
+      { id: 'yard-mungchi', name: '먼지 뭉치', seed: 0x120F17, personality: '겁쟁이', powerCoeff: 0.08, intro: '먼지 굴러옴', winLine: '나 피해도 돼?', loseLine: '먼지가 인정함' },
+      { id: 'yard-kongtteok', name: '콩떡', seed: 0xC0A771, personality: '저돌', powerCoeff: 0.22, intro: '콩떡 돌진 중', winLine: '콩떡이 굴렀다', loseLine: '콩떡 납작해짐' },
+      { id: 'yard-dubu', name: '두부 반장', seed: 0xD0B0AA, personality: '침착', powerCoeff: 0.46, rival: true, intro: '너 말랑하네', rematchLine: '또 왔어?', winLine: '두부 안 밀림', loseLine: '두부가 끄덕임' },
     ],
   },
   {
@@ -110,8 +120,8 @@ const LEAGUES = [
     memory: '골목을 지나간 날',
     opponents: [
       { id: 'alley-bori', name: '보리알', seed: 0xB0121A, personality: '겁쟁이', powerCoeff: 1.08, intro: '보리알 숨는 중', winLine: '보리알 버팀', loseLine: '보리알 놓침' },
-      { id: 'alley-jelly', name: '젤리 발', seed: 0x9E1177, personality: '저돌', powerCoeff: 1.42, intro: '발이 먼저 옴', winLine: '발이 이김', loseLine: '발이 꼬임' },
-      { id: 'alley-jinsun', name: '골목 진순', seed: 0x711150, personality: '침착', powerCoeff: 1.82, rival: true, intro: '골목은 내 바닥', rematchLine: '바닥 또 밟음?', winLine: '진순이 지킴', loseLine: '진순이 길 비켜줌' },
+      { id: 'alley-jelly', name: '젤리 발', seed: 0x9E1177, personality: '저돌', powerCoeff: 1.42, intro: '발 먼저 옴', winLine: '발이 이긴 척', loseLine: '발 꼬이는 중' },
+      { id: 'alley-jinsun', name: '골목 진순', seed: 0x711150, personality: '침착', powerCoeff: 1.82, rival: true, intro: '여긴 내 바닥', rematchLine: '또 밟으러 왔어?', winLine: '진순이 지킴', loseLine: '진순이 비켜줌' },
     ],
   },
   {
@@ -120,8 +130,8 @@ const LEAGUES = [
     memory: '마을 앞에 선 날',
     opponents: [
       { id: 'town-nurung', name: '누룽 꼬리', seed: 0x901EAF, personality: '겁쟁이', powerCoeff: 1.96, intro: '꼬리만 보임', winLine: '꼬리가 살림', loseLine: '꼬리도 놀람' },
-      { id: 'town-bbam', name: '빵떡 장군', seed: 0xBBAA90, personality: '저돌', powerCoeff: 2.28, intro: '빵떡 돌진함', winLine: '빵떡 안 멈춤', loseLine: '빵떡 잠깐 멈춤' },
-      { id: 'town-king', name: '최강 말랑', seed: 0xF1A610, personality: '침착', powerCoeff: 2.55, rival: true, intro: '너 이름 작음', rematchLine: '작은 이름 또 옴', winLine: '말랑이 위에 있음', loseLine: '말랑이 인정함' },
+      { id: 'town-bbam', name: '빵떡 장군', seed: 0xBBAA90, personality: '저돌', powerCoeff: 2.28, intro: '빵떡 돌진 중', winLine: '빵떡 안 멈춤', loseLine: '빵떡 멈칫' },
+      { id: 'town-king', name: '최강 말랑', seed: 0xF1A610, personality: '침착', powerCoeff: 2.55, rival: true, intro: '작은 애 왔네', rematchLine: '또 왔네 작은 애', winLine: '말랑이 위에 있음', loseLine: '말랑이 인정함' },
     ],
   },
 ];
@@ -156,6 +166,17 @@ const BOND_MILESTONES = [
   { at: 0.55, line: '이제 나 알아보지?' },
   { at: 0.85, line: '완전 믿고 있어' },
   { at: 0.95, line: '평생 껌딱지' },
+];
+const KINSHIP_RANKS = [
+  { name: '초면', xp: 0, daily: 0, walk: 0, battle: 0 },
+  { name: '눈인사', xp: 2, daily: 1, walk: 0, battle: 0 },
+  { name: '낯익음', xp: 6, daily: 2, walk: 0, battle: 0 },
+  { name: '기다림', xp: 13, daily: 4, walk: 1, battle: 0 },
+  { name: '단짝', xp: 25, daily: 7, walk: 3, battle: 0 },
+  { name: '내 편', xp: 42, daily: 10, walk: 5, battle: 1 },
+  { name: '척하면 척', xp: 64, daily: 14, walk: 7, battle: 3 },
+  { name: '한몸', xp: 92, daily: 20, walk: 10, battle: 6 },
+  { name: '충신', xp: 130, daily: 30, walk: 15, battle: 10 },
 ];
 const roughPlayState = {
   roughness: 0,
@@ -193,6 +214,58 @@ function bondStage(value) {
   let stage = 0;
   for (let i = 0; i < BOND_MILESTONES.length; i++) if (value >= BOND_MILESTONES[i].at) stage = i + 1;
   return stage;
+}
+
+function normalizeKinship(savedKinship) {
+  const source = savedKinship && typeof savedKinship === 'object' ? savedKinship : {};
+  return {
+    daily: Math.max(0, Math.floor(Number(source.daily) || 0)),
+    walk: Math.max(0, Math.floor(Number(source.walk) || 0)),
+    battle: Math.max(0, Math.floor(Number(source.battle) || 0)),
+    xp: Math.max(0, Math.floor(Number(source.xp) || 0)),
+    lastDailyDay: Math.floor(Number.isFinite(Number(source.lastDailyDay)) ? Number(source.lastDailyDay) : -1),
+  };
+}
+
+function kinshipRankIndex() {
+  let index = 0;
+  const kinship = normalizeKinship(careStats.kinship);
+  for (let i = 0; i < KINSHIP_RANKS.length; i++) {
+    const rank = KINSHIP_RANKS[i];
+    if (kinship.xp >= rank.xp && kinship.daily >= rank.daily && kinship.walk >= rank.walk && kinship.battle >= rank.battle) index = i;
+  }
+  return index;
+}
+
+function kinshipRank() {
+  return KINSHIP_RANKS[kinshipRankIndex()];
+}
+
+function grantKinship(kind, amount, xp) {
+  if (!['daily', 'walk', 'battle'].includes(kind)) return false;
+  careStats.kinship = normalizeKinship(careStats.kinship);
+  const before = kinshipRankIndex();
+  careStats.kinship[kind] += Math.max(0, Math.floor(amount));
+  careStats.kinship.xp += Math.max(0, Math.floor(xp));
+  const after = kinshipRankIndex();
+  if (after > before) {
+    const rank = KINSHIP_RANKS[after];
+    rememberCare(`유대 ${rank.name}이 된 날`);
+    pet.caption = `${rank.name} 됐다`;
+    pet.captionT = 0;
+    pet.happy = Math.max(pet.happy, 0.85);
+    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
+  }
+  saveCareState();
+  return after > before;
+}
+
+function grantDailyKinship() {
+  careStats.kinship = normalizeKinship(careStats.kinship);
+  const today = dayStamp(nowTime());
+  if (careStats.kinship.lastDailyDay === today) return false;
+  careStats.kinship.lastDailyDay = today;
+  return grantKinship('daily', 1, 2);
 }
 
 function updateBondMilestone() {
@@ -241,9 +314,11 @@ function saveCareState() {
 	      pebbles: careStats.pebbles,
 	      lastWalkPebbleDay: careStats.lastWalkPebbleDay,
 	      furnitureOwned: careStats.furnitureOwned,
+	      furnitureStored: careStats.furnitureStored,
 	      furniturePlaced: careStats.furniturePlaced,
 	      stats: careStats.stats,
 	      league: careStats.league,
+	      kinship: normalizeKinship(careStats.kinship),
 	      bondMilestone,
       ts: nowTime(),
     }));
@@ -317,9 +392,11 @@ function loadCareState() {
 	    careStats.pebbles = Math.max(0, Math.floor(Number.isFinite(savedPebbles) ? savedPebbles : 0));
 	    careStats.lastWalkPebbleDay = Math.floor(Number.isFinite(savedLastWalkPebbleDay) ? savedLastWalkPebbleDay : -1);
 	    careStats.furnitureOwned = migrateFurnitureOwned(saved.furnitureOwned);
+	    careStats.furnitureStored = migrateFurnitureStored(saved.furnitureStored, careStats.furnitureOwned);
 	    careStats.furniturePlaced = migrateFurniturePlaced(saved.furniturePlaced);
 	    careStats.stats = migrateStats(saved.stats, careStats.fetchCount);
 	    careStats.league = migrateLeague(saved.league, careStats.battleWins);
+	    careStats.kinship = normalizeKinship(saved.kinship);
 	    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     handleReturnEvents(away);
   } catch (_) {}
@@ -362,6 +439,11 @@ function migrateMemoryLog(savedLog, currentLine, fallbackAt) {
 function migrateFurnitureOwned(savedOwned) {
   if (!Array.isArray(savedOwned)) return [];
   return savedOwned.filter(id => furnitureItemById(id)).filter((id, index, owned) => owned.indexOf(id) === index);
+}
+function migrateFurnitureStored(savedStored, owned) {
+  if (!Array.isArray(savedStored)) return [];
+  const ownedIds = Array.isArray(owned) ? owned : [];
+  return savedStored.filter(id => ownedIds.includes(id)).filter((id, index, stored) => stored.indexOf(id) === index);
 }
 function migrateFurniturePlaced(savedPlaced) {
   const placed = {};
@@ -562,7 +644,13 @@ function addBattleStats(amount) {
   addStat('power', amount);
 }
 function hasFurniture(id) {
+  return careStats.furnitureOwned.includes(id) && !careStats.furnitureStored.includes(id);
+}
+function ownsFurniture(id) {
   return careStats.furnitureOwned.includes(id);
+}
+function isFurnitureStored(id) {
+  return careStats.furnitureStored.includes(id);
 }
 function ensureFurniturePlacement(id) {
   if (!furnitureItemById(id)) return;
@@ -585,6 +673,28 @@ function finishFurniturePlacement(id, x, y) {
   saveCareState();
   return true;
 }
+function restoreFurniture(id) {
+  if (!ownsFurniture(id)) return false;
+  careStats.furnitureStored = careStats.furnitureStored.filter(storedId => storedId !== id);
+  ensureFurniturePlacement(id);
+  pet.caption = '다시 꺼냈다';
+  pet.captionT = 0;
+  saveCareState();
+  return true;
+}
+function storeFurniture(id) {
+  if (!ownsFurniture(id) || isFurnitureStored(id)) return false;
+  careStats.furnitureStored.push(id);
+  furnitureMotion.heldId = '';
+  furnitureMotion.settleId = '';
+  furnitureMotion.settleT = 0;
+  if (furnitureState.moveTargetId === id) furnitureState.moveTargetId = '';
+  pet.caption = '잠깐 치움';
+  pet.captionT = 0;
+  for (let i = 0; i < 4; i++) spawn('dust', pet.x + rand(-16, 16), pet.y + rand(-5, 7));
+  saveCareState();
+  return true;
+}
 function furnitureUsePoint(id) {
   const anchor = furnitureAnchor(id);
   if (id === 'window') return { x: clamp(anchor.x - 42, 90, W - 90), y: H * 0.48 };
@@ -599,11 +709,13 @@ function furnitureUsePoint(id) {
 }
 function buyFurniture(id) {
   const item = furnitureItemById(id);
-  if (!item || hasFurniture(id) || careStats.pebbles < item.price) return false;
+  if (!item) return false;
+  if (isFurnitureStored(id)) return restoreFurniture(id);
+  if (ownsFurniture(id) || careStats.pebbles < item.price) return false;
   careStats.pebbles -= item.price;
   careStats.furnitureOwned.push(id);
   ensureFurniturePlacement(id);
-  pet.caption = `${item.name} 여기 둠`;
+  pet.caption = `${item.name} 여기 좋아`;
   pet.captionT = 0;
   pet.happy = Math.max(pet.happy, 0.5);
   saveCareState();
@@ -676,7 +788,7 @@ function cheerWheelAt(x, y) {
   pet.happy = Math.max(pet.happy, 0.8);
   affectNeed('bond', 0.006);
   for (let i = 0; i < 3; i++) spawn('heart', anchor.x + rand(-18, 18), anchor.y - 52 * s + rand(-8, 8));
-  pet.caption = '보고 있음';
+    pet.caption = '구경 중';
   pet.captionT = 0;
   return true;
 }
@@ -689,7 +801,7 @@ function updateFurnitureUse(dt) {
   if (place !== 'home' || !hasFurniture('wheel') || needs.energy < 0.18) {
     pet.behavior = 'stare';
     pet.behaviorT = 1.5;
-    pet.caption = '다리 쉬는 중';
+    pet.caption = '다리 쉬자';
     pet.captionT = 0;
     return;
   }
@@ -757,12 +869,17 @@ function startTravel(to, options = {}) {
     pet.captionT = 0;
     return false;
   }
+  if (battleDefeatReturn) {
+    pet.caption = '굴러가는 중';
+    pet.captionT = 0;
+    return false;
+  }
   if (isEggStage()) {
     nudgeEgg('아직 세상 구경 전');
     return false;
   }
   if (input.mode === 'drag') {
-    pet.caption = '손에서 못 감';
+    pet.caption = '손에 있어';
     pet.captionT = 0;
     return false;
   }
@@ -791,7 +908,7 @@ function startTravel(to, options = {}) {
   pet.behaviorT = 60;
   pet.target.x = exitSide < 0 ? -70 : W + 70;
   pet.target.y = targetY;
-  pet.caption = to === 'battle' ? randomLine(TRAVEL_BATTLE_LINES) : to === 'walk' ? randomLine(TRAVEL_WALK_LINES) : '집에 감';
+  pet.caption = to === 'battle' ? randomLine(TRAVEL_BATTLE_LINES) : to === 'walk' ? randomLine(TRAVEL_WALK_LINES) : '집에 가자';
   pet.captionT = 0;
   return true;
 }
@@ -816,7 +933,7 @@ function completeTravelStep() {
     pet.vy = 0;
     pet.target.x = arrival.x;
     pet.target.y = arrival.y;
-    pet.caption = travel.to === 'battle' ? '여기 싸움터' : travel.to === 'walk' ? '여기 바깥' : '집 보임';
+    pet.caption = travel.to === 'battle' ? '여기구나' : travel.to === 'walk' ? '밖이다' : '집 보인다';
     pet.captionT = 0;
     return;
   }
@@ -840,8 +957,12 @@ function completeTravelStep() {
   } else if (destination === 'battle' && shouldStartBattle) {
     startBattleHere(opponentId);
 	  } else {
-	    if (destination === 'home' && origin === 'walk') addStat('tough', 0.02);
-	    pet.caption = randomLine(RETURN_HOME_LINES);
+	    let rankedUp = false;
+	    if (destination === 'home' && origin === 'walk') {
+	      addStat('tough', 0.02);
+	      rankedUp = grantKinship('walk', 1, 3);
+	    }
+	    if (!rankedUp) pet.caption = randomLine(RETURN_HOME_LINES);
     pet.captionT = 0;
     pet.behavior = 'stare';
     pet.behaviorT = rand(BEHAVIORS.stare.dur[0], BEHAVIORS.stare.dur[1]);
@@ -854,13 +975,64 @@ function updateTravel(dt) {
 }
 function updateBattleReturn(dt) {
   if (battleReturnT <= 0) return;
-  if (battle || travel || place !== 'battle') {
+  if (battle || travel || battleDefeatReturn || place !== 'battle') {
     battleReturnT = 0;
     return;
   }
   if (input.mode === 'drag') return;
   battleReturnT = Math.max(0, battleReturnT - dt);
   if (battleReturnT <= 0) startTravel('home');
+}
+function battleDefeatReturnTarget() {
+  if (!battleDefeatReturn) return null;
+  if (battleDefeatReturn.phase === 'rollingOut') {
+    return {
+      x: battleDefeatReturn.exitSide < 0 ? -90 : W + 90,
+      y: battleDefeatReturn.y,
+    };
+  }
+  return { x: W * 0.5, y: H * 0.66 };
+}
+function battleDefeatReturnSpeed() {
+  return BATTLE_DEFEAT_RETURN_SPEED * stageScale('speed');
+}
+function isBattleDefeatReturning() {
+  return Boolean(battleDefeatReturn);
+}
+function completeBattleDefeatReturnStep() {
+  if (!battleDefeatReturn) return;
+  if (battleDefeatReturn.phase === 'rollingOut') {
+    const entrySide = -battleDefeatReturn.exitSide;
+    place = 'home';
+    clearPlaceObjects();
+    battleDefeatReturn.phase = 'rollingIn';
+    battleDefeatReturn.t = 0;
+    battleDefeatReturn.y = H * 0.66;
+    pet.x = entrySide < 0 ? -70 : W + 70;
+    pet.y = battleDefeatReturn.y;
+    pet.vx = 0;
+    pet.vy = 0;
+    pet.target.x = W * 0.5;
+    pet.target.y = battleDefeatReturn.y;
+    pet.caption = '데굴데굴 귀가';
+    pet.captionT = 0;
+    return;
+  }
+  battleDefeatReturn = null;
+  pet.defeatT = Math.max(pet.defeatT || 0, 1.4);
+  pet.rollSpin = 0;
+  pet.behavior = 'sleep';
+  pet.behaviorT = 4.8;
+  pet.caption = '집 바닥 좋아';
+  pet.captionT = 0;
+}
+function updateBattleResult(dt) {
+  if (battleResult) {
+    battleResult.t = Math.max(0, battleResult.t - dt);
+    if (battleResult.t <= 0) battleResult = null;
+  }
+  if (battleDefeatReturn) battleDefeatReturn.t += dt;
+  if (pet.defeatT > 0) pet.defeatT = Math.max(0, pet.defeatT - dt);
 }
 function fetchSkillLevel() {
   return clamp(careStats.stats.quick / 5, 0, 1);
@@ -878,12 +1050,13 @@ function battlePower() {
   return battleCorePower(playerBattleCoreSide());
 }
 function playerBattleCoreSide() {
+  const kinshipBoost = kinshipRankIndex() * 0.025;
   return {
     seed: genes.seed,
     personality: hasCareTrait('mellow') ? '침착' : needs.bond < 0.22 ? '겁쟁이' : '저돌',
     powerCoeff: 0,
     stats: careStats.stats,
-    condition: { hunger: needs.hunger, energy: needs.energy, bond: needs.bond },
+    condition: { hunger: needs.hunger, energy: needs.energy, bond: clamp(needs.bond + kinshipBoost, 0, 1) },
     traits: careTraitNames(),
   };
 }
@@ -1097,7 +1270,7 @@ function tryHatchEgg() {
   if (careStats.hatchWarmth < 1 || stageAgeSeconds() < eggHatchSeconds()) return false;
   if (!transitionStage('baby')) return false;
   rememberCare('알에서 나온 날');
-  pet.caption = '…누구세요';
+  pet.caption = '너 누구야?';
   pet.captionT = 0;
   pet.hatchFxT = 1.2;
   pet.happy = Math.max(pet.happy, 0.72);
@@ -1113,7 +1286,7 @@ function canGrowAdult() {
 function tryGrowAdultOnSleep() {
   if (!canGrowAdult() || !transitionStage('adult')) return false;
   rememberCare('어른이 된 날');
-  pet.caption = '나 좀 큰 듯';
+  pet.caption = '나 좀 컸어';
   pet.captionT = 0;
   pet.happy = 1;
   for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
@@ -1127,7 +1300,7 @@ function growAdultForDebug() {
     return false;
   }
   if (currentStage() === 'adult') {
-    pet.caption = '이미 다 컸음';
+    pet.caption = '이미 다 컸어';
     pet.captionT = 0;
     return false;
   }
@@ -1138,7 +1311,7 @@ function growAdultForDebug() {
   needs.hunger = Math.max(needs.hunger, 0.72);
   needs.energy = Math.max(needs.energy, 0.82);
   needs.bond = Math.max(needs.bond, 0.18);
-  pet.caption = from === 'egg' ? '갑자기 커짐' : '나 좀 커졌나';
+  pet.caption = from === 'egg' ? '갑자기 컸어' : '나 좀 커졌어';
   pet.captionT = 0;
   pet.happy = 1;
   pet.hatchFxT = Math.max(pet.hatchFxT || 0, from === 'egg' ? 0.7 : 0);
@@ -1196,26 +1369,26 @@ function launchBall() {
 }
 function requestPlayBall() {
   if (awayFromHome() || travel) {
-    pet.caption = awayFromHome() ? '집에 공 있음' : '가는 중이라 안 됨';
+    pet.caption = awayFromHome() ? '공은 집에 있어' : '도착하면 하자';
     pet.captionT = 0;
     return;
   }
   if (battle) {
-    pet.caption = '지금 바쁨';
+    pet.caption = '지금 바빠';
     pet.captionT = 0;
     return;
   }
   if (!canPlayBallNow()) {
     if (isEggStage()) nudgeEgg('아직 세상 구경 전');
     else {
-      pet.caption = '아직 공 몰라';
+      pet.caption = '공은 아직 어려워';
       pet.captionT = 0;
       pet.squashVel = clamp(pet.squashVel - 1.4, -8, 8);
     }
     return;
   }
   if (ball) {
-    pet.caption = '공 여기 있어';
+    pet.caption = '공 여기 있다';
     pet.captionT = 0;
     return;
   }
@@ -1236,7 +1409,7 @@ function startFetchBall() {
   ball.fetchState = ball.phase === 'carried' ? 'return' : 'chase';
   ball.fetchSpeed = hasCareTrait('mellow') && Math.random() < 0.2 ? 62 : fetchChaseSpeed(220);
   setBehavior('fetch');
-  if (ball.fetchSpeed === 62) pet.caption = '천천히 가지러 감';
+  if (ball.fetchSpeed === 62) pet.caption = '천천히 갈게';
   pet.captionT = 0;
   return true;
 }
@@ -1286,7 +1459,7 @@ function clearBallIfTimedOut() {
   if (!ball || ball.phase === 'carried' || ball.phase === 'fading') return false;
   if (ball.age < 25) return false;
   if (!ball.fetchStarted) {
-    pet.caption = '공 까먹음';
+    pet.caption = '공 까먹은 척';
     pet.captionT = 0;
   }
   ball = null;
@@ -1315,7 +1488,7 @@ function requestBattle(opponentId = '') {
     return;
   }
   if (travel) {
-    pet.caption = '가는 중이라 안 됨';
+    pet.caption = '도착하면 하자';
     pet.captionT = 0;
     return;
   }
@@ -1324,12 +1497,12 @@ function requestBattle(opponentId = '') {
     return;
   }
   if (!canPlayBallNow()) {
-    pet.caption = '아직 싸움 몰라';
+    pet.caption = '싸움은 아직 어려워';
     pet.captionT = 0;
     return;
   }
   if (food) {
-    pet.caption = '밥 먼저 봄';
+    pet.caption = '밥부터 볼래';
     pet.captionT = 0;
     setBehavior('eat');
     return;
@@ -1351,7 +1524,13 @@ function requestBattle(opponentId = '') {
 function startBattleHere(opponentId = '') {
   const opponent = opponentById(opponentId) || currentLeagueOpponent();
   if (!opponent) return;
-  const foeX = pet.x < W / 2 ? W * 0.72 : W * 0.28;
+  battleResult = null;
+  battleDefeatReturn = null;
+  pet.defeatT = 0;
+  pet.rollSpin = 0;
+  const foeX = clamp(pet.x < W / 2 ? W * 0.72 : W * 0.28, 90, W - 90);
+  const entrySide = foeX > W / 2 ? 1 : -1;
+  const entryX = entrySide > 0 ? W + 74 : -74;
   const plan = resolveBattleCore({
     seed: (genes.seed ^ opponent.seed ^ careStats.battleWins) | 0,
     pet: playerBattleCoreSide(),
@@ -1360,8 +1539,8 @@ function startBattleHere(opponentId = '') {
   const defeated = isOpponentDefeated(opponent.id);
   const battleY = clamp(pet.y + rand(-50, 45), H * 0.48, H * 0.78);
   battle = {
-    x: clamp(foeX, 90, W - 90),
-    baseX: clamp(foeX, 90, W - 90),
+    x: entryX,
+    baseX: foeX,
     y: battleY,
     baseY: battleY,
     hp: 1,
@@ -1371,12 +1550,21 @@ function startBattleHere(opponentId = '') {
     foeHitT: 0,
     cheerT: 0,
     nextAct: 0.4,
-    phase: 'active',
+    phase: 'entering',
+    entrySide,
+    entryT: 0,
     opponentId: opponent.id,
     rematch: defeated,
     plan,
     roundIndex: 0,
     shape: makeBlobGenes(opponent.seed),
+    physics: null,
+    angle: 0,
+    petImpactT: 0,
+    defeatT: 0,
+    haloT: 0,
+    haloVisible: false,
+    resultShown: false,
   };
   if (ball) ball = null;
   pet.behavior = 'battle';
@@ -1385,6 +1573,160 @@ function startBattleHere(opponentId = '') {
   pet.captionT = 0;
   rememberCare('처음 싸움 구경한 날');
   requestAiLine('battle_start', false);
+}
+function matterApi() {
+  return typeof globalThis !== 'undefined' && globalThis.Matter ? globalThis.Matter : null;
+}
+function battlePhysicsBounds() {
+  return {
+    left: 70,
+    right: W - 70,
+    top: H * 0.46,
+    bottom: H * 0.82,
+  };
+}
+function initBattlePhysics() {
+  const Matter = matterApi();
+  if (!battle || !Matter || !Matter.Engine || !Matter.World || !Matter.Bodies || !Matter.Body) return false;
+  const { Engine, World, Bodies, Body } = Matter;
+  const bounds = battlePhysicsBounds();
+  const engine = Engine.create({ enableSleeping: false });
+  engine.gravity.x = 0;
+  engine.gravity.y = 0;
+  const wall = 80;
+  const petRadius = clamp(stagedRadius() * 0.68, 24, 42);
+  const foeRadius = clamp(24 * depthScaleAt(battle.y), 19, 34);
+  const common = {
+    restitution: 0.86,
+    friction: 0.08,
+    frictionStatic: 0.16,
+    frictionAir: 0.035,
+    density: 0.004,
+    slop: 0.05,
+  };
+  const petBody = Bodies.circle(pet.x, pet.y, petRadius, {
+    ...common,
+    label: 'pet',
+    density: 0.0032,
+  });
+  const foeBody = Bodies.circle(battle.x, battle.y, foeRadius, {
+    ...common,
+    label: 'foe',
+    density: 0.0048,
+  });
+  const walls = [
+    Bodies.rectangle(W / 2, bounds.top - wall / 2, W, wall, { isStatic: true, restitution: 0.95 }),
+    Bodies.rectangle(W / 2, bounds.bottom + wall / 2, W, wall, { isStatic: true, restitution: 0.95 }),
+    Bodies.rectangle(bounds.left - wall / 2, H / 2, wall, H, { isStatic: true, restitution: 0.95 }),
+    Bodies.rectangle(bounds.right + wall / 2, H / 2, wall, H, { isStatic: true, restitution: 0.95 }),
+  ];
+  Body.setVelocity(petBody, { x: pet.vx / 60, y: pet.vy / 60 });
+  World.add(engine.world, [petBody, foeBody, ...walls]);
+  battle.physics = {
+    engine,
+    petBody,
+    foeBody,
+    walls,
+    bounds,
+    width: W,
+    height: H,
+  };
+  return true;
+}
+function ensureBattlePhysics() {
+  if (!battle) return false;
+  if (battle.physics && battle.physics.width === W && battle.physics.height === H) return true;
+  return initBattlePhysics();
+}
+function steerBattleBody(body, targetX, targetY, amount) {
+  const Matter = matterApi();
+  if (!Matter || !body) return;
+  const dx = targetX - body.position.x;
+  const dy = targetY - body.position.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const force = amount * body.mass;
+  Matter.Body.applyForce(body, body.position, { x: dx / d * force, y: dy / d * force });
+}
+function syncBattleFromPhysics() {
+  if (!battle || !battle.physics) return;
+  const petBody = battle.physics.petBody;
+  const foeBody = battle.physics.foeBody;
+  pet.x = petBody.position.x;
+  pet.y = petBody.position.y;
+  pet.vx = petBody.velocity.x * 60;
+  pet.vy = petBody.velocity.y * 60;
+  battle.x = foeBody.position.x;
+  battle.y = foeBody.position.y;
+  battle.angle = foeBody.angle;
+}
+function updateBattlePhysics(dt) {
+  const Matter = matterApi();
+  if (!battle || !ensureBattlePhysics() || !Matter) return false;
+  const { Engine, Body } = Matter;
+  const petBody = battle.physics.petBody;
+  const foeBody = battle.physics.foeBody;
+  const opponent = opponentById(battle.opponentId);
+  const personality = opponent ? opponent.personality : '침착';
+  const directionAway = battle.baseX < W / 2 ? -1 : 1;
+  const dx = foeBody.position.x - petBody.position.x;
+  const dy = foeBody.position.y - petBody.position.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const petHitStun = battle.petImpactT > 0;
+  const foeHitStun = battle.hitT > 0;
+  if (d > 58 && !petHitStun) {
+    steerBattleBody(petBody, foeBody.position.x - dx / d * 48, foeBody.position.y - dy / d * 10, 0.00022 * stageScale('speed'));
+  }
+  let foeTargetX = battle.baseX + Math.sin(battle.t * 2.2) * 24;
+  let foeTargetY = battle.baseY + Math.cos(battle.t * 1.9) * 12;
+  if (personality === '겁쟁이') {
+    foeTargetX = battle.baseX + directionAway * (42 + Math.sin(battle.t * 3.4) * 18);
+    foeTargetY = battle.baseY + Math.cos(battle.t * 2.6) * 22;
+  } else if (personality === '저돌') {
+    foeTargetX = petBody.position.x + dx / d * 64;
+    foeTargetY = petBody.position.y + dy / d * 20;
+  }
+  if (!foeHitStun) {
+    steerBattleBody(foeBody, clamp(foeTargetX, battle.physics.bounds.left + 26, battle.physics.bounds.right - 26), clamp(foeTargetY, battle.physics.bounds.top + 26, battle.physics.bounds.bottom - 26), 0.00014);
+  }
+  const maxSpeed = 8.8;
+  for (const body of [petBody, foeBody]) {
+    const speed = Math.hypot(body.velocity.x, body.velocity.y);
+    if (speed > maxSpeed) Body.setVelocity(body, { x: body.velocity.x / speed * maxSpeed, y: body.velocity.y / speed * maxSpeed });
+  }
+  Engine.update(battle.physics.engine, Math.min(dt * 1000, BATTLE_PHYSICS_STEP_MAX));
+  syncBattleFromPhysics();
+  return true;
+}
+function applyBattleRoundImpact(round) {
+  if (!battle || !battle.physics || !round) return false;
+  const Matter = matterApi();
+  if (!Matter) return false;
+  const { Body } = Matter;
+  const petBody = battle.physics.petBody;
+  const foeBody = battle.physics.foeBody;
+  const petActs = round.actor === 'pet';
+  const attacker = petActs ? petBody : foeBody;
+  const target = petActs ? foeBody : petBody;
+  const dx = target.position.x - attacker.position.x;
+  const dy = target.position.y - attacker.position.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const decisiveBoost = round.decisive ? 1.72 : 1;
+  const damage = Number(round.damage) || 0.1;
+  const hitImpulse = (6.4 + damage * 30) * decisiveBoost;
+  const recoilImpulse = hitImpulse * (round.decisive ? 0.12 : 0.18);
+  const lift = petActs ? -0.58 : -0.18;
+  Body.setVelocity(target, {
+    x: target.velocity.x + dx / d * hitImpulse,
+    y: target.velocity.y + dy / d * hitImpulse + lift,
+  });
+  Body.setAngularVelocity(target, (target.angularVelocity || 0) + (petActs ? 0.34 : -0.28) * (dx >= 0 ? 1 : -1) * decisiveBoost);
+  Body.setVelocity(attacker, {
+    x: attacker.velocity.x - dx / d * recoilImpulse,
+    y: attacker.velocity.y - dy / d * recoilImpulse * 0.65,
+  });
+  Body.setAngularVelocity(attacker, (attacker.angularVelocity || 0) - (petActs ? 0.05 : -0.05) * (dx >= 0 ? 1 : -1));
+  syncBattleFromPhysics();
+  return true;
 }
 function requestWalk() {
   if (isEggStage()) {
@@ -1397,7 +1739,7 @@ function requestWalk() {
     return;
   }
   if (battle) {
-    pet.caption = '끝나고 갈래';
+    pet.caption = '끝나고 가자';
     pet.captionT = 0;
     return;
   }
@@ -1406,7 +1748,7 @@ function requestWalk() {
     return;
   }
   if (food) {
-    pet.caption = '밥 먼저 봄';
+    pet.caption = '밥부터 볼래';
     pet.captionT = 0;
     setBehavior('eat');
     return;
@@ -1414,9 +1756,14 @@ function requestWalk() {
   startTravel('walk');
 }
 function cheerBattle() {
-  if (!battle || battle.phase !== 'active') return;
+  if (!battle) return;
+  if (battle.phase !== 'active') {
+    pet.caption = battle.phase === 'entering' ? '상대 오는 중' : '끝난 것 같아';
+    pet.captionT = 0;
+    return;
+  }
   if (battle.cheerT > 0.2) {
-    pet.caption = '방금 들음';
+    pet.caption = '방금 들었어';
     pet.captionT = 0;
     return;
   }
@@ -1435,39 +1782,174 @@ function cheerBattle() {
   }
   pet.captionT = 0;
 }
+function updateBattleEntry(dt) {
+  if (!battle) return;
+  battle.entryT += dt;
+  battle.t += dt;
+  const dx = battle.baseX - battle.x;
+  const step = Math.sign(dx || -battle.entrySide) * Math.min(Math.abs(dx), BATTLE_FOE_ENTRY_SPEED * dt);
+  battle.x += step;
+  battle.y = lerp(battle.y, battle.baseY, 1 - Math.exp(-8 * dt));
+  battle.angle += -battle.entrySide * dt * 7.5;
+  pet.target.x = battle.baseX - battle.entrySide * 54;
+  pet.target.y = battle.baseY + 8;
+  if (Math.abs(battle.baseX - battle.x) <= 4) {
+    battle.x = battle.baseX;
+    battle.y = battle.baseY;
+    battle.angle = 0;
+    battle.t = 0;
+    battle.phase = 'active';
+    initBattlePhysics();
+    pet.caption = '마주섰다';
+    pet.captionT = 0;
+  }
+}
+function launchDefeatedFoe() {
+  const Matter = matterApi();
+  if (!battle || !ensureBattlePhysics() || !Matter) return false;
+  const { Body } = Matter;
+  const foeBody = battle.physics.foeBody;
+  const petBody = battle.physics.petBody;
+  const dx = foeBody.position.x - petBody.position.x;
+  const dy = foeBody.position.y - petBody.position.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const side = dx >= 0 ? 1 : -1;
+  Body.setVelocity(foeBody, {
+    x: dx / d * 14.2 + side * 3.2,
+    y: dy / d * 9.2 - 1.1,
+  });
+  Body.setAngularVelocity(foeBody, side * 0.62);
+  foeBody.frictionAir = 0.018;
+  foeBody.restitution = 0.96;
+  battle.hitT = 0.78;
+  return true;
+}
+function updateBattleDefeated(dt) {
+  const Matter = matterApi();
+  if (!battle) return;
+  if (!battle.physics || !Matter) {
+    battle.t += dt;
+    battle.defeatT += dt;
+    battle.x += (battle.defeatDir || 1) * 260 * dt;
+    battle.angle += (battle.defeatDir || 1) * dt * 6;
+    if (!battle.haloVisible && battle.defeatT >= 0.9) {
+      battle.haloVisible = true;
+      battle.haloT = 0;
+      if (!battle.resultShown) {
+        battle.resultShown = true;
+        battleResult = {
+          won: true,
+          title: '이겼다!',
+          line: battle.resultLine || '반짝 챙김',
+          t: 3.4,
+        };
+      }
+    }
+    if (battle.haloVisible) {
+      battle.haloT += dt;
+      if (battle.haloT > 1.35) {
+        battle = null;
+        if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
+      }
+    }
+    return;
+  }
+  const { Engine, Body } = Matter;
+  battle.t += dt;
+  battle.defeatT += dt;
+  battle.hitT = Math.max(0, battle.hitT - dt * 0.75);
+  Engine.update(battle.physics.engine, Math.min(dt * 1000, BATTLE_PHYSICS_STEP_MAX));
+  const foeBody = battle.physics.foeBody;
+  const speed = Math.hypot(foeBody.velocity.x, foeBody.velocity.y);
+  const maxSpeed = 15.5;
+  if (speed > maxSpeed) Body.setVelocity(foeBody, { x: foeBody.velocity.x / speed * maxSpeed, y: foeBody.velocity.y / speed * maxSpeed });
+  syncBattleFromPhysics();
+  const settled = battle.defeatT >= BATTLE_FOE_DEFEAT_MIN_SECONDS && speed < BATTLE_FOE_DEFEAT_SETTLE_SPEED;
+  if (!battle.haloVisible && (settled || battle.defeatT >= BATTLE_FOE_DEFEAT_MAX_SECONDS)) {
+    battle.haloVisible = true;
+    battle.haloT = 0;
+    Body.setVelocity(foeBody, { x: 0, y: 0 });
+    Body.setAngularVelocity(foeBody, 0);
+    battle.hitT = 0;
+    if (!battle.resultShown) {
+      battle.resultShown = true;
+      battleResult = {
+        won: true,
+        title: '이겼다!',
+        line: battle.resultLine || '반짝 챙김',
+        t: 3.4,
+      };
+    }
+  }
+  if (battle.haloVisible) {
+    battle.haloT += dt;
+    if (battle.haloT > 2.25) {
+      battle = null;
+      if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
+    }
+  }
+}
 function finishBattle(won) {
   if (!battle) return;
   const battleY = battle.y;
   const opponent = battle.opponentId ? opponentById(battle.opponentId) : null;
   const rematch = Boolean(battle.rematch);
-  battle = null;
+  const returnSide = Math.abs(pet.vx) > 90 ? Math.sign(pet.vx) : pet.x < W / 2 ? -1 : 1;
   pet.behavior = 'stare';
   pet.behaviorT = 2.4;
   careStats.lastBattleAt = nowTime();
   affectNeed('energy', won ? -0.08 : -0.14);
-	  if (won) {
-	    const firstDefeat = opponent && !isOpponentDefeated(opponent.id);
-	    const winCaption = opponent && opponent.loseLine ? opponent.loseLine : randomLine(BATTLE_WIN_LINES);
-	    careStats.battleWins += 1;
-	    addBattleStats(0.03);
-	    affectNeed('bond', 0.028);
-	    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
-	    if (firstDefeat) recordOpponentDefeat(opponent);
-	    pet.happy = Math.max(pet.happy, 0.85);
-	    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
-	    grantPebbles(rematch ? BATTLE_REMATCH_PEBBLES : BATTLE_WIN_PEBBLES, SHINY_PEBBLE_CAPTIONS);
-	    pet.caption = winCaption;
-	  } else {
-	    const loseCaption = opponent && opponent.winLine ? opponent.winLine : '지긴 했는데 이거 주움';
-	    addBattleStats(0.015);
-	    rememberCare('싸우고 푹 쉬는 날');
-	    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
-	    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
-	    grantPebbles(BATTLE_LOSS_PEBBLES, ['지긴 했는데 이거 주움']);
-	    pet.caption = loseCaption;
-	  }
+  if (won) {
+    const firstDefeat = opponent && !isOpponentDefeated(opponent.id);
+    const winCaption = opponent && opponent.loseLine ? opponent.loseLine : randomLine(BATTLE_WIN_LINES);
+    careStats.battleWins += 1;
+    addBattleStats(0.03);
+    affectNeed('bond', 0.028);
+    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
+    if (firstDefeat) recordOpponentDefeat(opponent);
+    pet.happy = Math.max(pet.happy, 0.85);
+    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
+    grantPebbles(rematch ? BATTLE_REMATCH_PEBBLES : BATTLE_WIN_PEBBLES, SHINY_PEBBLE_CAPTIONS);
+    const rankedUp = grantKinship('battle', 1, 5);
+    if (!rankedUp) pet.caption = winCaption;
+    battle.phase = 'defeated';
+    battle.defeatT = 0;
+    battle.defeatDir = battle.x >= pet.x ? 1 : -1;
+    battle.haloT = 0;
+    battle.haloVisible = false;
+    battle.resultShown = false;
+    battle.resultLine = firstDefeat && opponent ? `${opponent.name} 넘어섬` : '반짝 챙김';
+    battle.hp = 0;
+    launchDefeatedFoe();
+  } else {
+    battle = null;
+    const loseCaption = opponent && opponent.winLine ? opponent.winLine : '졌지만 이거 봐';
+    addBattleStats(0.015);
+    rememberCare('싸우고 푹 쉬는 날');
+    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
+    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
+    grantPebbles(BATTLE_LOSS_PEBBLES, ['졌지만 이거 봐', '작은 반짝 챙김']);
+    pet.caption = loseCaption;
+    pet.defeatT = 5.6;
+    pet.rollSpin = 0;
+    pet.vx = returnSide * BATTLE_DEFEAT_RETURN_SPEED * 0.82;
+    pet.vy = 0;
+    pet.behavior = 'travel';
+    pet.behaviorT = 60;
+    battleDefeatReturn = {
+      phase: 'rollingOut',
+      exitSide: returnSide,
+      y: clamp(pet.y, H * 0.55, H * 0.78),
+      t: 0,
+    };
+    battleResult = {
+      won: false,
+      title: '져부렀다 ㅠㅠ',
+      line: '데굴데굴 귀가',
+      t: 4.0,
+    };
+  }
   pet.captionT = 0;
-  if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
   requestAiLine(won ? 'battle_win' : 'battle_tired', false);
 }
 function recordOpponentDefeat(opponent) {
@@ -1484,24 +1966,38 @@ function recordOpponentDefeat(opponent) {
 }
 function updateBattle(dt) {
   if (!battle) return;
+  if (battle.phase === 'entering') {
+    updateBattleEntry(dt);
+    return;
+  }
+  if (battle.phase === 'defeated') {
+    updateBattleDefeated(dt);
+    return;
+  }
   if (battle.phase !== 'active') return;
   battle.t += dt;
   battle.hitT = Math.max(0, battle.hitT - dt);
   battle.foeHitT = Math.max(0, battle.foeHitT - dt);
+  battle.petImpactT = Math.max(0, (battle.petImpactT || 0) - dt);
   battle.cheerT = Math.max(0, battle.cheerT - dt);
+  const physicsActive = updateBattlePhysics(dt);
   const dx = battle.x - pet.x, dy = battle.y - pet.y, d = Math.hypot(dx, dy) || 1;
-  updateBattleFoeMotion(dt);
+  if (!physicsActive) updateBattleFoeMotion(dt);
   pet.target.x = battle.x - Math.sign(dx || pet.dir) * 46;
   pet.target.y = battle.y + 8;
   if (d > 72) {
-    pet.vx = lerp(pet.vx, dx / d * 105 * stageScale('speed'), 1 - Math.exp(-8 * dt));
-    pet.vy = lerp(pet.vy, dy / d * 82 * stageScale('speed'), 1 - Math.exp(-8 * dt));
+    if (!physicsActive) {
+      pet.vx = lerp(pet.vx, dx / d * 105 * stageScale('speed'), 1 - Math.exp(-8 * dt));
+      pet.vy = lerp(pet.vy, dy / d * 82 * stageScale('speed'), 1 - Math.exp(-8 * dt));
+    }
     return;
   }
-  pet.vx = lerp(pet.vx, Math.sin(battle.t * 8) * 24, 1 - Math.exp(-9 * dt));
-  pet.vy = lerp(pet.vy, Math.cos(battle.t * 5) * 12, 1 - Math.exp(-9 * dt));
+  if (!physicsActive) {
+    pet.vx = lerp(pet.vx, Math.sin(battle.t * 8) * 24, 1 - Math.exp(-9 * dt));
+    pet.vy = lerp(pet.vy, Math.cos(battle.t * 5) * 12, 1 - Math.exp(-9 * dt));
+  }
   playBattlePlanRounds();
-  if (battle && battle.t > battle.plan.duration) finishBattle(battle.plan.won);
+  if (battle && battle.phase === 'active' && battle.t > battle.plan.duration) finishBattle(battle.plan.won);
 }
 function updateBattleFoeMotion(dt) {
   const opponent = opponentById(battle.opponentId);
@@ -1531,13 +2027,16 @@ function playBattlePlanRounds() {
     battle.petHp = clamp(round.petHp, 0, 1);
     if (round.actor === 'pet') {
       battle.hitT = 0.22;
+      applyBattleRoundImpact(round);
       pet.squashVel = clamp(pet.squashVel - 1.6, -9, 9);
       spawn('dust', battle.x + rand(-14, 14), battle.y + rand(-6, 6));
     } else {
       battle.foeHitT = 0.22;
+      battle.petImpactT = 0.28;
+      applyBattleRoundImpact(round);
       pet.squashVel = clamp(pet.squashVel - 2.4, -10, 10);
       if (pet.captionT > 1.1) {
-        pet.caption = '헛발질함';
+        pet.caption = '헛발질했다';
         pet.captionT = 0;
       }
     }
@@ -1567,11 +2066,11 @@ function careTraitNames() {
   return Object.entries(CARE_TRAITS).filter(([, trait]) => careStats.traitMask & trait.bit).map(([name]) => name);
 }
 function careBehaviorCaptions(name, caps) {
-  if (hasCareTrait('cuddly') && name === 'stare') return caps.concat(['가까이 있을래', '손 기다림']);
-  if (hasCareTrait('cuddly') && name === 'wiggle') return caps.concat(['쓰다듬 대기중', '꼬물꼬물 다가감']);
-  if (hasCareTrait('foodie') && name === 'sniff') return caps.concat(['밥 냄새 탐색', '혹시 간식?']);
+  if (hasCareTrait('cuddly') && name === 'stare') return caps.concat(['가까이 있을래', '손 기다리는 중']);
+  if (hasCareTrait('cuddly') && name === 'wiggle') return caps.concat(['쓰다듬 대기 중', '꼬물꼬물 다가가는 중']);
+  if (hasCareTrait('foodie') && name === 'sniff') return caps.concat(['밥 냄새 찾는 중', '혹시 간식?']);
   if (hasCareTrait('mellow') && name === 'plop') return caps.concat(['천천히 녹는 중', '느긋하게 철푸덕']);
-  if (hasCareTrait('mellow') && name === 'sleep') return caps.concat(['좋은 낮잠 자리', '느긋한 꿈']);
+  if (hasCareTrait('mellow') && name === 'sleep') return caps.concat(['여기 좋다', '느긋한 꿈 보는 중']);
   return caps;
 }
 function careBehaviorStarted(name) {
@@ -1601,15 +2100,14 @@ function noteCareAction(kind) {
   if (careStats.routineBits !== 7) return false;
   careStats.routineBits = 0;
   careStats.routineCount += 1;
-	  careStats.lastRoutineAt = nowTime();
-	  affectNeed('bond', 0.045);
-	  rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
-	  pet.caption = careStats.routineCount > 1 ? '또 챙겨줬다' : '나 챙겨줬네';
-  pet.captionT = 0;
-	  pet.happy = 1;
-	  for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
-	  grantPebbles(1, ROUTINE_PEBBLE_CAPTIONS);
-	  return true;
+  careStats.lastRoutineAt = nowTime();
+  affectNeed('bond', 0.045);
+  rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
+  grantDailyKinship();
+  pet.happy = 1;
+  for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
+  grantPebbles(1, ROUTINE_PEBBLE_CAPTIONS);
+  return true;
 }
 function isFavoriteFood(foodType) {
   return foodType.id === genes.favoriteFoodId;
@@ -1645,7 +2143,7 @@ function mealCaption(foodType) {
 }
 function requestRest() {
   if (awayFromHome() || travel) {
-    pet.caption = awayFromHome() ? '집 가서 누울래' : '가는 중이라 안 됨';
+    pet.caption = awayFromHome() ? '집 가서 누울래' : '도착하면 잘래';
     pet.captionT = 0;
     return;
   }
@@ -1697,7 +2195,7 @@ function recordPetting(amount) {
     bellyState.rewarded = true;
     bellyRewarded = true;
     affectNeed('bond', BELLY_RUB_BOND_GAIN);
-    pet.caption = '믿으니까 보여줌';
+    pet.caption = '믿으니까 보여줘';
     pet.captionT = 0;
     pet.happy = 1;
     for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.75));
@@ -1706,7 +2204,7 @@ function recordPetting(amount) {
   if (amount > 2.4) {
     const routineCompleted = noteCareAction('pet');
     if (bellyRewarded && routineCompleted) {
-      pet.caption = '믿으니까 보여줌';
+      pet.caption = '믿으니까 보여줘';
       pet.captionT = 0;
     }
   }
@@ -1714,6 +2212,7 @@ function recordPetting(amount) {
   careStats.lastPetAt = now;
 }
 function updateCare(dt, { airborne, speed }) {
+  updateBattleResult(dt);
   updateTravel(dt);
   updateBattle(dt);
   updateBattleReturn(dt);

@@ -179,7 +179,7 @@ function testNightReturnSleepsAndWakeCaption() {
   run(context, `localStorage.setItem('protopet-care-v1', ${JSON.stringify(savedCare({ now, adoptedAt: now, lastDailyLoginDay: -1, bond: 0.8 }))}); loadCareState();`);
   let state = run(context, '({ behavior: pet.behavior, caption: pet.caption })');
   assert(state.behavior === 'sleep', 'night return starts asleep');
-  assert(state.caption === '안 자고 왔네', 'night first login uses the planned greeting');
+  assert(state.caption === '안 자?', 'night first login uses the planned greeting');
   run(context, 'surprisePet();');
   state = run(context, '({ caption: pet.caption })');
   assert(state.caption === '…밤임', 'waking a sleeping night pet uses the planned caption');
@@ -202,7 +202,7 @@ function testBellyRubRewardAndMilestone() {
   const context = makeContext({ search: '?seed=12345&hour=12' });
   run(context, 'careStats.stage = "adult"; needs.bond = 0.7; setBehavior("belly"); recordPetting(8);');
   const state = run(context, '({ caption: pet.caption, bond: needs.bond, hearts: particles.filter(p => p.type === "heart").length })');
-  assert(state.caption === '믿으니까 보여줌', 'belly rub uses planned caption');
+  assert(state.caption === '믿으니까 보여줘', 'belly rub uses planned caption');
   assert(state.bond > 0.7, 'belly rub grants a small bond gain');
   assert(state.hearts >= 5, 'belly rub emits five hearts');
 

@@ -175,12 +175,27 @@ function testFurnitureLongPressDragAndPetPriority() {
   assert(state.particles >= 5, 'dropping furniture emits dust particles');
 }
 
+function testFurnitureCanBeStoredAndRestored() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; careStats.furnitureOwned = ["plant"]; careStats.furnitureStored = []; careStats.furniturePlaced = migrateFurniturePlaced(null); setFurniturePlacement("plant", W * 0.18, H * 0.7);');
+  run(context, '__setNow(0); const p = furnitureAnchor("plant"); __elements.get("c").listeners.pointerdown({ clientX: p.x, clientY: p.y, pointerId: 9, pointerType: "mouse", timeStamp: 0, preventDefault() {} });');
+  run(context, '__setNow(360); update(1 / 60);');
+  run(context, '__elements.get("c").listeners.pointermove({ clientX: W * 0.5, clientY: 120, pointerId: 9, pointerType: "mouse", timeStamp: 420, preventDefault() {} }); update(1 / 60); __elements.get("c").listeners.pointerup({ clientX: W * 0.5, clientY: 120, pointerId: 9, pointerType: "mouse", timeStamp: 440, preventDefault() {} });');
+  let state = run(context, '({ stored: careStats.furnitureStored.slice(), visible: ownedFurnitureIds(), has: hasFurniture("plant"), owns: ownsFurniture("plant"), caption: pet.caption, saved: JSON.parse(localStorage.getItem("protopet-care-v1")).furnitureStored, held: furnitureMotion.heldId })');
+  assert(state.stored.includes('plant') && state.saved.includes('plant'), 'dropping furniture on remove sign stores it persistently');
+  assert(state.visible.length === 0 && state.has === false && state.owns === true, 'stored furniture is owned but not visible in the room');
+  assert(state.caption === '잠깐 치움' && state.held === '', 'stored furniture clears drag state and uses the required caption');
+  assert(run(context, 'buyFurniture("plant")') === true, 'stored furniture can be restored from the shop action');
+  state = run(context, '({ stored: careStats.furnitureStored.slice(), visible: ownedFurnitureIds(), has: hasFurniture("plant"), owns: ownsFurniture("plant") })');
+  assert(state.stored.length === 0 && state.visible.includes('plant') && state.has === true && state.owns === true, 'restored furniture becomes visible without losing ownership');
+}
+
 function testWalkDiscoveryPebblesAreDaily() {
   const context = makeContext();
   run(context, 'careStats.stage = "adult"; grantWalkDiscoveryShinyPebble();');
   let state = run(context, '({ pebbles: careStats.pebbles, caption: pet.caption })');
   assert(state.pebbles === 2 || state.pebbles === 3, 'first daily walk discovery grants two or three pebbles');
-  assert(['반짝이는 거 주움', '반짝 하나 물고 옴', '작은 반짝 있음', '이거 반짝임'].includes(state.caption), 'walk discovery uses pebble caption');
+  assert(['이거 줄게', '반짝 찾았어', '작은 거 봐', '반짝 물고 옴', '입에서 선물 나옴', '작은 보물 배송'].includes(state.caption), 'walk discovery uses pebble caption');
   run(context, 'grantWalkDiscoveryShinyPebble();');
   state = run(context, '({ pebbles: careStats.pebbles })');
   assert(state.pebbles === 3 || state.pebbles === 4, 'repeat same-day discovery grants one pebble');
@@ -196,7 +211,7 @@ function testBattlePebblesAndStats() {
   state = run(context, '({ pebbles: careStats.pebbles, tough: careStats.stats.tough, power: careStats.stats.power, caption: pet.caption })');
   assert(state.pebbles === 5, 'battle loss grants one pebble');
   assert(near(state.tough, 0.045) && near(state.power, 0.045), 'battle loss gives smaller body practice');
-  assert(state.caption === '지긴 했는데 이거 주움', 'battle loss uses required pebble caption');
+  assert(['졌지만 이거 봐', '작은 반짝 챙김'].includes(state.caption), 'battle loss uses required pebble caption');
 }
 
 function testRoutinePebbleAndBuyingFurniture() {
@@ -204,7 +219,7 @@ function testRoutinePebbleAndBuyingFurniture() {
   run(context, 'noteCareAction("meal"); noteCareAction("rest"); noteCareAction("pet");');
   let state = run(context, '({ pebbles: careStats.pebbles, caption: pet.caption })');
   assert(state.pebbles === 1, 'full care round grants one pebble');
-  assert(['어디서 반짝 물어옴', '반짝 놓고 감', '작은 거 줌', '입에서 반짝 나옴'].includes(state.caption), 'routine reward uses pebble caption');
+  assert(['이거 줄게', '고마워서 줌', '반짝 놓고 갈게', '입에서 선물 나옴', '작은 보상 배송', '반짝 반납 중'].includes(state.caption), 'routine reward uses pebble caption');
   run(context, 'careStats.pebbles = 5;');
   assert(run(context, 'buyFurniture("plant")') === false, 'cannot buy furniture without enough pebbles');
   run(context, 'careStats.pebbles = 20;');
@@ -253,6 +268,7 @@ testFurniturePlacementMigrationPersistenceAndResize();
 testFurniturePlacementClampsAndSeparates();
 testFurnitureBehaviorTargetsPlacedPosition();
 testFurnitureLongPressDragAndPetPriority();
+testFurnitureCanBeStoredAndRestored();
 testWalkDiscoveryPebblesAreDaily();
 testBattlePebblesAndStats();
 testRoutinePebbleAndBuyingFurniture();

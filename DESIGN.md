@@ -20,7 +20,7 @@ The UI now leans into a hand-drawn pocket-world language inspired by small playf
 | Drawn/ink-soft | --drawn-ink-soft | rgba(111,90,69,0.32) | n/a | Soft sketch borders |
 | Drawn/paper-line | --drawn-paper-line | rgba(111,90,69,0.18) | n/a | Gauge tracks and panel divider lines |
 | Pet/body | --pet-body | #efd9b8 | n/a | Default pet body, varied slightly by gene seed |
-| Pet/body-dark | --pet-body-dark | #dfc49c | n/a | Default legs and darker body parts, varied slightly by gene seed |
+| Pet/body-dark | --pet-body-dark | #dfc49c | n/a | Default darker body accents, varied slightly by gene seed |
 | Pet/outline | --pet-outline | rgba(96,74,56,0.35) | n/a | Soft outline |
 | Pet/cheek | --pet-cheek | rgba(240,140,130,0.18) | n/a | Cuddly blush, intensified by happy state |
 | Pet/foodie-mark | --pet-foodie-mark | rgba(176,128,82,0.36) | n/a | Small belly dots for foodie trait |
@@ -83,7 +83,7 @@ The UI now leans into a hand-drawn pocket-world language inspired by small playf
 ### Rules
 
 - Use warm neutrals for the world, not saturated game UI chrome.
-- Care colors are functional: green for hunger, blue for energy, pink for bond, rose for play, coral for low state.
+- Care colors are functional: green for hunger, blue for energy, pink for mind, rose for play, coral for low state.
 - Food colors stay soft and edible, with three recognizable families: warm kibble, berry pink, and leafy green.
 - Pet body color may vary inside the documented peach-to-cream family through the saved gene seed.
 - New colors should extend the table before use.
@@ -180,9 +180,42 @@ All spacing derives from a base of 4px.
 - **Accessibility**: text is visible and concise.
 - **Motion**: no decorative animation.
 
+### Relationship Rank
+
+- **Structure**: one compact `#rankLine` inside the top-center sign.
+- **Variants**: `유대 · 초면` through `유대 · 충신`.
+- **Spacing**: text-only, no fourth gauge.
+- **States**: rank updates from daily care, walk returns, and battle wins.
+- **Accessibility**: visible text; details appear again inside the notebook.
+- **Motion**: rank-up feedback uses existing captions and hearts only.
+
+### Tutorial Sign
+
+- **Structure**: top-center hand-drawn sign containing the relationship rank and short control hint.
+- **Spacing**: stays clear of the top-right outing/record buttons and top-left debug button on 320px+ mobile.
+- **States**: static, text-only, never blocks canvas input.
+- **Accessibility**: visible Korean text; no icon-only instruction.
+- **Motion**: no decorative animation.
+
+### Outing Menu
+
+- **Structure**: fixed top-right `외출` paper-label button opens a bottom sheet containing 산책, 전투, 상점.
+- **Spacing**: the trigger lives outside the bottom care row so the core care actions stay visually primary.
+- **States**: unavailable while away, traveling, egg-stage, or already battling.
+- **Accessibility**: native buttons; each refused action answers with pet text.
+- **Motion**: same bottom-sheet slide as other menus.
+
+### Record Menu
+
+- **Structure**: fixed top-right `기록` paper-label button opens a bottom sheet containing 기억 and 수첩.
+- **Spacing**: sits beside `외출` as a secondary global menu, not inside the care economy.
+- **States**: closed, open, panel launched, subdued while away or traveling.
+- **Accessibility**: native buttons open their existing panels.
+- **Motion**: same bottom-sheet slide as other menus.
+
 ### Memory Panel
 
-- **Structure**: fixed top-right `기억` text button opens a tonal-shift overlay panel separate from the notebook.
+- **Structure**: `기록` menu entry opens a tonal-shift overlay panel separate from the notebook.
 - **Variants**: today, yesterday, recent day, and old memory groups.
 - **Spacing**: the trigger keeps a 44px touch target and leaves room for the top-left hint.
 - **States**: closed, open, empty fallback through saved memory migration.
@@ -234,7 +267,9 @@ All spacing derives from a base of 4px.
 - **Spacing**: no new gauge; battle uses canvas-only opponent and keeps the bottom control cluster compact on 320px+ mobile.
 - **States**: inactive, active, cheered, won, tired.
 - **Accessibility**: battle and cheer are native button actions, and every battle outcome has a visible pet caption and memory line.
-- **Motion**: opponent is a simple procedural blob; pet movement, dust, hearts, squash, and wobble reuse the existing simulation.
+- **Canvas HUD**: battle health uses a quiet in-world status strip with pet/opponent face dots and opposing fills, not floating dashboard labels such as "나/상대".
+- **Outcome Readout**: win/loss appears as a short hand-drawn plaque in the battle ground. Loss should visibly hand off into the return-home motion.
+- **Motion**: opponent is a simple procedural blob that enters from outside the map, then fights through recoil/knockback. A defeated opponent stays in the scene, bounces off the battle bounds, and only gets a small halo after settling; the player pet loss uses the xx-eyed roll-home motion.
 
 ### Place Travel
 
@@ -250,7 +285,7 @@ All spacing derives from a base of 4px.
 - **Structure**: more-sheet entry opens a tonal overlay panel matching the notebook; pebble count appears only inside shop and notebook.
 - **Variants**: wheel, window, cushion, and plant rows with procedural canvas previews, item note, and pebble cost.
 - **Spacing**: list rows keep 44px minimum purchase targets and compact mobile-safe columns.
-- **States**: not enough pebbles disables the row action; owned furniture reads as already at home. No error popup.
+- **States**: not enough pebbles disables the row action; visible owned furniture reads as already at home; stored owned furniture reads as `꺼내기`. No error popup.
 - **Accessibility**: native buttons purchase furniture, and the visible count explains affordance.
 - **Motion**: panel motion reuses the bottom overlay language; furniture itself animates only on canvas after placement.
 
@@ -259,8 +294,9 @@ All spacing derives from a base of 4px.
 - **Structure**: bought furniture is stored in care state and drawn at fixed home anchors from place terrain data.
 - **Variants**: wheel, window, cushion, plant. All use lumpy blob or tapered curve canvas grammar and the furniture color tokens.
 - **Spacing**: anchors live in the home scene, not the bottom UI; furniture never adds a persistent home counter.
-- **States**: owned, placed, and autonomously used by the pet.
+- **States**: owned, placed, stored, and autonomously used by the pet.
 - **Accessibility**: furniture effects are reflected by pet captions and notebook observations.
+- **Remove Target**: while a furniture item is being dragged, a top-center `치우기` sign appears; dropping there stores the item without refunding or deleting purchase ownership.
 - **Motion**: wheel rotates while used, cushion gently breathes, plant leaves sway, window line drifts subtly.
 
 ### Body Notebook Scale

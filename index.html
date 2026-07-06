@@ -11,30 +11,40 @@
 <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body>
-<div id="hint">탭: 놀래키기 · 문지르기: 쓰다듬기 · 길게/쭉 끌기: 잡기</div>
+<div id="topSign" aria-label="유대와 조작 안내">
+  <div id="rankLine">유대 · 초면</div>
+  <div id="hint">탭: 놀래키기 · 문지르기: 쓰담 · 길게: 잡기</div>
+</div>
 <button id="debugAdultBtn" type="button" aria-label="디버그: 성체로 성장">성체</button>
 <button id="memoryBtn" aria-expanded="false" aria-controls="memoryPanel">기억</button>
+<div id="topMenu" aria-label="주요 메뉴">
+  <button id="outingBtn" aria-expanded="false" aria-controls="outingSheet">외출</button>
+  <button id="moreBtn" aria-expanded="false" aria-controls="moreSheet">기록</button>
+</div>
 <canvas id="c"></canvas>
+<div id="furnitureRemoveZone" aria-hidden="true">치우기</div>
 <div id="ui">
   <div id="memoryLine">오늘 아직 아무 일 없음</div>
   <div id="gauges">
     <div class="g">밥<div class="bar"><i id="gH"></i></div></div>
     <div class="g">기운<div class="bar"><i id="gE"></i></div></div>
-    <div class="g">친함<div class="bar"><i id="gB"></i></div></div>
+    <div class="g">마음<div class="bar"><i id="gB"></i></div></div>
   </div>
   <div id="actions">
     <button id="feedBtn">밥주기</button>
     <button id="restBtn">재우기</button>
     <button id="playBtn">공놀이</button>
-    <button id="moreBtn" aria-expanded="false" aria-controls="moreSheet">⋯</button>
     <button id="returnBtn" class="is-context">귀가</button>
   </div>
 </div>
 <div id="sheetScrim" class="overlay-scrim" hidden></div>
-<div id="moreSheet" class="bottom-sheet" hidden>
+<div id="outingSheet" class="bottom-sheet" hidden>
   <button id="walkBtn">산책</button>
   <button id="battleBtn">전투</button>
   <button id="shopBtn">상점</button>
+</div>
+<div id="moreSheet" class="bottom-sheet" hidden>
+  <button id="memorySheetBtn">기억</button>
   <button id="notebookBtn">수첩</button>
 </div>
 <div id="battleScrim" class="overlay-scrim" hidden></div>
@@ -60,6 +70,10 @@
     <section>
       <h3>자람</h3>
       <p id="notebookStage"></p>
+    </section>
+    <section>
+      <h3>유대</h3>
+      <p id="notebookKinship"></p>
     </section>
     <section id="notebookTraitsSection">
       <h3>성격</h3>
@@ -93,6 +107,7 @@
   </div>
 </section>
 <script src="./src/render.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js" defer></script>
 <script src="./src/battle-core.js" defer></script>
 <script src="./src/app.js" defer></script>
 <script src="./src/care.js" defer></script>

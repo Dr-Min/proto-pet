@@ -1,18 +1,22 @@
 // ---------- 하단 UI ----------
 const memoryLine = document.getElementById('memoryLine');
+const rankLine = document.getElementById('rankLine');
 const gH = document.getElementById('gH'), gE = document.getElementById('gE'), gB = document.getElementById('gB');
 const feedBtn = document.getElementById('feedBtn');
 const restBtn = document.getElementById('restBtn');
 const playBtn = document.getElementById('playBtn');
 const debugAdultBtn = document.getElementById('debugAdultBtn');
 const memoryBtn = document.getElementById('memoryBtn');
+const outingBtn = document.getElementById('outingBtn');
 const moreBtn = document.getElementById('moreBtn');
 const returnBtn = document.getElementById('returnBtn');
 const walkBtn = document.getElementById('walkBtn');
 const battleBtn = document.getElementById('battleBtn');
 const shopBtn = document.getElementById('shopBtn');
 const notebookBtn = document.getElementById('notebookBtn');
+const memorySheetBtn = document.getElementById('memorySheetBtn');
 const sheetScrim = document.getElementById('sheetScrim');
+const outingSheet = document.getElementById('outingSheet');
 const moreSheet = document.getElementById('moreSheet');
 const battleScrim = document.getElementById('battleScrim');
 const battlePanel = document.getElementById('battlePanel');
@@ -27,6 +31,7 @@ const notebookPanel = document.getElementById('notebookPanel');
 const notebookCloseBtn = document.getElementById('notebookCloseBtn');
 const notebookTogether = document.getElementById('notebookTogether');
 const notebookStage = document.getElementById('notebookStage');
+const notebookKinship = document.getElementById('notebookKinship');
 const notebookTraitsSection = document.getElementById('notebookTraitsSection');
 const notebookTraits = document.getElementById('notebookTraits');
 const notebookPebbles = document.getElementById('notebookPebbles');
@@ -43,22 +48,23 @@ const shopList = document.getElementById('shopList');
 const STAGE_NOTEBOOK_LABELS = { egg: '알', baby: '아기', adult: '어른' };
 const TRAIT_NOTEBOOK_LABELS = {
   cuddly: '손길 좋아함',
-  foodie: '밥 기억 좋음',
+  foodie: '밥 냄새 잘 앎',
   mellow: '느긋함',
 };
 closeMoreSheet();
+closeOutingSheet();
 closeBattlePanel();
 closeNotebook();
 closeMemory();
 closeShop();
 feedBtn.addEventListener('click', () => {
   if (isTraveling()) {
-    pet.caption = '가는 중이라 안 됨';
+    pet.caption = '도착하면 먹자';
     pet.captionT = 0;
     return;
   }
   if (currentPlace() !== 'home') {
-    pet.caption = '집 가서 먹을래';
+    pet.caption = '집 가서 먹자';
     pet.captionT = 0;
     return;
   }
@@ -67,7 +73,7 @@ feedBtn.addEventListener('click', () => {
     return;
   }
   if (food) {
-    pet.caption = '밥 여기 있어';
+    pet.caption = '밥 여기 있다';
     pet.captionT = 0;
     if (input.mode !== 'drag' && needs.hunger < 0.98) setBehavior('eat');
     return;
@@ -103,6 +109,10 @@ debugAdultBtn.addEventListener('click', () => {
 memoryBtn.addEventListener('click', () => {
   openMemory();
 });
+outingBtn.addEventListener('click', () => {
+  if (outingSheet.hidden) openOutingSheet();
+  else closeOutingSheet();
+});
 moreBtn.addEventListener('click', () => {
   if (moreSheet.hidden) openMoreSheet();
   else closeMoreSheet();
@@ -113,7 +123,7 @@ returnBtn.addEventListener('click', () => {
 });
 walkBtn.addEventListener('click', () => {
   requestWalk();
-  closeMoreSheet();
+  closeOutingSheet();
 });
 battleBtn.addEventListener('click', () => {
   openBattlePanel();
@@ -121,10 +131,13 @@ battleBtn.addEventListener('click', () => {
 shopBtn.addEventListener('click', () => {
   openShop();
 });
+memorySheetBtn.addEventListener('click', () => {
+  openMemory();
+});
 notebookBtn.addEventListener('click', () => {
   openNotebook();
 });
-sheetScrim.addEventListener('click', closeMoreSheet);
+sheetScrim.addEventListener('click', closeAllSheets);
 battleScrim.addEventListener('click', closeBattlePanel);
 battleCloseBtn.addEventListener('click', closeBattlePanel);
 battleChallengeBtn.addEventListener('click', () => {
@@ -140,19 +153,38 @@ shopScrim.addEventListener('click', closeShop);
 shopCloseBtn.addEventListener('click', closeShop);
 function openMoreSheet() {
   if (currentPlace() !== 'home' || isTraveling()) return;
+  closeOutingSheet();
   sheetScrim.hidden = false;
   moreSheet.hidden = false;
   moreSheet.classList.add('is-open');
   moreBtn.setAttribute('aria-expanded', 'true');
 }
 function closeMoreSheet() {
-  sheetScrim.hidden = true;
   moreSheet.classList.remove('is-open');
   moreSheet.hidden = true;
   moreBtn.setAttribute('aria-expanded', 'false');
+  if (outingSheet.hidden) sheetScrim.hidden = true;
+}
+function openOutingSheet() {
+  if (currentPlace() !== 'home' || isTraveling()) return;
+  closeMoreSheet();
+  sheetScrim.hidden = false;
+  outingSheet.hidden = false;
+  outingSheet.classList.add('is-open');
+  outingBtn.setAttribute('aria-expanded', 'true');
+}
+function closeOutingSheet() {
+  outingSheet.classList.remove('is-open');
+  outingSheet.hidden = true;
+  outingBtn.setAttribute('aria-expanded', 'false');
+  if (moreSheet.hidden) sheetScrim.hidden = true;
+}
+function closeAllSheets() {
+  closeMoreSheet();
+  closeOutingSheet();
 }
 function openBattlePanel() {
-  closeMoreSheet();
+  closeAllSheets();
   renderBattlePanel();
   battleScrim.hidden = false;
   battlePanel.hidden = false;
@@ -162,7 +194,7 @@ function closeBattlePanel() {
   battlePanel.hidden = true;
 }
 function openNotebook() {
-  closeMoreSheet();
+  closeAllSheets();
   closeBattlePanel();
   renderNotebook();
   notebookScrim.hidden = false;
@@ -173,7 +205,7 @@ function closeNotebook() {
   notebookPanel.hidden = true;
 }
 function openMemory() {
-  closeMoreSheet();
+  closeAllSheets();
   closeBattlePanel();
   renderMemoryPanel();
   memoryScrim.hidden = false;
@@ -186,7 +218,7 @@ function closeMemory() {
   memoryBtn.setAttribute('aria-expanded', 'false');
 }
 function openShop() {
-  closeMoreSheet();
+  closeAllSheets();
   closeBattlePanel();
   renderShop();
   shopScrim.hidden = false;
@@ -322,6 +354,9 @@ function renderMemoryPanel() {
 function renderNotebook() {
   notebookTogether.textContent = `함께한 지 ${togetherDays()}일`;
   notebookStage.textContent = STAGE_NOTEBOOK_LABELS[currentStage()] || '알';
+  const kinship = normalizeKinship(careStats.kinship);
+  const rank = kinshipRank();
+  notebookKinship.textContent = `${rank.name} · 매일 ${kinship.daily}번 · 산책 ${kinship.walk}번 · 승리 ${kinship.battle}번`;
   notebookTraits.textContent = '';
   const traits = careTraitNames();
   notebookTraitsSection.hidden = traits.length === 0;
@@ -367,9 +402,10 @@ function renderShop() {
     text.appendChild(note);
     const button = document.createElement('button');
     button.className = 'shop-buy';
-    const owned = hasFurniture(item.id);
-    button.textContent = owned ? '집에 있음' : `${item.price}개`;
-    button.disabled = owned || careStats.pebbles < item.price;
+    const owned = ownsFurniture(item.id);
+    const stored = isFurnitureStored(item.id);
+    button.textContent = stored ? '꺼내기' : owned ? '집에 있음' : `${item.price}개`;
+    button.disabled = (owned && !stored) || (!owned && careStats.pebbles < item.price);
     button.addEventListener('click', () => {
       if (buyFurniture(item.id)) renderShop();
     });
@@ -392,6 +428,8 @@ function updateGauges() {
   document.body.dataset.stage = stage;
   document.body.dataset.place = place;
   document.body.dataset.away = place !== 'home' || traveling ? 'true' : 'false';
+  document.body.dataset.furnitureDrag = furnitureMotion.heldId ? 'true' : 'false';
+  document.body.dataset.furnitureRemoveHot = furnitureMotion.heldId && furnitureRemovePointerHit(input.x, input.y) ? 'true' : 'false';
   gH.style.width = needs.hunger * 100 + '%';
   gH.style.background = needs.hunger < 0.3 ? 'var(--care-low)' : 'var(--care-hunger)';
   gE.style.width = needs.energy * 100 + '%';
@@ -399,18 +437,22 @@ function updateGauges() {
   gB.style.width = needs.bond * 100 + '%';
   gB.style.background = needs.bond < 0.25 ? 'var(--care-bond-low)' : 'var(--care-bond)';
   memoryLine.textContent = stage !== 'egg' && memoryText === '아직 세상 구경 전' ? '오늘 아직 아무 일 없음' : memoryText;
+  rankLine.textContent = `유대 · ${kinshipRank().name}`;
   setButtonLocked(feedBtn, stage === 'egg');
   setButtonLocked(restBtn, stage === 'egg');
   setButtonLocked(playBtn, stage !== 'adult');
   setButtonLocked(debugAdultBtn, stage === 'adult' || isStagePreview());
+  setButtonLocked(outingBtn, stage === 'egg' || place !== 'home' || traveling || Boolean(battle));
+  setButtonLocked(moreBtn, place !== 'home' || traveling);
   setButtonLocked(walkBtn, stage === 'egg' || Boolean(battle));
   setButtonLocked(battleBtn, stage !== 'adult');
   setButtonLocked(shopBtn, false);
+  setButtonLocked(memorySheetBtn, false);
   setButtonLocked(notebookBtn, false);
   returnBtn.textContent = traveling ? '이동중' : '귀가';
   setButtonLocked(returnBtn, traveling);
   if (place !== 'home' || traveling) {
-    closeMoreSheet();
+    closeAllSheets();
     closeBattlePanel();
   }
 }
