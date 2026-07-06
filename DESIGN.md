@@ -54,6 +54,10 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Furniture/window-light | --furniture-window-light | #eef0e8 | n/a | Pale outside light in window |
 | Furniture/pot | --furniture-pot | #c79b78 | n/a | Small clay plant pot |
 | Furniture/leaf | --furniture-leaf | #8faf77 | n/a | Low-saturation plant leaves |
+| Day/morning-tone | --day-morning-tone | rgba(232,184,127,0.04) | n/a | Subtle morning gold overlay |
+| Day/tone | --day-tone | rgba(0,0,0,0) | n/a | Midday clear overlay |
+| Day/evening-tone | --day-evening-tone | rgba(217,143,122,0.06) | n/a | Subtle evening orange overlay |
+| Day/night-tone | --day-night-tone | rgba(64,78,118,0.10) | n/a | Subtle night blue overlay and sky dim |
 | World/battle-floor | --world-battle-floor | #e2d8c7 | n/a | Training ground plane |
 | World/battle-sky | --world-battle-sky | #eee8dc | n/a | Dimmer training-ground sky |
 | World/battle-sand | --world-battle-sand | #d8c8b1 | n/a | Inner sand band for training ring |

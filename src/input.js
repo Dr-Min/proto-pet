@@ -49,15 +49,24 @@ function surprisePet() {
   }
   if (input.tapCooldown > 0) return;
   input.tapCooldown = 0.16;
+  const wokeAtNight = pet.behavior === 'sleep' && typeof isNightPeriod === 'function' && isNightPeriod();
   if (pet.jy > -4) pet.jvy = -240;
   else pet.jvy = Math.max(pet.jvy, -80);
   pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
   pet.dizzy = Math.min(pet.dizzy + 1, 3);
   affectNeed('energy', -0.012);
-  pet.caption = pet.dizzy >= 3 ? '@_@ 그만…' : '깜짝!?';
+  pet.caption = wokeAtNight ? '…밤임' : pet.dizzy >= 3 ? '@_@ 그만…' : '깜짝!?';
   pet.captionT = 0;
   recordRoughPlay(ROUGHNESS_SURPRISE_GAIN);
-  if (pet.behavior === 'sleep' || pet.behavior === 'plop') setTimeout(() => setBehavior('stare'), 0);
+  if (pet.behavior === 'sleep' || pet.behavior === 'plop') {
+    setTimeout(() => {
+      setBehavior('stare');
+      if (wokeAtNight) {
+        pet.caption = '…밤임';
+        pet.captionT = 0;
+      }
+    }, 0);
+  }
   pet.behaviorT = Math.max(pet.behaviorT, 1.2);
   for (let i = 0; i < 4; i++) spawn('dust', pet.x + rand(-20, 20), pet.y);
 }

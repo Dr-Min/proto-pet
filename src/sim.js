@@ -13,7 +13,8 @@ function update(dt) {
   // 이동
   let desiredVX = 0, desiredVY = 0;
   const movingToPlace = !eggStage && !dragging && !airborne && typeof travelTarget === 'function' ? travelTarget() : null;
-  const movingToFurniture = !movingToPlace && !eggStage && !dragging && !airborne && typeof furnitureMoveTarget === 'function' ? furnitureMoveTarget() : null;
+  const movingToHomecoming = !movingToPlace && !eggStage && !dragging && !airborne && typeof homecomingTarget === 'function' ? homecomingTarget() : null;
+  const movingToFurniture = !movingToPlace && !movingToHomecoming && !eggStage && !dragging && !airborne && typeof furnitureMoveTarget === 'function' ? furnitureMoveTarget() : null;
   if (!movingToPlace && !eggStage && !dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
     if (ball && ball.phase === 'carried') {
       const mouth = carriedBallPoint();
@@ -112,6 +113,16 @@ function update(dt) {
 	      completeTravelStep();
 	    }
 	  }
+	  if (movingToHomecoming && pet.tripT <= 0) {
+	    const dx = movingToHomecoming.x - pet.x, dy = movingToHomecoming.y - pet.y;
+	    const d = Math.hypot(dx, dy) || 1;
+	    if (d > 22) {
+	      desiredVX = dx / d * 260 * stageScale('speed');
+	      desiredVY = dy / d * 220 * stageScale('speed');
+	    } else {
+	      completeHomecoming();
+	    }
+	  }
 	  if (movingToFurniture && pet.tripT <= 0) {
 	    const dx = movingToFurniture.x - pet.x, dy = movingToFurniture.y - pet.y;
 	    const d = Math.hypot(dx, dy) || 1;
@@ -126,7 +137,7 @@ function update(dt) {
 	      pet.dir = furnitureAnchor('window').x > pet.x ? 1 : -1;
 	    }
 	  }
-	  const moving = !movingToPlace && !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
+	  const moving = !movingToPlace && !movingToHomecoming && !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
   if (moving && pet.tripT <= 0) {
     const speed = (pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62) * stageScale('speed');
     const dx = pet.target.x - pet.x, dy = pet.target.y - pet.y;

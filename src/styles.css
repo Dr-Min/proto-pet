@@ -22,6 +22,10 @@
 	    --furniture-window-light: #eef0e8;
 	    --furniture-pot: #c79b78;
 	    --furniture-leaf: #8faf77;
+	    --day-morning-tone: rgba(232,184,127,0.04);
+	    --day-tone: rgba(0,0,0,0);
+	    --day-evening-tone: rgba(217,143,122,0.06);
+	    --day-night-tone: rgba(64,78,118,0.10);
 	  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
   canvas { display: block; touch-action: none; }

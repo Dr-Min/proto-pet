@@ -33,6 +33,10 @@ const BATTLE_SAND = '#d8c8b1';
 const BATTLE_RING = 'rgba(120,96,72,0.22)';
 const BATTLE_FLAG = '#c9a8a0';
 const BATTLE_FOOTPRINT = 'rgba(112,91,70,0.13)';
+const DAY_MORNING_TONE = 'rgba(232,184,127,0.04)';
+const DAY_TONE = 'rgba(0,0,0,0)';
+const DAY_EVENING_TONE = 'rgba(217,143,122,0.06)';
+const DAY_NIGHT_TONE = 'rgba(64,78,118,0.10)';
 
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
@@ -643,13 +647,28 @@ function drawWorld(t) {
   const placeName = typeof currentPlace === 'function' ? currentPlace() : 'home';
   if (placeName === 'walk') {
     drawWalkWorld(t);
-    return;
-  }
-  if (placeName === 'battle') {
+  } else if (placeName === 'battle') {
     drawBattleWorld(t);
-    return;
+  } else {
+    drawHomeWorld(t);
   }
-  drawHomeWorld(t);
+  drawDayCycleOverlay();
+}
+
+function drawDayCycleOverlay() {
+  const period = typeof dayPeriod === 'function' ? dayPeriod() : 'day';
+  const tones = {
+    morning: DAY_MORNING_TONE,
+    day: DAY_TONE,
+    evening: DAY_EVENING_TONE,
+    night: DAY_NIGHT_TONE,
+  };
+  if (period === 'night') {
+    ctx.fillStyle = DAY_NIGHT_TONE;
+    ctx.fillRect(0, 0, W, H * 0.39);
+  }
+  ctx.fillStyle = tones[period] || DAY_TONE;
+  ctx.fillRect(0, 0, W, H);
 }
 
 function drawBlob(cx, cy, rx, ry) {
@@ -769,16 +788,17 @@ function draw(t) {
   if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);
 
   const s = depthScale(), r = stagedRadius();
+  const bellyPose = pet.behavior === 'belly';
   const sy = pet.squash, sx = 1 + (1 - sy) * 0.85;
   const sp = Math.hypot(pet.vx, pet.vy);
-  const bob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
+  const bob = bellyPose ? 0 : Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
   const breathe = (pet.behavior === 'sleep' ? Math.sin(t * 1.6) * 0.035 : Math.sin(t * 2.6) * 0.015);
-  const cy = pet.y + pet.jy + bob - r * sy;
+  const cy = bellyPose ? pet.y + pet.jy - r * 0.46 : pet.y + pet.jy + bob - r * sy;
 
   // 그림자
   ctx.fillStyle = 'rgba(120,100,70,0.18)';
   ctx.beginPath();
-  ctx.ellipse(pet.x, pet.y + 4, r * 1.15 * sx * (1 - pet.jy * -0.002), r * 0.28, 0, 0, Math.PI * 2);
+  ctx.ellipse(pet.x, pet.y + 4, r * (bellyPose ? 1.45 : 1.15) * sx * (1 - pet.jy * -0.002), r * (bellyPose ? 0.22 : 0.28), 0, 0, Math.PI * 2);
   ctx.fill();
 
   // 밥그릇
@@ -802,32 +822,47 @@ function draw(t) {
   drawBattleObject();
 
   // 꼬리 (몸 뒤)
-  drawTail(tail, 8);
+  if (!bellyPose) drawTail(tail, 8);
 
-  // 다리 (뭉툭한 캡슐)
-  ctx.strokeStyle = bodyDarkColor(); ctx.lineWidth = 9 * s * stageScale('leg'); ctx.lineCap = 'round';
-  for (const f of feet) {
-    ctx.beginPath();
-    ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * sy);
-    ctx.lineTo(f.x, f.y);
-    ctx.stroke();
-  }
-  // 발끝
   ctx.fillStyle = bodyDarkColor();
-  for (const f of feet) { ctx.beginPath(); ctx.arc(f.x, f.y, 5.5 * s * stageScale('leg'), 0, Math.PI * 2); ctx.fill(); }
+  if (bellyPose) {
+    const pawBob = Math.sin(t * 2.3) * r * 0.025;
+    for (const paw of [
+      { x: -0.56, y: -0.08 },
+      { x: 0.55, y: -0.06 },
+      { x: -0.42, y: 0.34 },
+      { x: 0.43, y: 0.35 },
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(pet.x + paw.x * r, cy + paw.y * r + pawBob, 6.2 * s * stageScale('leg'), 4.2 * s * stageScale('leg'), paw.x * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // 다리 (뭉툭한 캡슐)
+    ctx.strokeStyle = bodyDarkColor(); ctx.lineWidth = 9 * s * stageScale('leg'); ctx.lineCap = 'round';
+    for (const f of feet) {
+      ctx.beginPath();
+      ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * sy);
+      ctx.lineTo(f.x, f.y);
+      ctx.stroke();
+    }
+    // 발끝
+    for (const f of feet) { ctx.beginPath(); ctx.arc(f.x, f.y, 5.5 * s * stageScale('leg'), 0, Math.PI * 2); ctx.fill(); }
+  }
 
   // 몸통 (머리 겸용 한 덩어리)
   ctx.save();
   ctx.translate(pet.x, cy);
   if (pet.behavior === 'wiggle') ctx.rotate(Math.sin(t * 14) * 0.13);
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
-  ctx.scale(sx + breathe, sy - breathe);
+  if (bellyPose) ctx.scale(1.28 + breathe, 0.68 - breathe * 0.45);
+  else ctx.scale(sx + breathe, sy - breathe);
   drawEars(r, 'outer');
   drawBlob(0, 0, r * 1.05 * geneValue('bodyAspect', 1), r);
   ctx.fillStyle = bodyColor(); ctx.fill();
   ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(r); ctx.stroke();
   // 배 무늬
-  ctx.beginPath(); ctx.ellipse(0, r * 0.45, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.ellipse(0, r * (bellyPose ? 0.1 : 0.45), r * (bellyPose ? 0.66 : 0.55), r * (bellyPose ? 0.5 : 0.4), 0, 0, Math.PI * 2);
   ctx.fillStyle = bellyColor(); ctx.fill();
   if (petHasTrait('foodie')) {
     ctx.fillStyle = PET_FOODIE_MARK;

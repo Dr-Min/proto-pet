@@ -16,6 +16,7 @@ const moreSheet = document.getElementById('moreSheet');
 const notebookScrim = document.getElementById('notebookScrim');
 const notebookPanel = document.getElementById('notebookPanel');
 const notebookCloseBtn = document.getElementById('notebookCloseBtn');
+const notebookTogether = document.getElementById('notebookTogether');
 const notebookStage = document.getElementById('notebookStage');
 const notebookTraitsSection = document.getElementById('notebookTraitsSection');
 const notebookTraits = document.getElementById('notebookTraits');
@@ -198,7 +199,7 @@ function memoryEntriesNewestFirst() {
 }
 function memoryGroupTitle(at) {
   if (!at) return '예전';
-  const age = dayStamp(Date.now()) - dayStamp(at);
+  const age = dayStamp(nowTime()) - dayStamp(at);
   if (age <= 0) return '오늘';
   if (age === 1) return '어제';
   if (age <= 6) return `${age}일 전`;
@@ -228,6 +229,7 @@ function renderMemoryPanel() {
   }
 }
 function renderNotebook() {
+  notebookTogether.textContent = `함께한 지 ${togetherDays()}일`;
   notebookStage.textContent = STAGE_NOTEBOOK_LABELS[currentStage()] || '알';
   notebookTraits.textContent = '';
   const traits = careTraitNames();

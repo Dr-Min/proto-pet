@@ -16,6 +16,26 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const urlParams = new URLSearchParams(location.search);
+const forcedHour = Number(urlParams.get('hour'));
+function nowTime() {
+  const injectedNow = typeof window !== 'undefined' ? Number(window.__petNow) : NaN;
+  return Number.isFinite(injectedNow) ? injectedNow : Date.now();
+}
+function currentHour() {
+  if (Number.isInteger(forcedHour) && forcedHour >= 0 && forcedHour <= 23) return forcedHour;
+  return new Date(nowTime()).getHours();
+}
+function dayPeriod() {
+  const hour = currentHour();
+  if (hour >= 6 && hour < 11) return 'morning';
+  if (hour >= 11 && hour < 17) return 'day';
+  if (hour >= 17 && hour < 21) return 'evening';
+  return 'night';
+}
+function isNightPeriod() {
+  return dayPeriod() === 'night';
+}
 
 const FOOD_TYPES = [
   { id: 'kibble', name: '동글 사료', fill: '#f0c98b', top: '#d59b57', bits: '#8c6042' },
@@ -268,8 +288,8 @@ function stageScale(name) {
 function stagedRadius() { return pet.r * depthScale() * stageScale('body'); }
 function stageAgeSeconds() {
   if (typeof careStats === 'undefined') return 0;
-  const changedAt = Number.isFinite(careStats.stageChangedAt) ? careStats.stageChangedAt : Date.now();
-  return Math.max(0, (Date.now() - changedAt) / 1000);
+  const changedAt = Number.isFinite(careStats.stageChangedAt) ? careStats.stageChangedAt : nowTime();
+  return Math.max(0, (nowTime() - changedAt) / 1000);
 }
 function eggHatchSeconds() { return FAST_PREVIEW ? 5 : 20; }
 function adultGrowthSeconds() { return FAST_PREVIEW ? 60 : 24 * 3600; }
@@ -593,6 +613,7 @@ const BEHAVIORS = {
   zoomies: { w: 1.0, dur: [1.8, 3] },
   wiggle:  { w: 1.6, dur: [1, 2] },
   sleep:   { w: 0.6, dur: [6, 10] },
+  belly:   { w: 0.28, dur: [3.5, 6] },
   eat:     { w: 0, dur: [60, 60] },
   fetch:   { w: 0, dur: [60, 60] },
   wheel:   { w: 0.85, dur: [4.5, 6.5] },
@@ -608,6 +629,7 @@ const CAPTIONS = {
   zoomies: ['갑자기 신남!!', '우다다다!!'],
   wiggle: ['꼬물꼬물', '춤(본인 생각)'],
   sleep: ['Zzz…', '꿈나라'],
+  belly: ['배 보임', '누워 있음'],
   eat: ['밥이다!!', '우걱우걱'],
   fetch: ['공이다!!', '잡으러 감'],
   wheel: ['달려봄', '쳇바퀴 봄'],
@@ -634,6 +656,7 @@ function setBehavior(name) {
   if (name === 'wander' || name === 'zoomies') pickTarget();
   if (name === 'plop') pet.squashVel -= 3.5;
   if (typeof setFurnitureBehaviorTarget === 'function') setFurnitureBehaviorTarget(name);
+  if (typeof careBehaviorStarted === 'function') careBehaviorStarted(name);
 }
 function pickTarget() {
   pet.target.x = rand(90, W - 90);
@@ -667,11 +690,13 @@ window.__petDebug = {
         landingT: pet.landingT,
         needs: { ...needs },
         mood: careMood(),
+        dayPeriod: typeof dayPeriod === 'function' ? dayPeriod() : 'day',
         stage: currentStage(),
         stagePreview: stagePreview(),
         stageAge: stageAgeSeconds(),
         traits: typeof careTraitNames === 'function' ? careTraitNames() : [],
         careStats: { ...careStats },
+        togetherDays: typeof togetherDays === 'function' ? togetherDays() : 1,
         genes: { ...genes },
         bondMilestone,
         food: food ? { ...food } : null,

@@ -17,11 +17,14 @@ const careStats = {
   fetchCount: 0,
   lastPlayAt: 0,
   stage: 'egg',
-  stageChangedAt: Date.now(),
+  stageChangedAt: nowTime(),
   hatchWarmth: 0,
   battleWins: 0,
   lastBattleAt: 0,
   grime: 0,
+  adoptedAt: nowTime(),
+  lastDailyLoginDay: -1,
+  anniversaryMask: 0,
   memoryLog: [{ text: '아직 세상 구경 전', at: 0 }],
   pebbles: 0,
   lastWalkPebbleDay: -1,
@@ -73,6 +76,14 @@ const BUTTERFLY_START_LINES = ['저거 움직임', '잡으러 감'];
 const BUTTERFLY_MISS_LINES = ['놓쳤다'];
 const BUTTERFLY_NOSE_LINES = ['코에 뭐 있음'];
 const AI_LINE_COOLDOWN = 12000;
+const DAILY_GREETING_CAPTIONS = {
+  morning: '왔다!!',
+  day: '기다렸어…',
+  evening: '기다렸어…',
+  night: '안 자고 왔네',
+};
+const ANNIVERSARY_DAYS = [7, 14, 30, 50, 100];
+const BELLY_RUB_BOND_GAIN = 0.018;
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
 const STAT_KEYS = ['tough', 'quick', 'power'];
@@ -102,6 +113,7 @@ const BOND_MILESTONES = [
   { at: 0.25, line: '조금 친해졌어' },
   { at: 0.55, line: '이제 나 알아보지?' },
   { at: 0.85, line: '완전 믿고 있어' },
+  { at: 0.95, line: '평생 껌딱지' },
 ];
 const roughPlayState = {
   roughness: 0,
@@ -126,6 +138,13 @@ const butterfly = {
   y: 0,
   chaseT: 0,
   noseT: 0,
+};
+const homecoming = {
+  active: false,
+  arrived: false,
+};
+const bellyState = {
+  rewarded: false,
 };
 
 function bondStage(value) {
@@ -169,10 +188,13 @@ function saveCareState() {
       lastPlayAt: careStats.lastPlayAt,
       stage: careStats.stage,
       stageChangedAt: careStats.stageChangedAt,
-      hatchWarmth: careStats.hatchWarmth,
+	      hatchWarmth: careStats.hatchWarmth,
       battleWins: careStats.battleWins,
       lastBattleAt: careStats.lastBattleAt,
 	      grime: careStats.grime,
+	      adoptedAt: careStats.adoptedAt,
+	      lastDailyLoginDay: careStats.lastDailyLoginDay,
+	      anniversaryMask: careStats.anniversaryMask,
 	      memoryLog: careStats.memoryLog,
 	      pebbles: careStats.pebbles,
 	      lastWalkPebbleDay: careStats.lastWalkPebbleDay,
@@ -180,7 +202,7 @@ function saveCareState() {
 	      furniturePlaced: careStats.furniturePlaced,
 	      stats: careStats.stats,
 	      bondMilestone,
-      ts: Date.now(),
+      ts: nowTime(),
     }));
   } catch (_) {}
 }
@@ -189,7 +211,9 @@ function loadCareState() {
   try {
     const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
     if (!saved) return;
-    const away = clamp((Date.now() - saved.ts) / 1000, 0, 12 * 3600);
+    const now = nowTime();
+    const savedTs = Number(saved.ts);
+    const away = clamp((now - (Number.isFinite(savedTs) ? savedTs : now)) / 1000, 0, 12 * 3600);
     const savedHunger = Number(saved.hunger);
     const savedEnergy = Number(saved.energy);
     const savedBond = Number(saved.bond);
@@ -211,8 +235,11 @@ function loadCareState() {
     const savedStageChangedAt = Number(saved.stageChangedAt);
     const savedHatchWarmth = Number(saved.hatchWarmth);
     const savedBattleWins = Number(saved.battleWins);
-	    const savedLastBattleAt = Number(saved.lastBattleAt);
+    const savedLastBattleAt = Number(saved.lastBattleAt);
 	    const savedGrime = Number(saved.grime);
+	    const savedAdoptedAt = Number(saved.adoptedAt);
+	    const savedLastDailyLoginDay = Number(saved.lastDailyLoginDay);
+	    const savedAnniversaryMask = Number(saved.anniversaryMask);
 	    const savedPebbles = Number(saved.pebbles);
 	    const savedLastWalkPebbleDay = Number(saved.lastWalkPebbleDay);
 	    needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
@@ -236,21 +263,21 @@ function loadCareState() {
     careStats.fetchCount = Math.max(0, Math.floor(Number.isFinite(savedFetchCount) ? savedFetchCount : careStats.fetchCount));
     careStats.lastPlayAt = Math.max(0, Number.isFinite(savedLastPlayAt) ? savedLastPlayAt : careStats.lastPlayAt);
     careStats.stage = migrateStage(saved.stage, saved);
-    careStats.stageChangedAt = Math.max(0, Number.isFinite(savedStageChangedAt) ? savedStageChangedAt : Date.now());
+    careStats.stageChangedAt = Math.max(0, Number.isFinite(savedStageChangedAt) ? savedStageChangedAt : nowTime());
     careStats.hatchWarmth = clamp(Number.isFinite(savedHatchWarmth) ? savedHatchWarmth : (careStats.stage === 'egg' ? 0 : 1), 0, 1);
     careStats.battleWins = Math.max(0, Math.floor(Number.isFinite(savedBattleWins) ? savedBattleWins : careStats.battleWins));
 	    careStats.lastBattleAt = Math.max(0, Number.isFinite(savedLastBattleAt) ? savedLastBattleAt : careStats.lastBattleAt);
 	    careStats.grime = clamp((Number.isFinite(savedGrime) ? savedGrime : careStats.grime) + (away > 3 * 3600 ? away * 0.000012 : 0), 0, 1);
+	    careStats.adoptedAt = Number.isFinite(savedAdoptedAt) && savedAdoptedAt > 0 ? savedAdoptedAt : migrateAdoptedAt(saved);
+	    careStats.lastDailyLoginDay = Math.floor(Number.isFinite(savedLastDailyLoginDay) ? savedLastDailyLoginDay : -1);
+	    careStats.anniversaryMask = Math.floor(clamp(Number.isFinite(savedAnniversaryMask) ? savedAnniversaryMask : 0, 0, 31));
 	    careStats.pebbles = Math.max(0, Math.floor(Number.isFinite(savedPebbles) ? savedPebbles : 0));
 	    careStats.lastWalkPebbleDay = Math.floor(Number.isFinite(savedLastWalkPebbleDay) ? savedLastWalkPebbleDay : -1);
 	    careStats.furnitureOwned = migrateFurnitureOwned(saved.furnitureOwned);
 	    careStats.furniturePlaced = migrateFurniturePlaced(saved.furniturePlaced);
 	    careStats.stats = migrateStats(saved.stats, careStats.fetchCount);
 	    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
-    if (away > 60) {
-      pet.caption = careStats.grime > 0.55 ? '먼지 좀 붙음' : '기다렸어…';
-      pet.captionT = 0;
-    }
+    handleReturnEvents(away);
   } catch (_) {}
 }
 loadCareState();
@@ -318,6 +345,104 @@ function migrateStats(savedStats, fetchCount) {
     stats[key] = clamp(Number.isFinite(value) ? value : stats[key], 0, 5);
   }
   return stats;
+}
+function migrateAdoptedAt(saved) {
+  const candidates = [
+    Number(saved.lastCareAt),
+    Number(saved.lastMealAt),
+    Number(saved.lastNapAt),
+    Number(saved.lastPetAt),
+    Number(saved.lastRoutineAt),
+    Number(saved.lastPlayAt),
+    Number(saved.lastBattleAt),
+  ];
+  if (Array.isArray(saved.memoryLog)) {
+    for (const entry of saved.memoryLog) {
+      const at = typeof entry === 'string' ? 0 : Number(entry && entry.at);
+      if (Number.isFinite(at)) candidates.push(at);
+    }
+  }
+  const oldest = candidates.filter(value => Number.isFinite(value) && value > 0).sort((a, b) => a - b)[0];
+  return oldest || nowTime();
+}
+function togetherDays() {
+  const adoptedDay = dayStamp(careStats.adoptedAt || nowTime());
+  return Math.max(1, dayStamp(nowTime()) - adoptedDay + 1);
+}
+function anniversaryIndex(day) {
+  return ANNIVERSARY_DAYS.indexOf(day);
+}
+function hasCelebratedAnniversary(index) {
+  return Boolean(careStats.anniversaryMask & (1 << index));
+}
+function markAnniversaryCelebrated(index) {
+  careStats.anniversaryMask |= 1 << index;
+}
+function celebrateAnniversary(day, index) {
+  markAnniversaryCelebrated(index);
+  pet.caption = `같이 산 지 ${day}일`;
+  pet.captionT = 0;
+  rememberCare(`함께 ${day}일째 되는 날`);
+  pet.happy = 1;
+  for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-28, 28), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
+}
+function startNightSleepAfterReturn() {
+  if (isEggStage() || !isNightPeriod()) return false;
+  pet.behavior = 'sleep';
+  pet.behaviorT = rand(BEHAVIORS.sleep.dur[0], BEHAVIORS.sleep.dur[1]) * 1.5;
+  pet.zTimer = 0.2;
+  return true;
+}
+function startHomecoming() {
+  if (isEggStage() || awayFromHome() || travel || battle) return false;
+  if (typeof input !== 'undefined' && input.mode === 'drag') return false;
+  homecoming.active = true;
+  homecoming.arrived = false;
+  pet.behavior = 'zoomies';
+  pet.behaviorT = 5;
+  pet.target.x = W * 0.5;
+  pet.target.y = H * 0.78;
+  pet.caption = '왔다!!';
+  pet.captionT = 0;
+  return true;
+}
+function homecomingTarget() {
+  if (!homecoming.active || homecoming.arrived) return null;
+  if (typeof input !== 'undefined' && input.mode === 'drag') return null;
+  return { x: W * 0.5, y: H * 0.78 };
+}
+function completeHomecoming() {
+  if (!homecoming.active) return;
+  homecoming.arrived = true;
+  homecoming.active = false;
+  pet.behavior = 'wiggle';
+  pet.behaviorT = rand(BEHAVIORS.wiggle.dur[0], BEHAVIORS.wiggle.dur[1]);
+  pet.caption = '왔다!!';
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.85);
+}
+function handleReturnEvents(away) {
+  const today = dayStamp(nowTime());
+  const firstDailyLogin = careStats.lastDailyLoginDay !== today;
+  let didAnniversary = false;
+  const sleptAtNight = away > 60 && startNightSleepAfterReturn();
+  if (away > 60 && !sleptAtNight) {
+    pet.caption = careStats.grime > 0.55 ? '먼지 좀 붙음' : '기다렸어…';
+    pet.captionT = 0;
+  }
+  if (firstDailyLogin) {
+    careStats.lastDailyLoginDay = today;
+    pet.caption = DAILY_GREETING_CAPTIONS[dayPeriod()] || DAILY_GREETING_CAPTIONS.day;
+    pet.captionT = 0;
+    const day = togetherDays();
+    const index = anniversaryIndex(day);
+    if (index >= 0 && !hasCelebratedAnniversary(index)) {
+      celebrateAnniversary(day, index);
+      didAnniversary = true;
+    }
+  }
+  if (away > 60 && needs.bond >= 0.4 && !sleptAtNight && !didAnniversary) startHomecoming();
+  if (firstDailyLogin || homecoming.active || sleptAtNight) saveCareState();
 }
 function isEggStage() { return currentStage() === 'egg'; }
 function isBabyStage() { return currentStage() === 'baby'; }
@@ -438,7 +563,7 @@ function isUsingCushion() {
 function recordWheelSession(fell) {
   if (furnitureState.wheelRewarded || furnitureState.wheelRunT < 2) return;
   furnitureState.wheelRewarded = true;
-  addStat('quick', furnitureState.wheelCheered ? 0.1 : 0.08);
+  addStat('quick', 0.04);
   affectNeed('energy', furnitureState.wheelCheered ? -0.06 : -0.05);
   pet.caption = fell ? randomLine(WHEEL_FALL_CAPTIONS) : randomLine(WHEEL_RUN_CAPTIONS);
   pet.captionT = 0;
@@ -611,7 +736,7 @@ function completeTravelStep() {
   } else if (destination === 'battle' && shouldStartBattle) {
     startBattleHere();
 	  } else {
-	    if (destination === 'home' && origin === 'walk') addStat('tough', 0.04);
+	    if (destination === 'home' && origin === 'walk') addStat('tough', 0.02);
 	    pet.caption = randomLine(RETURN_HOME_LINES);
     pet.captionT = 0;
     pet.behavior = 'stare';
@@ -640,7 +765,7 @@ function battlePower() {
   return 0.86 + fetchSkillLevel() * 0.2 + careStats.stats.power * 0.025 + needs.energy * 0.18 + needs.bond * 0.18 + foodBoost;
 }
 function grantWalkDiscoveryShinyPebble() {
-  const today = dayStamp(Date.now());
+  const today = dayStamp(nowTime());
   const firstToday = careStats.lastWalkPebbleDay !== today;
   const count = firstToday ? 2 + ((today + genes.seed) % 2) : 1;
   careStats.lastWalkPebbleDay = today;
@@ -767,8 +892,8 @@ function updateWalkPlace(dt) {
 }
 function requestAiLine(event, fallback) {
   if (typeof fetch !== 'function') return;
-  if (Date.now() < nextAiLineAt) return;
-  nextAiLineAt = Date.now() + AI_LINE_COOLDOWN;
+  if (nowTime() < nextAiLineAt) return;
+  nextAiLineAt = nowTime() + AI_LINE_COOLDOWN;
   fetch('/api/pet-line', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -812,7 +937,7 @@ function transitionStage(stage) {
   const from = careStats.stage;
   if (from === stage) return false;
   careStats.stage = stage;
-  careStats.stageChangedAt = Date.now();
+  careStats.stageChangedAt = nowTime();
   careStats.hatchWarmth = stage === 'egg' ? 0 : 1;
   pet.stageTween = from !== 'egg' && stage !== 'egg' ? { from, to: stage, t: 0, dur: 1.5 } : null;
   return true;
@@ -991,8 +1116,8 @@ function clearBallIfTimedOut() {
 function recordFetchComplete() {
   const firstFetch = careStats.fetchCount === 0;
   careStats.fetchCount += 1;
-	  careStats.lastPlayAt = Date.now();
-	  addStat('quick', 0.05);
+	  careStats.lastPlayAt = nowTime();
+	  addStat('quick', 0.025);
   affectNeed('bond', 0.02);
   affectNeed('energy', -0.03);
   if (firstFetch) rememberCare('공 물어오기 배움');
@@ -1117,11 +1242,11 @@ function finishBattle(won) {
   battle = null;
   pet.behavior = 'stare';
   pet.behaviorT = 2.4;
-  careStats.lastBattleAt = Date.now();
+  careStats.lastBattleAt = nowTime();
   affectNeed('energy', won ? -0.08 : -0.14);
 	  if (won) {
 	    careStats.battleWins += 1;
-	    addBattleStats(0.06);
+	    addBattleStats(0.03);
 	    affectNeed('bond', 0.028);
 	    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
 	    pet.caption = randomLine(BATTLE_WIN_LINES);
@@ -1129,7 +1254,7 @@ function finishBattle(won) {
 	    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
 	    grantPebbles(4, SHINY_PEBBLE_CAPTIONS);
 	  } else {
-	    addBattleStats(0.03);
+	    addBattleStats(0.015);
 	    rememberCare('싸우고 푹 쉬는 날');
 	    pet.caption = randomLine(BATTLE_LOSE_LINES);
 	    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
@@ -1187,7 +1312,7 @@ function careMood() {
 }
 function rememberCare(line) {
   careStats.lastCareLine = line;
-  const now = Date.now();
+  const now = nowTime();
   careStats.lastCareAt = now;
   careStats.memoryLog.push({ text: line, at: now });
   if (careStats.memoryLog.length > 30) careStats.memoryLog.splice(0, careStats.memoryLog.length - 30);
@@ -1205,6 +1330,9 @@ function careBehaviorCaptions(name, caps) {
   if (hasCareTrait('mellow') && name === 'plop') return caps.concat(['천천히 녹는 중', '느긋하게 철푸덕']);
   if (hasCareTrait('mellow') && name === 'sleep') return caps.concat(['좋은 낮잠 자리', '느긋한 꿈']);
   return caps;
+}
+function careBehaviorStarted(name) {
+  if (name === 'belly') bellyState.rewarded = false;
 }
 function revealCareTrait(name) {
   const trait = CARE_TRAITS[name];
@@ -1230,7 +1358,7 @@ function noteCareAction(kind) {
   if (careStats.routineBits !== 7) return false;
   careStats.routineBits = 0;
   careStats.routineCount += 1;
-	  careStats.lastRoutineAt = Date.now();
+	  careStats.lastRoutineAt = nowTime();
 	  affectNeed('bond', 0.045);
 	  rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
 	  pet.caption = careStats.routineCount > 1 ? '또 챙겨줬다' : '나 챙겨줬네';
@@ -1245,7 +1373,7 @@ function isFavoriteFood(foodType) {
 }
 function recordMeal(foodType) {
   careStats.mealsFed += 1;
-  careStats.lastMealAt = Date.now();
+  careStats.lastMealAt = nowTime();
   if (isFavoriteFood(foodType)) {
     careStats.favoriteMeals += 1;
     rememberCare(`${foodObjectLabel(foodType)} 제일 좋아함`);
@@ -1301,7 +1429,7 @@ function requestRest() {
     return;
   }
   careStats.napsTaken += 1;
-  careStats.lastNapAt = Date.now();
+  careStats.lastNapAt = nowTime();
   rememberCare(needs.energy < 0.28 ? '낮잠으로 기운 충전 중' : '잠깐 눈 붙이는 중');
   const routineCompleted = noteCareAction('rest');
   const traitRevealed = updateCareTraits();
@@ -1318,11 +1446,27 @@ function recordPetting(amount) {
     warmEgg(amount);
     return;
   }
-  const now = Date.now();
+  const now = nowTime();
   careStats.grime = clamp(careStats.grime - amount * 0.00022, 0, 1);
   careStats.petStrokes += amount;
+  let bellyRewarded = false;
+  if (pet.behavior === 'belly' && !bellyState.rewarded && amount > 1.5) {
+    bellyState.rewarded = true;
+    bellyRewarded = true;
+    affectNeed('bond', BELLY_RUB_BOND_GAIN);
+    pet.caption = '믿으니까 보여줌';
+    pet.captionT = 0;
+    pet.happy = 1;
+    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.75));
+  }
   if (now - careStats.lastPetAt > 1400) rememberCare(needs.bond > 0.45 ? '쓰다듬받고 골골거림' : '손길을 기억함');
-  if (amount > 2.4) noteCareAction('pet');
+  if (amount > 2.4) {
+    const routineCompleted = noteCareAction('pet');
+    if (bellyRewarded && routineCompleted) {
+      pet.caption = '믿으니까 보여줌';
+      pet.captionT = 0;
+    }
+  }
   updateCareTraits();
   careStats.lastPetAt = now;
 }
@@ -1342,6 +1486,7 @@ function updateCare(dt, { airborne, speed }) {
 	  }
 	  updateWalkPlace(dt);
 	  updateFurnitureUse(dt);
+	  if (pet.behavior !== 'belly') bellyState.rewarded = false;
 	  roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);
 	  affectNeed('hunger', -dt * (0.00042 + speed * 0.000003) * stageScale('hunger'));
 	  affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 * (isUsingCushion() ? 1.3 : 1) : -dt * (0.0014 + speed * 0.000012) * stageScale('energy'));
@@ -1371,7 +1516,14 @@ function behaviorWeight(name, base) {
 	  if (name === 'sniff') w *= needs.hunger < 0.5 ? 2.2 : 1;
 	  if (name === 'stare') w *= 1 + needs.bond * 1.8;
 	  if (name === 'wheel') w *= place === 'home' && hasFurniture('wheel') && needs.energy > 0.42 && !food && !ball ? 1 : 0;
+	  if (name === 'belly') w *= needs.bond >= 0.7 && place === 'home' && !food && !ball && needs.energy > 0.32 ? 1 : 0;
 	  if (name === 'wiggle') w *= 1 + needs.bond * 1.2;
+  if (name === 'wander' && dayPeriod() === 'morning') w *= 1.4;
+  if (name === 'zoomies' && dayPeriod() === 'morning') w *= 1.4;
+  if (name === 'sniff' && dayPeriod() === 'evening') w *= 1.3;
+  if (name === 'wiggle' && dayPeriod() === 'evening') w *= 1.3;
+  if (name === 'sleep' && dayPeriod() === 'night') w *= 3;
+  if (name === 'zoomies' && dayPeriod() === 'night') w *= 0.3;
   if (hasCareTrait('cuddly') && (name === 'stare' || name === 'wiggle')) w *= 1.45;
   if (hasCareTrait('foodie') && name === 'sniff') w *= 1.55;
   if (hasCareTrait('mellow') && (name === 'plop' || name === 'sleep')) w *= 1.35;

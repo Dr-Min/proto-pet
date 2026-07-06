@@ -191,11 +191,11 @@ function testBattlePebblesAndStats() {
   run(context, 'careStats.stage = "adult"; battle = { y: pet.y }; finishBattle(true);');
   let state = run(context, '({ pebbles: careStats.pebbles, tough: careStats.stats.tough, power: careStats.stats.power })');
   assert(state.pebbles === 4, 'battle win grants four pebbles');
-  assert(near(state.tough, 0.06) && near(state.power, 0.06), 'battle win trains tough and power');
+  assert(near(state.tough, 0.03) && near(state.power, 0.03), 'battle win trains tough and power');
   run(context, 'battle = { y: pet.y }; finishBattle(false);');
   state = run(context, '({ pebbles: careStats.pebbles, tough: careStats.stats.tough, power: careStats.stats.power, caption: pet.caption })');
   assert(state.pebbles === 5, 'battle loss grants one pebble');
-  assert(near(state.tough, 0.09) && near(state.power, 0.09), 'battle loss gives smaller body practice');
+  assert(near(state.tough, 0.045) && near(state.power, 0.045), 'battle loss gives smaller body practice');
   assert(state.caption === '지긴 했는데 이거 주움', 'battle loss uses required pebble caption');
 }
 
@@ -221,7 +221,7 @@ function testWheelSessionTrainsQuickAndCheerBonuses() {
   run(context, 'pet.behavior = "stare"; updateCare(1 / 60, { airborne: false, speed: 0 });');
   const state = run(context, '({ quick: careStats.stats.quick, energy: needs.energy, cheered: furnitureState.wheelCheered })');
   assert(state.cheered === true, 'wheel tap cheer is recorded during a wheel session');
-  assert(near(state.quick, 0.1), 'cheered wheel session gives quick bonus');
+  assert(near(state.quick, 0.04), 'wheel session gives quick bonus');
   assert(state.energy < 0.9, 'wheel session costs energy');
 }
 
