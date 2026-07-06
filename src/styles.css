@@ -26,9 +26,16 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
   canvas { display: block; touch-action: none; }
   #hint {
-    position: fixed; top: 14px; left: 16px;
+    position: fixed; top: 14px; left: 16px; right: 76px;
     font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
     color: var(--text-muted); user-select: none; pointer-events: none;
+  }
+  #memoryBtn {
+    position: fixed; top: 6px; right: 12px; z-index: 3;
+    min-width: 56px; min-height: 44px; padding: 10px 0;
+    border: none; background: transparent; color: var(--text-muted);
+    font: 400 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+    cursor: pointer; touch-action: manipulation;
   }
   #ui {
     position: fixed; left: 0; right: 0; bottom: 0;
@@ -52,7 +59,7 @@
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .bar { width: clamp(56px, 17vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
   .bar i { display: block; height: 100%; width: 50%; background: var(--care-hunger); border-radius: 5px; }
-	  #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn, #notebookCloseBtn, #shopCloseBtn {
+	  #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn {
     min-height: 44px; padding: 10px 14px; border: none; border-radius: 22px;
     background: var(--care-warm); color: #5a4632;
     font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
@@ -65,8 +72,8 @@
   #returnBtn { display: none; width: 100%; background: var(--care-walk); color: #46573d; }
 	  #walkBtn { background: var(--care-walk); color: #46573d; }
 	  #battleBtn { background: var(--care-battle); color: #4d4358; }
-	  #shopBtn, #notebookBtn, #notebookCloseBtn, #shopCloseBtn { background: transparent; color: var(--text-ui); }
-	  #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #shopCloseBtn:active, .shop-buy:active { transform: scale(0.96); }
+	  #shopBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn { background: transparent; color: var(--text-ui); }
+	  #memoryBtn:active, #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #memoryCloseBtn:active, #shopCloseBtn:active, .shop-buy:active { transform: scale(0.96); }
 	  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #notebookBtn.is-locked, .shop-buy:disabled {
 	    opacity: 0.58;
 	    filter: saturate(0.72);
@@ -79,7 +86,7 @@
     touch-action: manipulation;
   }
   #sheetScrim { z-index: 4; }
-	  #notebookScrim, #shopScrim { z-index: 6; }
+	  #notebookScrim, #memoryScrim, #shopScrim { z-index: 6; }
   .bottom-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
     box-sizing: border-box;
@@ -97,7 +104,7 @@
     pointer-events: auto;
   }
   .bottom-sheet[hidden] { display: flex; }
-	  .notebook-panel[hidden], .shop-panel[hidden], .overlay-scrim[hidden] { display: none; }
+	  .notebook-panel[hidden], .memory-panel[hidden], .shop-panel[hidden], .overlay-scrim[hidden] { display: none; }
   .bottom-sheet button {
     width: 100%;
     background: transparent;
@@ -107,7 +114,7 @@
     padding: 12px 10px;
   }
   .bottom-sheet button:active { background: var(--surface-panel-deep); }
-	  .notebook-panel, .shop-panel {
+	  .notebook-panel, .memory-panel, .shop-panel {
 	    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 7;
 	    max-height: min(560px, calc(100dvh - 56px));
 	    box-sizing: border-box;
@@ -117,18 +124,18 @@
 	    color: var(--text-ui);
 	    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
 	  }
-	  .notebook-close, .shop-close {
+	  .notebook-close, .memory-close, .shop-close {
 	    float: right;
 	    min-height: 44px;
 	    padding: 8px 4px;
 	  }
-	  .notebook-content, .shop-content { clear: both; }
-	  .notebook-panel h2, .notebook-panel h3, .notebook-panel p, .shop-panel h2, .shop-panel h3, .shop-panel p { margin: 0; }
-	  .notebook-panel h2, .shop-panel h2 { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--text-ui); }
-	  .notebook-panel h3, .shop-panel h3 { margin-top: 16px; font-size: 12px; line-height: 1.4; font-weight: 600; color: var(--text-muted); }
-	  .notebook-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
-	  .notebook-panel li { padding: 5px 0; color: var(--text-ui); }
-	  .notebook-panel li + li { margin-top: 2px; }
+	  .notebook-content, .memory-content, .shop-content { clear: both; }
+	  .notebook-panel h2, .notebook-panel h3, .notebook-panel p, .memory-panel h2, .memory-panel h3, .shop-panel h2, .shop-panel h3, .shop-panel p { margin: 0; }
+	  .notebook-panel h2, .memory-panel h2, .shop-panel h2 { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--text-ui); }
+	  .notebook-panel h3, .memory-panel h3, .shop-panel h3 { margin-top: 16px; font-size: 12px; line-height: 1.4; font-weight: 600; color: var(--text-muted); }
+	  .notebook-panel ul, .memory-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
+	  .notebook-panel li, .memory-panel li { padding: 5px 0; color: var(--text-ui); }
+	  .notebook-panel li + li, .memory-panel li + li { margin-top: 2px; }
 	  .body-stat { display: grid; grid-template-columns: 48px 1fr; gap: 6px 10px; align-items: baseline; padding: 6px 0; }
 	  .paw-scale { display: flex; gap: 5px; align-items: center; }
 	  .paw-mark {
@@ -144,7 +151,9 @@
 	    box-shadow: 4px -1px 0 var(--text-ui), 8px 1px 0 var(--text-ui);
 	  }
 	  .paw-mark.is-filled { opacity: 0.9; }
-	  .body-observation { grid-column: 2; color: var(--text-muted); }
+	  .body-observation { grid-column: 2; color: var(--text-ui); }
+	  .body-stat-hint { grid-column: 2; margin-top: -4px; color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+	  .memory-groups section:first-child h3 { margin-top: 10px; }
 	  .shop-balance { color: var(--text-muted); }
 	  .shop-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 	  .shop-item { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; min-height: 62px; }

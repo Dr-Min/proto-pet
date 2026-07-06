@@ -156,6 +156,15 @@ All spacing derives from a base of 4px.
 - **Accessibility**: text is visible and concise.
 - **Motion**: no decorative animation.
 
+### Memory Panel
+
+- **Structure**: fixed top-right `기억` text button opens a tonal-shift overlay panel separate from the notebook.
+- **Variants**: today, yesterday, recent day, and old memory groups.
+- **Spacing**: the trigger keeps a 44px touch target and leaves room for the top-left hint.
+- **States**: closed, open, empty fallback through saved memory migration.
+- **Accessibility**: native buttons open and close the panel; grouped headings are visible text.
+- **Motion**: no decorative animation.
+
 ### Care Routine Memory
 
 - **Structure**: saved care state tracks whether meal, rest, and petting happened in the current care cycle.
@@ -232,7 +241,7 @@ All spacing derives from a base of 4px.
 ### Body Notebook Scale
 
 - **Structure**: notebook-only body section for tough, quick, and power using five procedural DOM paw marks.
-- **Variants**: each stat pairs marks with one observation sentence.
+- **Variants**: each stat pairs marks with one observation sentence and one smaller muted growth-path hint.
 - **Spacing**: two-column compact rows fit narrow mobile panels.
 - **States**: 0 to 5 filled marks, with no numeric stat text.
 - **Accessibility**: text observation accompanies the non-numeric visual scale.

@@ -127,13 +127,21 @@ function testBabyPlayIsLocked() {
 
 function testMemoryLogMigratesAndKeepsRecentLines() {
   const context = makeContext();
-  run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, lastCareLine: '손길을 기억함', ts: Date.now() })); loadCareState();`);
+  run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, lastCareLine: '손길을 기억함', lastCareAt: 1234, ts: Date.now() })); loadCareState();`);
   let state = run(context, '({ memoryLog: careStats.memoryLog.slice(), memory: careStats.lastCareLine })');
-  assert(state.memoryLog.length === 1 && state.memoryLog[0] === '손길을 기억함', 'old saves seed memoryLog from lastCareLine');
+  assert(state.memoryLog.length === 1 && state.memoryLog[0].text === '손길을 기억함' && state.memoryLog[0].at === 1234, 'old saves seed memoryLog from lastCareLine with lastCareAt');
+  run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, lastCareLine: '공 가져다줌', memoryLog: ['손길을 기억함', '공 가져다줌'], lastCareAt: 5678, ts: Date.now() })); loadCareState();`);
+  state = run(context, '({ first: careStats.memoryLog[0], last: careStats.memoryLog[careStats.memoryLog.length - 1] })');
+  assert(state.first.text === '손길을 기억함' && state.first.at === 5678, 'string-array memoryLog migrates old entries to objects using lastCareAt');
+  assert(state.last.text === '공 가져다줌' && state.last.at === 5678, 'string-array migration keeps the newest text');
+  run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, lastCareLine: '예전 일', memoryLog: ['예전 일'], ts: Date.now() })); loadCareState();`);
+  state = run(context, 'careStats.memoryLog[0]');
+  assert(state.text === '예전 일' && state.at === 0, 'string-array migration without lastCareAt falls back to old-memory timestamp');
   run(context, 'for (let i = 0; i < 35; i++) rememberCare(`기억 ${i}`);');
   state = run(context, '({ length: careStats.memoryLog.length, first: careStats.memoryLog[0], last: careStats.memoryLog[careStats.memoryLog.length - 1] })');
   assert(state.length === 30, 'memoryLog keeps the recent 30 lines');
-  assert(state.first === '기억 5' && state.last === '기억 34', 'memoryLog drops oldest lines first');
+  assert(state.first.text === '기억 5' && state.last.text === '기억 34', 'memoryLog drops oldest lines first');
+  assert(state.last.at > 0, 'rememberCare records a timestamp');
 }
 
 testEggActionsStayInEgg();

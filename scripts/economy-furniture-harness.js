@@ -172,12 +172,15 @@ function testCushionImprovesSleepRecovery() {
 
 function testFurnitureDrawAndPanelsDoNotThrow() {
   const context = makeContext();
-  run(context, 'careStats.stage = "adult"; careStats.pebbles = 40; careStats.furnitureOwned = ["wheel", "window", "cushion", "plant"]; careStats.stats = { tough: 2, quick: 3, power: 4 }; draw(1); openShop(); openNotebook();');
-  const state = run(context, '({ shopOpen: !shopPanel.hidden, notebookOpen: !notebookPanel.hidden, shopRows: shopList.children.length, bodyRows: notebookBodyStats.children.length })');
+  run(context, 'careStats.stage = "adult"; careStats.pebbles = 40; careStats.furnitureOwned = ["wheel", "window", "cushion", "plant"]; careStats.stats = { tough: 2, quick: 3, power: 4 }; careStats.memoryLog = [{ text: "오늘 일", at: Date.now() }, { text: "어제 일", at: Date.now() - 86400000 }, { text: "먼저 일", at: Date.now() - 2 * 86400000 }, { text: "예전 일", at: 0 }]; draw(1); openShop(); openNotebook(); openMemory();');
+  const state = run(context, '({ shopOpen: !shopPanel.hidden, notebookOpen: !notebookPanel.hidden, memoryOpen: !memoryPanel.hidden, shopRows: shopList.children.length, bodyRows: notebookBodyStats.children.length, bodyHints: notebookBodyStats.children.map(row => row.children[3].textContent), memoryGroups: memoryGroups.children.map(section => section.children[0].textContent) })');
   assert(state.shopOpen === true, 'shop panel opens without rendering errors');
   assert(state.notebookOpen === true, 'notebook panel opens without rendering errors');
+  assert(state.memoryOpen === true, 'memory panel opens without rendering errors');
   assert(state.shopRows === 4, 'shop renders four furniture rows');
   assert(state.bodyRows === 3, 'notebook renders three body rows');
+  assert(state.bodyHints.includes('산책과 싸움 뒤에 느는 듯') && state.bodyHints.includes('공놀이랑 쳇바퀴로 느는 듯') && state.bodyHints.includes('싸움에서 버티면 느는 듯'), 'notebook body rows render growth-path hints');
+  assert(state.memoryGroups.join('|') === '오늘|어제|2일 전|예전', 'memory panel groups entries by relative date');
 }
 
 testMigrationDefaultsAndFetchCarryover();

@@ -9,6 +9,7 @@
 </head>
 <body>
 <div id="hint">탭: 놀래키기 · 문지르기: 쓰다듬기 · 길게/쭉 끌기: 잡기</div>
+<button id="memoryBtn" aria-expanded="false" aria-controls="memoryPanel">기억</button>
 <canvas id="c"></canvas>
 <div id="ui">
   <div id="memoryLine">오늘 아직 아무 일 없음</div>
@@ -53,10 +54,14 @@
       <h3>몸</h3>
       <div id="notebookBodyStats"></div>
     </section>
-    <section>
-      <h3>기억들</h3>
-      <ul id="notebookMemories"></ul>
-    </section>
+  </div>
+</section>
+<div id="memoryScrim" class="overlay-scrim" hidden></div>
+<section id="memoryPanel" class="memory-panel" aria-label="기억" hidden>
+  <button id="memoryCloseBtn" class="memory-close" aria-label="닫기">닫기</button>
+  <div class="memory-content">
+    <h2>기억</h2>
+    <div id="memoryGroups" class="memory-groups"></div>
   </div>
 </section>
 <div id="shopScrim" class="overlay-scrim" hidden></div>

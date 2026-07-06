@@ -22,7 +22,7 @@ const careStats = {
   battleWins: 0,
   lastBattleAt: 0,
   grime: 0,
-  memoryLog: ['아직 세상 구경 전'],
+  memoryLog: [{ text: '아직 세상 구경 전', at: 0 }],
   pebbles: 0,
   lastWalkPebbleDay: -1,
   furnitureOwned: [],
@@ -79,6 +79,11 @@ const STAT_OBSERVATIONS = {
   tough: ['아직 평범함', '산책 뒤 덜 헉헉거림', '요즘 오래 버팀'],
   quick: ['아직 평범함', '요즘 눈에 띄게 빨라짐', '발이 먼저 나감'],
   power: ['아직 평범함', '부딪히면 제법 묵직함', '힘 쓰는 법 조금 앎'],
+};
+const STAT_HINTS = {
+  tough: '산책과 싸움 뒤에 느는 듯',
+  quick: '공놀이랑 쳇바퀴로 느는 듯',
+  power: '싸움에서 버티면 느는 듯',
 };
 const furnitureState = {
   wheelRunT: 0,
@@ -216,9 +221,10 @@ function loadCareState() {
     careStats.lastNapAt = Math.max(0, Number.isFinite(savedLastNapAt) ? savedLastNapAt : careStats.lastNapAt);
     careStats.petStrokes = Math.max(0, Number.isFinite(savedPetStrokes) ? savedPetStrokes : careStats.petStrokes);
     careStats.lastPetAt = Math.max(0, Number.isFinite(savedLastPetAt) ? savedLastPetAt : careStats.lastPetAt);
-    careStats.lastCareLine = typeof saved.lastCareLine === 'string' ? saved.lastCareLine : careStats.lastCareLine;
-    careStats.memoryLog = migrateMemoryLog(saved.memoryLog, careStats.lastCareLine);
+    const memoryFallbackAt = Math.max(0, Number.isFinite(savedLastCareAt) ? savedLastCareAt : 0);
     careStats.lastCareAt = Math.max(0, Number.isFinite(savedLastCareAt) ? savedLastCareAt : careStats.lastCareAt);
+    careStats.lastCareLine = typeof saved.lastCareLine === 'string' ? saved.lastCareLine : careStats.lastCareLine;
+    careStats.memoryLog = migrateMemoryLog(saved.memoryLog, careStats.lastCareLine, memoryFallbackAt);
     careStats.favoriteMeals = Math.max(0, Math.floor(Number.isFinite(savedFavoriteMeals) ? savedFavoriteMeals : careStats.favoriteMeals));
     careStats.routineBits = Math.floor(clamp(Number.isFinite(savedRoutineBits) ? savedRoutineBits : careStats.routineBits, 0, 7));
     careStats.routineCount = Math.max(0, Math.floor(Number.isFinite(savedRoutineCount) ? savedRoutineCount : careStats.routineCount));
@@ -265,9 +271,18 @@ function migrateStage(savedStage, saved) {
   if (!hasHistory) return 'egg';
   return adultConditionCount() >= 2 ? 'adult' : 'baby';
 }
-function migrateMemoryLog(savedLog, currentLine) {
-  if (!Array.isArray(savedLog)) return currentLine ? [currentLine] : [];
-  return savedLog.filter(line => typeof line === 'string' && line.trim()).slice(-30);
+function migrateMemoryLog(savedLog, currentLine, fallbackAt) {
+  const fallbackTime = Number.isFinite(fallbackAt) ? Math.max(0, fallbackAt) : 0;
+  if (!Array.isArray(savedLog)) return currentLine ? [{ text: currentLine, at: fallbackTime }] : [];
+  return savedLog
+    .map(entry => {
+      if (typeof entry === 'string') return { text: entry, at: fallbackTime };
+      if (!entry || typeof entry !== 'object' || typeof entry.text !== 'string') return null;
+      const at = Number(entry.at);
+      return { text: entry.text, at: Math.max(0, Number.isFinite(at) ? at : 0) };
+    })
+    .filter(entry => entry && entry.text.trim())
+    .slice(-30);
 }
 function migrateFurnitureOwned(savedOwned) {
   if (!Array.isArray(savedOwned)) return [];
@@ -1120,8 +1135,9 @@ function careMood() {
 }
 function rememberCare(line) {
   careStats.lastCareLine = line;
-  careStats.lastCareAt = Date.now();
-  careStats.memoryLog.push(line);
+  const now = Date.now();
+  careStats.lastCareAt = now;
+  careStats.memoryLog.push({ text: line, at: now });
   if (careStats.memoryLog.length > 30) careStats.memoryLog.splice(0, careStats.memoryLog.length - 30);
 }
 function hasCareTrait(name) {

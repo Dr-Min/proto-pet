@@ -4,6 +4,7 @@ const gH = document.getElementById('gH'), gE = document.getElementById('gE'), gB
 const feedBtn = document.getElementById('feedBtn');
 const restBtn = document.getElementById('restBtn');
 const playBtn = document.getElementById('playBtn');
+const memoryBtn = document.getElementById('memoryBtn');
 const moreBtn = document.getElementById('moreBtn');
 const returnBtn = document.getElementById('returnBtn');
 const walkBtn = document.getElementById('walkBtn');
@@ -20,7 +21,10 @@ const notebookTraitsSection = document.getElementById('notebookTraitsSection');
 const notebookTraits = document.getElementById('notebookTraits');
 const notebookPebbles = document.getElementById('notebookPebbles');
 const notebookBodyStats = document.getElementById('notebookBodyStats');
-const notebookMemories = document.getElementById('notebookMemories');
+const memoryScrim = document.getElementById('memoryScrim');
+const memoryPanel = document.getElementById('memoryPanel');
+const memoryCloseBtn = document.getElementById('memoryCloseBtn');
+const memoryGroups = document.getElementById('memoryGroups');
 const shopScrim = document.getElementById('shopScrim');
 const shopPanel = document.getElementById('shopPanel');
 const shopCloseBtn = document.getElementById('shopCloseBtn');
@@ -34,6 +38,7 @@ const TRAIT_NOTEBOOK_LABELS = {
 };
 closeMoreSheet();
 closeNotebook();
+closeMemory();
 closeShop();
 feedBtn.addEventListener('click', () => {
   if (isTraveling()) {
@@ -81,6 +86,9 @@ restBtn.addEventListener('click', () => {
 playBtn.addEventListener('click', () => {
   requestPlayBall();
 });
+memoryBtn.addEventListener('click', () => {
+  openMemory();
+});
 moreBtn.addEventListener('click', () => {
   if (moreSheet.hidden) openMoreSheet();
   else closeMoreSheet();
@@ -106,6 +114,8 @@ notebookBtn.addEventListener('click', () => {
 sheetScrim.addEventListener('click', closeMoreSheet);
 notebookScrim.addEventListener('click', closeNotebook);
 notebookCloseBtn.addEventListener('click', closeNotebook);
+memoryScrim.addEventListener('click', closeMemory);
+memoryCloseBtn.addEventListener('click', closeMemory);
 shopScrim.addEventListener('click', closeShop);
 shopCloseBtn.addEventListener('click', closeShop);
 function openMoreSheet() {
@@ -130,6 +140,18 @@ function openNotebook() {
 function closeNotebook() {
   notebookScrim.hidden = true;
   notebookPanel.hidden = true;
+}
+function openMemory() {
+  closeMoreSheet();
+  renderMemoryPanel();
+  memoryScrim.hidden = false;
+  memoryPanel.hidden = false;
+  memoryBtn.setAttribute('aria-expanded', 'true');
+}
+function closeMemory() {
+  memoryScrim.hidden = true;
+  memoryPanel.hidden = true;
+  memoryBtn.setAttribute('aria-expanded', 'false');
 }
 function openShop() {
   closeMoreSheet();
@@ -163,6 +185,48 @@ function statObservation(key, value) {
   if (value <= 3) return lines[1];
   return lines[2];
 }
+function memoryEntriesNewestFirst() {
+  return careStats.memoryLog
+    .map((entry, index) => {
+      if (typeof entry === 'string') return { text: entry, at: 0, index };
+      if (!entry || typeof entry !== 'object') return { text: '', at: 0, index };
+      const at = Number(entry.at);
+      return { text: entry.text, at: Math.max(0, Number.isFinite(at) ? at : 0), index };
+    })
+    .filter(entry => typeof entry.text === 'string' && entry.text.trim())
+    .sort((a, b) => b.at - a.at || b.index - a.index);
+}
+function memoryGroupTitle(at) {
+  if (!at) return '예전';
+  const age = dayStamp(Date.now()) - dayStamp(at);
+  if (age <= 0) return '오늘';
+  if (age === 1) return '어제';
+  if (age <= 6) return `${age}일 전`;
+  return '예전';
+}
+function appendMemoryGroup(title, entries) {
+  const section = document.createElement('section');
+  const heading = document.createElement('h3');
+  const list = document.createElement('ul');
+  heading.textContent = title;
+  for (const entry of entries) appendNotebookItem(list, entry.text);
+  section.appendChild(heading);
+  section.appendChild(list);
+  memoryGroups.appendChild(section);
+}
+function renderMemoryPanel() {
+  memoryGroups.textContent = '';
+  const groups = new Map();
+  for (const entry of memoryEntriesNewestFirst()) {
+    const title = memoryGroupTitle(entry.at);
+    if (!groups.has(title)) groups.set(title, []);
+    groups.get(title).push(entry);
+  }
+  for (const title of ['오늘', '어제', '2일 전', '3일 전', '4일 전', '5일 전', '6일 전', '예전']) {
+    const entries = groups.get(title);
+    if (entries && entries.length) appendMemoryGroup(title, entries);
+  }
+}
 function renderNotebook() {
   notebookStage.textContent = STAGE_NOTEBOOK_LABELS[currentStage()] || '알';
   notebookTraits.textContent = '';
@@ -179,14 +243,15 @@ function renderNotebook() {
     const observation = document.createElement('div');
     observation.className = 'body-observation';
     observation.textContent = statObservation(key, careStats.stats[key]);
+    const hint = document.createElement('div');
+    hint.className = 'body-stat-hint';
+    hint.textContent = STAT_HINTS[key];
     row.appendChild(label);
     row.appendChild(renderPawScale(careStats.stats[key]));
     row.appendChild(observation);
+    row.appendChild(hint);
     notebookBodyStats.appendChild(row);
   }
-  notebookMemories.textContent = '';
-  const memories = careStats.memoryLog.length ? careStats.memoryLog : [careStats.lastCareLine];
-  for (const line of memories.slice().reverse()) appendNotebookItem(notebookMemories, line);
 }
 function renderShop() {
   shopBalance.textContent = `주워온 반짝 ${careStats.pebbles}개`;
