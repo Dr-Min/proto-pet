@@ -31,6 +31,7 @@ const careStats = {
   furnitureOwned: [],
   furniturePlaced: {},
   stats: { tough: 0, quick: 0, power: 0 },
+  league: { defeated: [], current: 'yard' },
 };
 careStats.furniturePlaced = migrateFurniturePlaced(null);
 let food = null;                             // {x, y} 밥그릇
@@ -38,6 +39,7 @@ let ball = null;
 let battle = null;
 let place = 'home';
 let travel = null;
+let battleReturnT = 0;
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const ROUGHNESS_THROW_GAIN = 0.34;
@@ -84,6 +86,44 @@ const DAILY_GREETING_CAPTIONS = {
 };
 const ANNIVERSARY_DAYS = [7, 14, 30, 50, 100];
 const BELLY_RUB_BOND_GAIN = 0.018;
+const LEAGUE_REWARD_PEBBLES = 6;
+const BATTLE_WIN_PEBBLES = 4;
+const BATTLE_REMATCH_PEBBLES = 2;
+const BATTLE_LOSS_PEBBLES = 1;
+const BATTLE_RETURN_DELAY = 1.7;
+const LEAGUES = [
+  {
+    id: 'yard',
+    name: '공터 모임',
+    memory: '공터를 평정한 날',
+    opponents: [
+      { id: 'yard-mungchi', name: '먼지 뭉치', seed: 0x120F17, personality: '겁쟁이', powerCoeff: 0.08, intro: '먼지가 먼저 봄', winLine: '내가 좀 피했음', loseLine: '먼지가 인정함' },
+      { id: 'yard-kongtteok', name: '콩떡', seed: 0xC0A771, personality: '저돌', powerCoeff: 0.22, intro: '콩떡 굴러감', winLine: '콩떡이 이김', loseLine: '콩떡 납작해짐' },
+      { id: 'yard-dubu', name: '두부 반장', seed: 0xD0B0AA, personality: '침착', powerCoeff: 0.46, rival: true, intro: '너 아직 말랑함', rematchLine: '또 왔네 말랑함', winLine: '두부가 안 밀림', loseLine: '두부가 고개 끄덕임' },
+    ],
+  },
+  {
+    id: 'alley',
+    name: '골목 대회',
+    memory: '골목을 지나간 날',
+    opponents: [
+      { id: 'alley-bori', name: '보리알', seed: 0xB0121A, personality: '겁쟁이', powerCoeff: 1.08, intro: '보리알 숨는 중', winLine: '보리알 버팀', loseLine: '보리알 놓침' },
+      { id: 'alley-jelly', name: '젤리 발', seed: 0x9E1177, personality: '저돌', powerCoeff: 1.42, intro: '발이 먼저 옴', winLine: '발이 이김', loseLine: '발이 꼬임' },
+      { id: 'alley-jinsun', name: '골목 진순', seed: 0x711150, personality: '침착', powerCoeff: 1.82, rival: true, intro: '골목은 내 바닥', rematchLine: '바닥 또 밟음?', winLine: '진순이 지킴', loseLine: '진순이 길 비켜줌' },
+    ],
+  },
+  {
+    id: 'town',
+    name: '마을 최강전',
+    memory: '마을 앞에 선 날',
+    opponents: [
+      { id: 'town-nurung', name: '누룽 꼬리', seed: 0x901EAF, personality: '겁쟁이', powerCoeff: 1.96, intro: '꼬리만 보임', winLine: '꼬리가 살림', loseLine: '꼬리도 놀람' },
+      { id: 'town-bbam', name: '빵떡 장군', seed: 0xBBAA90, personality: '저돌', powerCoeff: 2.28, intro: '빵떡 돌진함', winLine: '빵떡 안 멈춤', loseLine: '빵떡 잠깐 멈춤' },
+      { id: 'town-king', name: '최강 말랑', seed: 0xF1A610, personality: '침착', powerCoeff: 2.55, rival: true, intro: '너 이름 작음', rematchLine: '작은 이름 또 옴', winLine: '말랑이 위에 있음', loseLine: '말랑이 인정함' },
+    ],
+  },
+];
+const LEAGUE_OPPONENTS = LEAGUES.flatMap(league => league.opponents.map((opponent, index) => ({ ...opponent, leagueId: league.id, leagueName: league.name, leagueIndex: LEAGUES.indexOf(league), index })));
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
 const STAT_KEYS = ['tough', 'quick', 'power'];
@@ -201,6 +241,7 @@ function saveCareState() {
 	      furnitureOwned: careStats.furnitureOwned,
 	      furniturePlaced: careStats.furniturePlaced,
 	      stats: careStats.stats,
+	      league: careStats.league,
 	      bondMilestone,
       ts: nowTime(),
     }));
@@ -276,6 +317,7 @@ function loadCareState() {
 	    careStats.furnitureOwned = migrateFurnitureOwned(saved.furnitureOwned);
 	    careStats.furniturePlaced = migrateFurniturePlaced(saved.furniturePlaced);
 	    careStats.stats = migrateStats(saved.stats, careStats.fetchCount);
+	    careStats.league = migrateLeague(saved.league, careStats.battleWins);
 	    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     handleReturnEvents(away);
   } catch (_) {}
@@ -345,6 +387,60 @@ function migrateStats(savedStats, fetchCount) {
     stats[key] = clamp(Number.isFinite(value) ? value : stats[key], 0, 5);
   }
   return stats;
+}
+function opponentById(id) {
+  return LEAGUE_OPPONENTS.find(opponent => opponent.id === id) || null;
+}
+function leagueById(id) {
+  return LEAGUES.find(league => league.id === id) || LEAGUES[0];
+}
+function leagueOpponentIds(league) {
+  return league.opponents.map(opponent => opponent.id);
+}
+function migrateLeague(savedLeague, oldBattleWins) {
+  const validIds = LEAGUE_OPPONENTS.map(opponent => opponent.id);
+  const defeated = [];
+  if (savedLeague && typeof savedLeague === 'object' && Array.isArray(savedLeague.defeated)) {
+    for (const id of savedLeague.defeated) {
+      if (validIds.includes(id) && !defeated.includes(id)) defeated.push(id);
+    }
+  } else {
+    const count = Math.floor(clamp(Number(oldBattleWins) || 0, 0, LEAGUE_OPPONENTS.length));
+    for (let i = 0; i < count; i++) defeated.push(LEAGUE_OPPONENTS[i].id);
+  }
+  const savedCurrent = savedLeague && typeof savedLeague === 'object' ? savedLeague.current : '';
+  const next = LEAGUE_OPPONENTS.find(opponent => !defeated.includes(opponent.id));
+  const current = leagueById(typeof savedCurrent === 'string' ? savedCurrent : next && next.leagueId).id;
+  return { defeated, current };
+}
+function isOpponentDefeated(id) {
+  return careStats.league.defeated.includes(id);
+}
+function firstUndefeatedOpponent() {
+  return LEAGUE_OPPONENTS.find(opponent => !isOpponentDefeated(opponent.id)) || LEAGUE_OPPONENTS[LEAGUE_OPPONENTS.length - 1];
+}
+function currentLeague() {
+  const next = firstUndefeatedOpponent();
+  return leagueById(next && next.leagueId ? next.leagueId : careStats.league.current);
+}
+function currentLeagueOpponent() {
+  const league = currentLeague();
+  return LEAGUE_OPPONENTS.find(opponent => opponent.leagueId === league.id && !isOpponentDefeated(opponent.id))
+    || opponentById(league.opponents[league.opponents.length - 1].id);
+}
+function defeatedOpponentsForRematch() {
+  return LEAGUE_OPPONENTS.filter(opponent => isOpponentDefeated(opponent.id));
+}
+function rivalMemoryLine(opponent) {
+  return `${opponent.name}${subjectParticle(opponent.name)} 인정해준 날`;
+}
+function subjectParticle(text) {
+  const code = text.charCodeAt(text.length - 1) - 0xac00;
+  return code >= 0 && code <= 11171 && code % 28 !== 0 ? '이' : '가';
+}
+function markLeagueCurrentFromProgress() {
+  const next = firstUndefeatedOpponent();
+  careStats.league.current = next && next.leagueId ? next.leagueId : LEAGUES[LEAGUES.length - 1].id;
 }
 function migrateAdoptedAt(saved) {
   const candidates = [
@@ -682,8 +778,10 @@ function startTravel(to, options = {}) {
     y: targetY,
     t: 0,
     startBattle: Boolean(options.startBattle),
+    opponentId: typeof options.opponentId === 'string' ? options.opponentId : '',
   };
   clearPlaceObjects();
+  battleReturnT = 0;
   pet.behavior = 'travel';
   pet.behaviorT = 60;
   pet.target.x = exitSide < 0 ? -70 : W + 70;
@@ -720,6 +818,7 @@ function completeTravelStep() {
 	  const destination = travel.to;
 	  const origin = travel.from;
 	  const shouldStartBattle = travel.startBattle;
+	  const opponentId = travel.opponentId;
 	  travel = null;
   if (destination === 'walk') {
     beginWalkVisit();
@@ -734,7 +833,7 @@ function completeTravelStep() {
     pet.behavior = 'sniff';
     pet.behaviorT = rand(BEHAVIORS.sniff.dur[0], BEHAVIORS.sniff.dur[1]);
   } else if (destination === 'battle' && shouldStartBattle) {
-    startBattleHere();
+    startBattleHere(opponentId);
 	  } else {
 	    if (destination === 'home' && origin === 'walk') addStat('tough', 0.02);
 	    pet.caption = randomLine(RETURN_HOME_LINES);
@@ -748,6 +847,16 @@ function updateTravel(dt) {
   travel.t += dt;
   if (travel.t > 5) completeTravelStep();
 }
+function updateBattleReturn(dt) {
+  if (battleReturnT <= 0) return;
+  if (battle || travel || place !== 'battle') {
+    battleReturnT = 0;
+    return;
+  }
+  if (input.mode === 'drag') return;
+  battleReturnT = Math.max(0, battleReturnT - dt);
+  if (battleReturnT <= 0) startTravel('home');
+}
 function fetchSkillLevel() {
   return clamp(careStats.stats.quick / 5, 0, 1);
 }
@@ -758,11 +867,30 @@ function fetchTripMultiplier() {
   return 1 - fetchSkillLevel() * 0.55;
 }
 function battleFocusChance() {
-  return clamp(0.35 + needs.bond * 0.42 + careStats.stats.quick * 0.035 + (hasCareTrait('mellow') ? 0.04 : 0), 0.2, 0.92);
+  return battleCoreFocusChance(playerBattleCoreSide());
 }
 function battlePower() {
-  const foodBoost = hasCareTrait('foodie') && needs.hunger > 0.5 ? 0.08 : 0;
-  return 0.86 + fetchSkillLevel() * 0.2 + careStats.stats.power * 0.025 + needs.energy * 0.18 + needs.bond * 0.18 + foodBoost;
+  return battleCorePower(playerBattleCoreSide());
+}
+function playerBattleCoreSide() {
+  return {
+    seed: genes.seed,
+    personality: hasCareTrait('mellow') ? '침착' : needs.bond < 0.22 ? '겁쟁이' : '저돌',
+    powerCoeff: 0,
+    stats: careStats.stats,
+    condition: { hunger: needs.hunger, energy: needs.energy, bond: needs.bond },
+    traits: careTraitNames(),
+  };
+}
+function opponentBattleCoreSide(opponent) {
+  return {
+    seed: opponent.seed,
+    personality: opponent.personality,
+    powerCoeff: opponent.powerCoeff,
+    stats: { tough: 0, quick: 0, power: 0 },
+    condition: { hunger: 0.65, energy: 0.58, bond: 0 },
+    traits: [],
+  };
 }
 function grantWalkDiscoveryShinyPebble() {
   const today = dayStamp(nowTime());
@@ -1130,7 +1258,7 @@ function recordFetchComplete() {
   for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(1.0, 1.65));
   requestAiLine('fetch_done', false);
 }
-function requestBattle() {
+function requestBattle(opponentId = '') {
   if (battle) {
     cheerBattle();
     return;
@@ -1161,17 +1289,30 @@ function requestBattle() {
     affectNeed('bond', 0.004);
     return;
   }
+  const opponent = opponentById(opponentId) || currentLeagueOpponent();
+  if (!opponent) return;
   if (place !== 'battle') {
-    startTravel('battle', { startBattle: true });
+    startTravel('battle', { startBattle: true, opponentId: opponent.id });
     return;
   }
-  startBattleHere();
+  startBattleHere(opponent.id);
 }
-function startBattleHere() {
+function startBattleHere(opponentId = '') {
+  const opponent = opponentById(opponentId) || currentLeagueOpponent();
+  if (!opponent) return;
   const foeX = pet.x < W / 2 ? W * 0.72 : W * 0.28;
+  const plan = resolveBattleCore({
+    seed: (genes.seed ^ opponent.seed ^ careStats.battleWins) | 0,
+    pet: playerBattleCoreSide(),
+    foe: opponentBattleCoreSide(opponent),
+  });
+  const defeated = isOpponentDefeated(opponent.id);
+  const battleY = clamp(pet.y + rand(-50, 45), H * 0.48, H * 0.78);
   battle = {
     x: clamp(foeX, 90, W - 90),
-    y: clamp(pet.y + rand(-50, 45), H * 0.48, H * 0.78),
+    baseX: clamp(foeX, 90, W - 90),
+    y: battleY,
+    baseY: battleY,
     hp: 1,
     petHp: clamp(0.62 + needs.energy * 0.36 + needs.bond * 0.18, 0.45, 1),
     t: 0,
@@ -1180,11 +1321,16 @@ function startBattleHere() {
     cheerT: 0,
     nextAct: 0.4,
     phase: 'active',
+    opponentId: opponent.id,
+    rematch: defeated,
+    plan,
+    roundIndex: 0,
+    shape: makeBlobGenes(opponent.seed),
   };
   if (ball) ball = null;
   pet.behavior = 'battle';
   pet.behaviorT = 60;
-  pet.caption = randomLine(BATTLE_START_LINES);
+  pet.caption = defeated && opponent.rival ? opponent.rematchLine : opponent.intro || randomLine(BATTLE_START_LINES);
   pet.captionT = 0;
   rememberCare('처음 싸움 구경한 날');
   requestAiLine('battle_start', false);
@@ -1224,8 +1370,10 @@ function cheerBattle() {
     return;
   }
   battle.cheerT = 2.4;
-  if (Math.random() < battleFocusChance()) {
-    battle.hp = clamp(battle.hp - 0.08 - needs.bond * 0.06, 0, 1);
+  const focus = battle.plan && Number.isFinite(battle.plan.focusChance) ? battle.plan.focusChance : battleFocusChance();
+  const heard = focus >= 0.48 || needs.bond >= 0.55;
+  if (heard) {
+    battle.hp = clamp(battle.hp - 0.05 - focus * 0.05 - needs.bond * 0.04, 0, 1);
     pet.happy = Math.max(pet.happy, 0.7);
     pet.caption = randomLine(BATTLE_CHEER_LINES);
     spawn('heart', pet.x + rand(-18, 18), pet.y - pet.r * depthScale() * rand(1.0, 1.5));
@@ -1239,30 +1387,49 @@ function cheerBattle() {
 function finishBattle(won) {
   if (!battle) return;
   const battleY = battle.y;
+  const opponent = battle.opponentId ? opponentById(battle.opponentId) : null;
+  const rematch = Boolean(battle.rematch);
   battle = null;
   pet.behavior = 'stare';
   pet.behaviorT = 2.4;
   careStats.lastBattleAt = nowTime();
   affectNeed('energy', won ? -0.08 : -0.14);
 	  if (won) {
+	    const firstDefeat = opponent && !isOpponentDefeated(opponent.id);
+	    const winCaption = opponent && opponent.loseLine ? opponent.loseLine : randomLine(BATTLE_WIN_LINES);
 	    careStats.battleWins += 1;
 	    addBattleStats(0.03);
 	    affectNeed('bond', 0.028);
 	    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
-	    pet.caption = randomLine(BATTLE_WIN_LINES);
+	    if (firstDefeat) recordOpponentDefeat(opponent);
 	    pet.happy = Math.max(pet.happy, 0.85);
 	    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
-	    grantPebbles(4, SHINY_PEBBLE_CAPTIONS);
+	    grantPebbles(rematch ? BATTLE_REMATCH_PEBBLES : BATTLE_WIN_PEBBLES, SHINY_PEBBLE_CAPTIONS);
+	    pet.caption = winCaption;
 	  } else {
+	    const loseCaption = opponent && opponent.winLine ? opponent.winLine : '지긴 했는데 이거 주움';
 	    addBattleStats(0.015);
 	    rememberCare('싸우고 푹 쉬는 날');
-	    pet.caption = randomLine(BATTLE_LOSE_LINES);
 	    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
 	    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
-	    grantPebbles(1, ['지긴 했는데 이거 주움']);
+	    grantPebbles(BATTLE_LOSS_PEBBLES, ['지긴 했는데 이거 주움']);
+	    pet.caption = loseCaption;
 	  }
   pet.captionT = 0;
+  if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
   requestAiLine(won ? 'battle_win' : 'battle_tired', false);
+}
+function recordOpponentDefeat(opponent) {
+  if (!opponent || isOpponentDefeated(opponent.id)) return;
+  careStats.league.defeated.push(opponent.id);
+  if (opponent.rival) rememberCare(rivalMemoryLine(opponent));
+  const league = leagueById(opponent.leagueId);
+  const cleared = leagueOpponentIds(league).every(id => careStats.league.defeated.includes(id));
+  if (cleared) {
+    rememberCare(league.memory);
+    grantPebbles(LEAGUE_REWARD_PEBBLES, SHINY_PEBBLE_CAPTIONS);
+  }
+  markLeagueCurrentFromProgress();
 }
 function updateBattle(dt) {
   if (!battle) return;
@@ -1272,6 +1439,7 @@ function updateBattle(dt) {
   battle.foeHitT = Math.max(0, battle.foeHitT - dt);
   battle.cheerT = Math.max(0, battle.cheerT - dt);
   const dx = battle.x - pet.x, dy = battle.y - pet.y, d = Math.hypot(dx, dy) || 1;
+  updateBattleFoeMotion(dt);
   pet.target.x = battle.x - Math.sign(dx || pet.dir) * 46;
   pet.target.y = battle.y + 8;
   if (d > 72) {
@@ -1279,28 +1447,52 @@ function updateBattle(dt) {
     pet.vy = lerp(pet.vy, dy / d * 82 * stageScale('speed'), 1 - Math.exp(-8 * dt));
     return;
   }
-  battle.nextAct -= dt;
   pet.vx = lerp(pet.vx, Math.sin(battle.t * 8) * 24, 1 - Math.exp(-9 * dt));
   pet.vy = lerp(pet.vy, Math.cos(battle.t * 5) * 12, 1 - Math.exp(-9 * dt));
-  if (battle.nextAct > 0) return;
-  battle.nextAct = rand(0.48, 0.82);
-  const focused = Math.random() < battleFocusChance();
-  if (focused) {
-    battle.hp = clamp(battle.hp - 0.08 * battlePower(), 0, 1);
-    battle.hitT = 0.22;
-    pet.squashVel = clamp(pet.squashVel - 1.6, -9, 9);
-    spawn('dust', battle.x + rand(-14, 14), battle.y + rand(-6, 6));
+  playBattlePlanRounds();
+  if (battle && battle.t > battle.plan.duration) finishBattle(battle.plan.won);
+}
+function updateBattleFoeMotion(dt) {
+  const opponent = opponentById(battle.opponentId);
+  const personality = opponent ? opponent.personality : '침착';
+  const directionAway = battle.baseX < W / 2 ? -1 : 1;
+  let targetX = battle.baseX;
+  let targetY = battle.baseY;
+  if (personality === '겁쟁이') {
+    targetX += directionAway * (24 + Math.sin(battle.t * 2.8) * 10);
+    targetY += Math.cos(battle.t * 2.1) * 14;
+  } else if (personality === '저돌') {
+    targetX += (pet.x - battle.baseX) * 0.16 + Math.sin(battle.t * 6.5) * 10;
+    targetY += (pet.y - battle.baseY) * 0.08;
   } else {
-    battle.petHp = clamp(battle.petHp - 0.045, 0, 1);
-    battle.foeHitT = 0.22;
-    pet.squashVel = clamp(pet.squashVel - 2.4, -10, 10);
-    if (pet.captionT > 1.1) {
-      pet.caption = '헛발질함';
-      pet.captionT = 0;
-    }
+    targetX += Math.sin(battle.t * 2.2) * 16;
+    targetY += Math.cos(battle.t * 2.2) * 8;
   }
-  if (battle.hp <= 0) finishBattle(true);
-  else if (battle.petHp <= 0 || battle.t > 18) finishBattle(false);
+  battle.x = lerp(battle.x, clamp(targetX, 84, W - 84), 1 - Math.exp(-5 * dt));
+  battle.y = lerp(battle.y, clamp(targetY, H * 0.48, H * 0.8), 1 - Math.exp(-5 * dt));
+}
+function playBattlePlanRounds() {
+  if (!battle || !battle.plan || !Array.isArray(battle.plan.rounds)) return;
+  while (battle.roundIndex < battle.plan.rounds.length && battle.t >= battle.plan.rounds[battle.roundIndex].at) {
+    const round = battle.plan.rounds[battle.roundIndex];
+    battle.roundIndex += 1;
+    battle.hp = clamp(round.foeHp, 0, 1);
+    battle.petHp = clamp(round.petHp, 0, 1);
+    if (round.actor === 'pet') {
+      battle.hitT = 0.22;
+      pet.squashVel = clamp(pet.squashVel - 1.6, -9, 9);
+      spawn('dust', battle.x + rand(-14, 14), battle.y + rand(-6, 6));
+    } else {
+      battle.foeHitT = 0.22;
+      pet.squashVel = clamp(pet.squashVel - 2.4, -10, 10);
+      if (pet.captionT > 1.1) {
+        pet.caption = '헛발질함';
+        pet.captionT = 0;
+      }
+    }
+    if (round.decisive) finishBattle(battle.plan.won);
+    if (!battle) return;
+  }
 }
 function careMood() {
   if (isEggStage()) return 'egg';
@@ -1473,6 +1665,7 @@ function recordPetting(amount) {
 function updateCare(dt, { airborne, speed }) {
   updateTravel(dt);
   updateBattle(dt);
+  updateBattleReturn(dt);
   if (pet.stageTween) {
     pet.stageTween.t += dt;
     if (pet.stageTween.t >= pet.stageTween.dur) pet.stageTween = null;

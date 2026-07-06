@@ -33,6 +33,20 @@
   <button id="shopBtn">상점</button>
   <button id="notebookBtn">수첩</button>
 </div>
+<div id="battleScrim" class="overlay-scrim" hidden></div>
+<section id="battlePanel" class="battle-panel" aria-label="전투" hidden>
+  <button id="battleCloseBtn" class="battle-close" aria-label="닫기">닫기</button>
+  <div class="battle-content">
+    <h2>전투</h2>
+    <p id="battleLeagueName"></p>
+    <div id="battleOpponentCard" class="battle-opponent-card"></div>
+    <button id="battleChallengeBtn" class="battle-challenge">도전</button>
+    <section id="battleRematchSection">
+      <h3>다시 만난 애들</h3>
+      <div id="battleRematchList" class="battle-rematch-list"></div>
+    </section>
+  </div>
+</section>
 <div id="notebookScrim" class="overlay-scrim" hidden></div>
 <section id="notebookPanel" class="notebook-panel" aria-label="수첩" hidden>
   <button id="notebookCloseBtn" class="notebook-close" aria-label="닫기">닫기</button>
@@ -75,6 +89,7 @@
   </div>
 </section>
 <script src="./src/render.js" defer></script>
+<script src="./src/battle-core.js" defer></script>
 <script src="./src/app.js" defer></script>
 <script src="./src/care.js" defer></script>
 <script src="./src/input.js" defer></script>

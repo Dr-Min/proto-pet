@@ -13,6 +13,14 @@ const shopBtn = document.getElementById('shopBtn');
 const notebookBtn = document.getElementById('notebookBtn');
 const sheetScrim = document.getElementById('sheetScrim');
 const moreSheet = document.getElementById('moreSheet');
+const battleScrim = document.getElementById('battleScrim');
+const battlePanel = document.getElementById('battlePanel');
+const battleCloseBtn = document.getElementById('battleCloseBtn');
+const battleLeagueName = document.getElementById('battleLeagueName');
+const battleOpponentCard = document.getElementById('battleOpponentCard');
+const battleChallengeBtn = document.getElementById('battleChallengeBtn');
+const battleRematchSection = document.getElementById('battleRematchSection');
+const battleRematchList = document.getElementById('battleRematchList');
 const notebookScrim = document.getElementById('notebookScrim');
 const notebookPanel = document.getElementById('notebookPanel');
 const notebookCloseBtn = document.getElementById('notebookCloseBtn');
@@ -38,6 +46,7 @@ const TRAIT_NOTEBOOK_LABELS = {
   mellow: '느긋함',
 };
 closeMoreSheet();
+closeBattlePanel();
 closeNotebook();
 closeMemory();
 closeShop();
@@ -103,8 +112,7 @@ walkBtn.addEventListener('click', () => {
   closeMoreSheet();
 });
 battleBtn.addEventListener('click', () => {
-  requestBattle();
-  closeMoreSheet();
+  openBattlePanel();
 });
 shopBtn.addEventListener('click', () => {
   openShop();
@@ -113,6 +121,13 @@ notebookBtn.addEventListener('click', () => {
   openNotebook();
 });
 sheetScrim.addEventListener('click', closeMoreSheet);
+battleScrim.addEventListener('click', closeBattlePanel);
+battleCloseBtn.addEventListener('click', closeBattlePanel);
+battleChallengeBtn.addEventListener('click', () => {
+  const opponentId = battleChallengeBtn.dataset.opponentId || '';
+  closeBattlePanel();
+  requestBattle(opponentId);
+});
 notebookScrim.addEventListener('click', closeNotebook);
 notebookCloseBtn.addEventListener('click', closeNotebook);
 memoryScrim.addEventListener('click', closeMemory);
@@ -132,8 +147,19 @@ function closeMoreSheet() {
   moreSheet.hidden = true;
   moreBtn.setAttribute('aria-expanded', 'false');
 }
+function openBattlePanel() {
+  closeMoreSheet();
+  renderBattlePanel();
+  battleScrim.hidden = false;
+  battlePanel.hidden = false;
+}
+function closeBattlePanel() {
+  battleScrim.hidden = true;
+  battlePanel.hidden = true;
+}
 function openNotebook() {
   closeMoreSheet();
+  closeBattlePanel();
   renderNotebook();
   notebookScrim.hidden = false;
   notebookPanel.hidden = false;
@@ -144,6 +170,7 @@ function closeNotebook() {
 }
 function openMemory() {
   closeMoreSheet();
+  closeBattlePanel();
   renderMemoryPanel();
   memoryScrim.hidden = false;
   memoryPanel.hidden = false;
@@ -156,6 +183,7 @@ function closeMemory() {
 }
 function openShop() {
   closeMoreSheet();
+  closeBattlePanel();
   renderShop();
   shopScrim.hidden = false;
   shopPanel.hidden = false;
@@ -168,6 +196,65 @@ function appendNotebookItem(list, text) {
   const item = document.createElement('li');
   item.textContent = text;
   list.appendChild(item);
+}
+function appendBattleOpponentCard(container, opponent, line) {
+  container.textContent = '';
+  const preview = document.createElement('canvas');
+  preview.className = 'battle-preview';
+  preview.setAttribute('aria-hidden', 'true');
+  if (typeof preview.getContext === 'function') drawOpponentPreviewCanvas(preview, opponent);
+  const text = document.createElement('div');
+  const name = document.createElement('div');
+  name.className = 'battle-opponent-name';
+  name.textContent = opponent.name;
+  const oneLine = document.createElement('div');
+  oneLine.className = 'battle-opponent-line';
+  oneLine.textContent = line;
+  text.appendChild(name);
+  text.appendChild(oneLine);
+  container.appendChild(preview);
+  container.appendChild(text);
+}
+function battlePanelLocked() {
+  return currentStage() !== 'adult' || needs.energy < 0.28 || Boolean(battle) || isTraveling();
+}
+function renderBattlePanel() {
+  const league = currentLeague();
+  const opponent = currentLeagueOpponent();
+  const defeated = isOpponentDefeated(opponent.id);
+  const line = defeated && opponent.rival ? opponent.rematchLine : opponent.intro;
+  battleLeagueName.textContent = league.name;
+  appendBattleOpponentCard(battleOpponentCard, opponent, line);
+  battleChallengeBtn.dataset.opponentId = opponent.id;
+  battleChallengeBtn.textContent = defeated ? '재도전' : '도전';
+  setButtonLocked(battleChallengeBtn, battlePanelLocked());
+  battleRematchList.textContent = '';
+  const rematches = defeatedOpponentsForRematch();
+  battleRematchSection.hidden = rematches.length === 0;
+  for (const rematch of rematches) {
+    const row = document.createElement('div');
+    row.className = 'rematch-row';
+    const text = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'battle-opponent-name';
+    name.textContent = rematch.name;
+    const note = document.createElement('div');
+    note.className = 'battle-rematch-note';
+    note.textContent = '다시 하면 반짝 반만';
+    text.appendChild(name);
+    text.appendChild(note);
+    const button = document.createElement('button');
+    button.className = 'rematch-btn';
+    button.textContent = '재대결';
+    button.disabled = battlePanelLocked();
+    button.addEventListener('click', () => {
+      closeBattlePanel();
+      requestBattle(rematch.id);
+    });
+    row.appendChild(text);
+    row.appendChild(button);
+    battleRematchList.appendChild(row);
+  }
 }
 function renderPawScale(value) {
   const scale = document.createElement('div');
@@ -317,7 +404,10 @@ function updateGauges() {
   setButtonLocked(notebookBtn, false);
   returnBtn.textContent = traveling ? '이동중' : '귀가';
   setButtonLocked(returnBtn, traveling);
-  if (place !== 'home' || traveling) closeMoreSheet();
+  if (place !== 'home' || traveling) {
+    closeMoreSheet();
+    closeBattlePanel();
+  }
 }
 
 // ---------- 루프 ----------

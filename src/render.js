@@ -115,24 +115,99 @@ function drawBattleObject() {
   ctx.beginPath();
   ctx.ellipse(0, br * 0.78, br * 0.92, br * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = BATTLE_FOE;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, br * (0.82 + battle.hitT * 0.18), br * (0.68 - battle.hitT * 0.08), 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = BATTLE_FOE_DARK;
-  ctx.lineWidth = outlineWidth(br);
-  ctx.stroke();
-  ctx.fillStyle = BATTLE_FOE_DARK;
-  ctx.beginPath();
-  ctx.arc(-br * 0.23, -br * 0.08, br * 0.07, 0, Math.PI * 2);
-  ctx.arc(br * 0.23, -br * 0.08, br * 0.07, 0, Math.PI * 2);
-  ctx.fill();
+  drawOpponentBlob(0, 0, br, battle.shape || makeBlobGenes(11), battle.t, battle.hitT);
   ctx.globalAlpha = 0.78;
   ctx.fillRect(-br * 0.62, -br * 0.95, br * 1.24 * battle.hp, br * 0.08);
   ctx.restore();
 }
 
+function drawOpponentBlob(cx, cy, r, shape, t, hitT = 0, targetCtx = ctx) {
+  const g = targetCtx;
+  const body = shape && shape.body ? shape.body : BATTLE_FOE;
+  const bodyDark = shape && shape.bodyDark ? shape.bodyDark : BATTLE_FOE_DARK;
+  const belly = shape && shape.belly ? shape.belly : 'rgba(255,250,240,0.45)';
+  const lumps = shape && Array.isArray(shape.lumps) ? shape.lumps : [0, 0, 0, 0, 0, 0, 0, 0];
+  const aspect = shape && Number.isFinite(shape.bodyAspect) ? shape.bodyAspect : 1;
+  const earScale = shape && Number.isFinite(shape.earScale) ? shape.earScale : 1;
+  const earSpread = shape && Number.isFinite(shape.earSpread) ? shape.earSpread : 0.52;
+  const squashX = 1 + hitT * 0.18;
+  const squashY = 1 - hitT * 0.08;
+  g.save();
+  g.translate(cx, cy);
+  g.scale(squashX, squashY);
+  g.fillStyle = bodyDark;
+  for (const side of [-1, 1]) {
+    g.save();
+    g.translate(side * r * earSpread, -r * 0.55);
+    g.rotate(side * 0.28 + Math.sin(t * 5 + side) * 0.04);
+    g.beginPath();
+    g.moveTo(-r * 0.18, 0);
+    g.quadraticCurveTo(0, -r * 0.46 * earScale, r * 0.18, 0);
+    g.closePath();
+    g.fillStyle = body;
+    g.fill();
+    g.strokeStyle = OUTLINE;
+    g.lineWidth = outlineWidth(r);
+    g.stroke();
+    g.restore();
+  }
+  g.strokeStyle = bodyDark;
+  g.lineWidth = Math.max(2.4, r * 0.13);
+  g.lineCap = 'round';
+  for (const side of [-1, 1]) {
+    g.beginPath();
+    g.moveTo(side * r * 0.28, r * 0.48);
+    g.lineTo(side * r * 0.36, r * 0.72);
+    g.stroke();
+  }
+  drawLumpyBlobOn(g, 0, 0, r * 0.82 * aspect, r * 0.68, lumps, t * 1.4, 0.018);
+  g.fillStyle = body;
+  g.fill();
+  g.strokeStyle = OUTLINE;
+  g.lineWidth = outlineWidth(r);
+  g.stroke();
+  g.beginPath();
+  g.ellipse(0, r * 0.28, r * 0.42, r * 0.26, 0, 0, Math.PI * 2);
+  g.fillStyle = belly;
+  g.fill();
+  g.fillStyle = bodyDark;
+  const eyeL = shape && Number.isFinite(shape.eyeL) ? shape.eyeL : 3.3;
+  const eyeR = shape && Number.isFinite(shape.eyeR) ? shape.eyeR : 3.0;
+  g.beginPath();
+  g.arc(-r * 0.23, -r * 0.12, Math.max(1.4, eyeL * r / 28), 0, Math.PI * 2);
+  g.arc(r * 0.22, -r * 0.1, Math.max(1.4, eyeR * r / 28), 0, Math.PI * 2);
+  g.fill();
+  g.beginPath();
+  g.arc(-r * 0.05, r * 0.1, r * 0.07, 0.1 * Math.PI, 0.85 * Math.PI);
+  g.arc(r * 0.08, r * 0.1, r * 0.07, 0.15 * Math.PI, 0.9 * Math.PI);
+  g.strokeStyle = bodyDark;
+  g.lineWidth = Math.max(1.2, r * 0.045);
+  g.stroke();
+  g.restore();
+}
+
+function drawOpponentPreviewCanvas(canvas, opponent) {
+  const pctx = canvas.getContext('2d');
+  if (!pctx || !opponent) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = 96;
+  const height = 72;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  pctx.clearRect(0, 0, width, height);
+  pctx.fillStyle = 'rgba(116,96,72,0.08)';
+  pctx.beginPath();
+  pctx.ellipse(width / 2, 58, 28, 6, 0, 0, Math.PI * 2);
+  pctx.fill();
+  drawOpponentBlob(width / 2, 38, 27, makeBlobGenes(opponent.seed), 0.7, 0, pctx);
+}
+
 function drawLumpyBlobShape(cx, cy, rx, ry, lumps, t, wobble) {
+  drawLumpyBlobOn(ctx, cx, cy, rx, ry, lumps, t, wobble);
+}
+
+function drawLumpyBlobOn(targetCtx, cx, cy, rx, ry, lumps, t, wobble) {
   const n = lumps.length;
   const lastA = (n - 1) / n * Math.PI * 2;
   let prevN = 1 + lumps[n - 1] + Math.sin(lastA * 3 + t) * wobble;
@@ -141,19 +216,19 @@ function drawLumpyBlobShape(cx, cy, rx, ry, lumps, t, wobble) {
   let prevY = cy + Math.sin(lastA) * ry * prevN;
   let curX = cx + rx * curN;
   let curY = cy;
-  ctx.beginPath();
-  ctx.moveTo((prevX + curX) / 2, (prevY + curY) / 2);
+  targetCtx.beginPath();
+  targetCtx.moveTo((prevX + curX) / 2, (prevY + curY) / 2);
   for (let i = 0; i < n; i++) {
     const next = (i + 1) % n;
     const nextA = next / n * Math.PI * 2;
     const nextN = 1 + lumps[next] + Math.sin(nextA * 3 + t) * wobble;
     const nextX = cx + Math.cos(nextA) * rx * nextN;
     const nextY = cy + Math.sin(nextA) * ry * nextN;
-    ctx.quadraticCurveTo(curX, curY, (curX + nextX) / 2, (curY + nextY) / 2);
+    targetCtx.quadraticCurveTo(curX, curY, (curX + nextX) / 2, (curY + nextY) / 2);
     curX = nextX;
     curY = nextY;
   }
-  ctx.closePath();
+  targetCtx.closePath();
 }
 
 function drawHomeWorld(t) {

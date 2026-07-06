@@ -1,3 +1,5 @@
 .claude/
 .vercel
 .env*
+.omo/
+install-korean-law-mcp.sh

@@ -225,6 +225,32 @@ function makeGeneRng(seed) {
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 }
+function makeBlobGenes(seed) {
+  const rng = makeGeneRng(seed);
+  const pick = (lo, hi) => lo + rng() * (hi - lo);
+  const hue = pick(24, 42);
+  const sat = pick(34, 50);
+  const light = pick(80, 87);
+  const lump = pick(1.7, 3.0);
+  return {
+    seed,
+    hue,
+    sat,
+    light,
+    bodyAspect: pick(0.96, 1.1),
+    earScale: pick(0.84, 1.18),
+    earSpread: pick(0.48, 0.58),
+    eyeL: pick(3.0, 4.2),
+    eyeR: pick(2.5, 3.7),
+    eyeTilt: pick(-2.2, 0.8),
+    tailLen: pick(7, 10),
+    lump,
+    lumps: makeLumps(rng, 14, lump),
+    body: `hsl(${hue} ${sat}% ${light}%)`,
+    bodyDark: `hsl(${hue} ${Math.max(24, sat - 8)}% ${Math.max(68, light - 12)}%)`,
+    belly: `hsla(${hue + 8} 70% 96% / 0.58)`,
+  };
+}
 function loadGeneSeed() {
   const urlSeed = new URLSearchParams(location.search).get('seed');
   if (urlSeed !== null && Number.isInteger(+urlSeed)) return +urlSeed;
