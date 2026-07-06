@@ -65,6 +65,7 @@ function surprisePet() {
   affectNeed('energy', -0.012);
   pet.caption = wokeAtNight ? '…밤임' : pet.dizzy >= 3 ? '@_@ 그만…' : '깜짝!?';
   pet.captionT = 0;
+  petReact(pet.dizzy >= 3 ? 'dizzy' : 'startle', wokeAtNight ? 0.72 : 0.52);
   recordRoughPlay(ROUGHNESS_SURPRISE_GAIN);
   if (pet.behavior === 'sleep' || pet.behavior === 'plop') {
     setTimeout(() => {
@@ -96,6 +97,7 @@ function startDrag(e) {
   pet.behaviorT = Math.max(pet.behaviorT, 1.5);
   pet.caption = randomLine(PICKUP_LINES);
   pet.captionT = 0;
+  petReact('lift', 0.62);
   pet.landCaption = '';
   pet.landingT = 0;
   reanchorFeetToBody(1);
@@ -174,6 +176,7 @@ function bounceReact({ lines, strength, x, y }) {
     pet.captionT = 0;
   }
   pet.landingT = Math.max(pet.landingT, clamp(strength / 1200, 0.22, 0.65));
+  petReact('bounce', 0.42);
   affectNeed('energy', -clamp(strength / 18000, 0.006, 0.06));
   pet.squashVel = clamp(pet.squashVel - clamp(strength / 180, 1.5, 7.5), -12, 12);
   const count = clamp(Math.floor(strength / 180), 2, 7);

@@ -53,6 +53,7 @@ function update(dt) {
           setBehavior('stare');
           pet.caption = routineCompleted ? '나 챙겨줬네' : likedFood ? '이거 좋아!' : '다 먹어버림';
           pet.captionT = 0;
+          petReact('proud', likedFood ? 0.78 : 0.62);
         }
       }
     }
@@ -269,6 +270,10 @@ function update(dt) {
   if (pet.nextBlink <= 0) { pet.blink = 0.14; pet.nextBlink = rand(1.5, 4.5); }
   pet.blink = Math.max(0, pet.blink - dt);
   pet.landingT = Math.max(0, pet.landingT - dt);
+  if (pet.reactionT > 0) {
+    pet.reactionT = Math.max(0, pet.reactionT - dt);
+    if (pet.reactionT <= 0) pet.reactionKind = '';
+  }
 
   // 귀 움찔
   pet.nextTwitch -= dt;

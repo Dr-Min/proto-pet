@@ -187,7 +187,7 @@ All spacing derives from a base of 4px.
 - **Spacing**: separate from the tutorial sign; desktop centers it, mobile pins it to the top-left so it does not collide with `외출/기록`.
 - **States**: rank updates from daily care, walk returns, and battle wins.
 - **Accessibility**: visible text; details appear again inside the notebook.
-- **Motion**: rank-up feedback uses existing captions and hearts only.
+- **Motion**: rank-up feedback uses existing captions, hearts, and the pet's short proud reaction pulse.
 
 ### Tutorial Sign
 
@@ -355,12 +355,14 @@ All spacing derives from a base of 4px.
 | Press | browser frame | transform | Button active scale |
 | Pet motion | simulation loop | spring-like | Body squash, feet, tail |
 | Pet pose change | 0.35-0.65s | lerp/spring-like | Behavior transitions such as sleep, plop, belly, eating return |
+| Pet caption reaction | 0.4-1s | sine pulse layered on canvas rig | Short lines such as surprise, caught ball, gift, rank-up, and bounce captions |
 
 ### Rules
 
 - Keep UI motion minimal; the pet animation carries the personality.
 - Animate only transform or canvas-rendered motion.
 - Behavior changes must preserve visual continuity: body scale, body center, feet/paws, eyes, and face position follow the new pose through `pet.pose` blending rather than switching frames immediately.
+- Caption reactions must stay additive: `pet.reactionKind` may briefly lift ears, squash/stretch the body, or change eye shape, but it must not replace the underlying behavior animation.
 - Pointer interactions must support both mouse and touch.
 
 ## 7. Depth & Surface

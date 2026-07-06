@@ -78,7 +78,7 @@ const WALK_DONE_LINES = ['집 갈까?', '발 쉬자', '냄새 다 봤어', '집 
 const SHINY_PEBBLE_CAPTIONS = ['이거 줄게', '반짝 찾았어', '작은 거 봐', '반짝 물고 옴', '입에서 선물 나옴', '작은 보물 배송'];
 const ROUTINE_PEBBLE_CAPTIONS = ['이거 줄게', '고마워서 줌', '반짝 놓고 갈게', '입에서 선물 나옴', '작은 보상 배송', '반짝 반납 중'];
 const WHEEL_FALL_CAPTIONS = ['어지러워', '바퀴가 셌어', '나 졌어', '바퀴 승리', '다리 꼬이는 중'];
-const WHEEL_RUN_CAPTIONS = ['나 빨라?', '한 바퀴 더', '멈추는 법 까먹음', '발 시험 중', '바퀴 안 출근', '달리기 하는 척'];
+const WHEEL_RUN_CAPTIONS = ['나 빨라?', '한 바퀴 더', '멈추는 법 까먹음', '발 시험 중', '바퀴 출근 중', '달리기 하는 척'];
 const CUSHION_SLEEP_CAPTIONS = ['여기 좋아', '잘래…', '푹신해', '몸이 녹는 중', '쿠션에 잡힘', '말랑 충전 중'];
 const BUTTERFLY_START_LINES = ['저거 뭐야?', '잡아볼래', '기다려 봐', '눈 따라가는 중', '작은 거 추적 중', '코까지 출동'];
 const BUTTERFLY_MISS_LINES = ['놓쳤다', '봤으니까 됐어', '눈으로 잡았어', '작은 패배'];
@@ -254,6 +254,7 @@ function grantKinship(kind, amount, xp) {
     pet.caption = `${rank.name} 됐다`;
     pet.captionT = 0;
     pet.happy = Math.max(pet.happy, 0.85);
+    petReact('proud', 0.95);
     for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
   }
   saveCareState();
@@ -277,6 +278,7 @@ function updateBondMilestone() {
   pet.captionT = 0;
   rememberCare(milestone.line);
   pet.happy = Math.max(pet.happy, 0.75);
+  petReact('proud', 0.85);
   for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
 }
 
@@ -777,6 +779,7 @@ function recordWheelSession(fell) {
   affectNeed('energy', furnitureState.wheelCheered ? -0.06 : -0.05);
   pet.caption = fell ? randomLine(WHEEL_FALL_CAPTIONS) : randomLine(WHEEL_RUN_CAPTIONS);
   pet.captionT = 0;
+  petReact(fell ? 'dizzy' : 'proud', fell ? 0.8 : 0.68);
   if (!fell) pet.happy = Math.max(pet.happy, 0.55);
 }
 function cheerWheelAt(x, y) {
@@ -786,6 +789,7 @@ function cheerWheelAt(x, y) {
   if (dist(x, y, anchor.x, anchor.y - 28 * s) > 54 * s) return false;
   furnitureState.wheelCheered = true;
   pet.happy = Math.max(pet.happy, 0.8);
+  petReact('proud', 0.65);
   affectNeed('bond', 0.006);
   for (let i = 0; i < 3; i++) spawn('heart', anchor.x + rand(-18, 18), anchor.y - 52 * s + rand(-8, 8));
     pet.caption = '구경 중';
@@ -828,6 +832,7 @@ function grantPebbles(count, captions) {
   pet.caption = randomLine(captions);
   pet.captionT = 0;
   pet.happy = Math.max(pet.happy, 0.62);
+  petReact('gift', 0.85);
   for (let i = 0; i < Math.min(6, count + 2); i++) spawn('spark', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(0.7, 1.45));
   saveCareState();
   return count;
@@ -1164,10 +1169,12 @@ function missButterfly(onNose) {
     butterfly.noseT = 1.35;
     pet.caption = randomLine(BUTTERFLY_NOSE_LINES);
     pet.squashVel = clamp(pet.squashVel - 1.2, -8, 8);
+    petReact('startle', 0.58);
   } else {
     butterfly.active = false;
     butterfly.cooldown = rand(10, 18);
     pet.caption = randomLine(BUTTERFLY_MISS_LINES);
+    petReact('dizzy', 0.48);
   }
   pet.captionT = 0;
   pet.behavior = 'stare';
@@ -1335,6 +1342,7 @@ function recordRoughPlay(amount) {
   }
   pet.caption = closeEnough && Math.random() < 0.5 ? randomLine(ROUGH_FUN_LINES) : randomLine(ROUGH_HURT_LINES);
   pet.captionT = 0;
+  petReact(closeEnough ? 'bounce' : 'dizzy', closeEnough ? 0.55 : 0.82);
   return true;
 }
 function pickBallTarget() {
@@ -1429,6 +1437,7 @@ function catchBall() {
   ball.jvy = 0;
   pet.caption = randomLine(FETCH_CAUGHT_LINES);
   pet.captionT = 0;
+  petReact('proud', 0.48);
 }
 function abandonFetchBall() {
   if (!ball) return;
@@ -1479,6 +1488,7 @@ function recordFetchComplete() {
   pet.caption = learnedFetch ? randomLine(FETCH_SKILL_LINES) : randomLine(FETCH_DONE_LINES);
   pet.captionT = 0;
   pet.happy = Math.max(pet.happy, 0.8);
+  petReact('proud', 0.82);
   for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(1.0, 1.65));
   requestAiLine('fetch_done', false);
 }
@@ -1912,6 +1922,7 @@ function finishBattle(won) {
     grantPebbles(rematch ? BATTLE_REMATCH_PEBBLES : BATTLE_WIN_PEBBLES, SHINY_PEBBLE_CAPTIONS);
     const rankedUp = grantKinship('battle', 1, 5);
     if (!rankedUp) pet.caption = winCaption;
+    petReact('proud', 0.95);
     battle.phase = 'defeated';
     battle.defeatT = 0;
     battle.defeatDir = battle.x >= pet.x ? 1 : -1;
@@ -1930,6 +1941,7 @@ function finishBattle(won) {
     for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
     grantPebbles(BATTLE_LOSS_PEBBLES, ['졌지만 이거 봐', '작은 반짝 챙김']);
     pet.caption = loseCaption;
+    petReact('dizzy', 1);
     pet.defeatT = 5.6;
     pet.rollSpin = 0;
     pet.vx = returnSide * BATTLE_DEFEAT_RETURN_SPEED * 0.82;
@@ -2084,6 +2096,7 @@ function revealCareTrait(name) {
   pet.caption = trait.caption;
   pet.captionT = 0;
   pet.happy = Math.max(pet.happy, 0.72);
+  petReact('proud', 0.82);
   for (let i = 0; i < 4; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
   return true;
 }
@@ -2198,6 +2211,7 @@ function recordPetting(amount) {
     pet.caption = '믿으니까 보여줘';
     pet.captionT = 0;
     pet.happy = 1;
+    petReact('proud', 0.62);
     for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.75));
   }
   if (now - careStats.lastPetAt > 1400) rememberCare(needs.bond > 0.45 ? '쓰다듬받고 골골거림' : '손길을 기억함');
@@ -2249,6 +2263,7 @@ function updateCare(dt, { airborne, speed }) {
   } else if (needs.bond > 0.65 && pet.captionT > 6 && Math.random() < dt * 0.35) {
     pet.caption = randomLine(BOND_LINES);
     pet.captionT = 0;
+    petReact('proud', 0.65);
   }
 }
 function behaviorWeight(name, base) {

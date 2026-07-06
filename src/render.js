@@ -906,14 +906,20 @@ function drawEars(r, phase) {
   const tw = pet.earTwitch;
   const heldOrFalling = input.mode === 'drag' || pet.jy < -8;
   const mellow = petHasTrait('mellow');
+  const alertPulse = clamp(
+    reactionPulse('startle') + reactionPulse('lift') * 0.65 + reactionPulse('dizzy') * 0.45 + reactionPulse('proud') * 0.25 + reactionPulse('gift') * 0.25,
+    0,
+    1
+  );
   const earScale = geneValue('earScale', 1) * stageScale('ear');
   const earSpread = geneValue('earSpread', 0.52);
   for (const side of [-1, 1]) {
     let twitch = 0;
     if (tw.side === side && tw.t < 0.4) twitch = Math.sin(tw.t * 28) * 0.25 * (1 - tw.t / 0.4);
+    const baseTilt = heldOrFalling ? 0.43 : mellow ? 0.22 : 0.3;
     ctx.save();
-    ctx.translate(side * r * earSpread, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0) + (mellow ? r * 0.035 : 0));
-    ctx.rotate(side * (heldOrFalling ? 0.43 : mellow ? 0.22 : 0.3) + twitch * (heldOrFalling ? 0.35 : mellow ? 0.65 : 1));
+    ctx.translate(side * r * earSpread, -r * 0.66 + (heldOrFalling ? r * 0.06 : 0) + (mellow ? r * 0.035 : 0) - alertPulse * r * 0.08);
+    ctx.rotate(side * (baseTilt + alertPulse * 0.08) + twitch * (heldOrFalling ? 0.35 : mellow ? 0.65 : 1));
     if (phase === 'outer') {
       ctx.beginPath();
       ctx.moveTo(-r * 0.27, 0);
@@ -992,6 +998,12 @@ function posePulse() {
   return Math.sin(age / 0.48 * Math.PI);
 }
 
+function reactionPulse(kind) {
+  if (pet.reactionKind !== kind || !(pet.reactionT > 0) || !(pet.reactionDur > 0)) return 0;
+  const age = clamp(1 - pet.reactionT / pet.reactionDur, 0, 1);
+  return Math.sin(age * Math.PI);
+}
+
 function draw(t) {
   ctx.clearRect(0, 0, W, H);
   drawWorld(t);
@@ -1013,6 +1025,12 @@ function draw(t) {
   const sniffBlend = poseValue('sniff');
   const plopBlend = poseValue('plop');
   const wiggleBlend = poseValue('wiggle');
+  const liftPulse = reactionPulse('lift');
+  const startlePulse = reactionPulse('startle');
+  const dizzyPulse = reactionPulse('dizzy');
+  const proudPulse = reactionPulse('proud');
+  const giftPulse = reactionPulse('gift');
+  const bouncePulse = reactionPulse('bounce');
   const loafBlend = clamp(Math.max(sleepBlend * 0.42, plopBlend * 0.78), 0, 1);
   const defeatedPose = (pet.defeatT || 0) > 0;
   const sy = pet.squash, sx = 1 + (1 - sy) * 0.85;
@@ -1022,10 +1040,10 @@ function draw(t) {
   const breathe = lerp(Math.sin(t * 2.6) * 0.015, Math.sin(t * 1.6) * 0.035, sleepBlend);
   const normalCy = pet.y + pet.jy + bob - r * sy;
   const bellyCy = pet.y + pet.jy - r * 0.46;
-  const cy = lerp(normalCy, bellyCy, bellyBlend) + loafBlend * r * 0.08;
+  const cy = lerp(normalCy, bellyCy, bellyBlend) + loafBlend * r * 0.08 - r * (startlePulse * 0.08 + liftPulse * 0.05 + proudPulse * 0.04 + giftPulse * 0.03);
   const settle = posePulse();
-  const bodyScaleX = lerp(sx + breathe, 1.28 + breathe, bellyBlend) + loafBlend * 0.12 + settle * 0.025;
-  const bodyScaleY = clamp(lerp(sy - breathe, 0.68 - breathe * 0.45, bellyBlend) - loafBlend * 0.1 - settle * 0.018, 0.5, 1.55);
+  const bodyScaleX = lerp(sx + breathe, 1.28 + breathe, bellyBlend) + loafBlend * 0.12 + settle * 0.025 - startlePulse * 0.04 - liftPulse * 0.025 + proudPulse * 0.035 + giftPulse * 0.025 + bouncePulse * 0.035;
+  const bodyScaleY = clamp(lerp(sy - breathe, 0.68 - breathe * 0.45, bellyBlend) - loafBlend * 0.1 - settle * 0.018 + startlePulse * 0.08 + liftPulse * 0.055 - proudPulse * 0.025 - giftPulse * 0.018 - bouncePulse * 0.035 + dizzyPulse * 0.035, 0.5, 1.55);
 
   // 그림자
   ctx.fillStyle = 'rgba(120,100,70,0.18)';
@@ -1114,6 +1132,7 @@ function draw(t) {
   ctx.save();
   ctx.translate(pet.x, cy);
   if (defeatedPose) ctx.rotate(pet.rollSpin || Math.sin(t * 7) * 0.2);
+  ctx.rotate(startlePulse * Math.sin(t * 22) * 0.035 + dizzyPulse * Math.sin(t * 18) * 0.08 + bouncePulse * Math.sin(t * 24) * 0.045);
   if (wiggleBlend > 0.01) ctx.rotate(Math.sin(t * 14) * 0.13 * wiggleBlend);
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
   ctx.scale(bodyScaleX, bodyScaleY);
@@ -1155,12 +1174,14 @@ function draw(t) {
   const held = input.mode === 'drag';
   const falling = pet.jy < -8 && pet.landCaption;
   const justLanded = pet.landingT > 0;
-  const eyeClose = clamp(sleepBlend + (pet.blink > 0 ? 1 : 0) + plopBlend * clamp((0.78 - pet.squash) / 0.3, 0, 1), 0, 1);
+  let eyeClose = clamp(sleepBlend + (pet.blink > 0 ? 1 : 0) + plopBlend * clamp((0.78 - pet.squash) / 0.3, 0, 1), 0, 1);
   const mood = careMood();
   const hungryEyes = mood === 'hungry';
   const tiredEyes = mood === 'tired';
   const shyEyes = mood === 'shy';
-  const happyEyes = pet.happy > 0.5 || mood === 'content';
+  const startleEyes = !held && !falling && !justLanded && (startlePulse > 0.12 || liftPulse > 0.28);
+  if (startleEyes) eyeClose = 0;
+  const happyEyes = pet.happy > 0.5 || mood === 'content' || proudPulse > 0.08 || giftPulse > 0.08;
 
   if (defeatedPose) {
     ctx.save();
@@ -1192,7 +1213,11 @@ function draw(t) {
       if (eyeClose < 0.98) {
         ctx.save();
         ctx.globalAlpha *= 1 - eyeClose;
-        if (tiredEyes) {
+        if (startleEyes) {
+          ctx.beginPath();
+          ctx.ellipse(ex, ey + 0.2 * s, e.r * 1.35, e.r * 1.55, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (tiredEyes) {
           ctx.beginPath();
           ctx.moveTo(ex - 4.6 * s, ey + 0.6 * s);
           ctx.quadraticCurveTo(ex, ey + 3.3 * s, ex + 4.6 * s, ey + 0.6 * s);

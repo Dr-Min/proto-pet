@@ -335,6 +335,7 @@ const pet = {
   blink: 0, nextBlink: 1,
   earTwitch: { side: 0, t: 9 }, nextTwitch: 3,   // 가끔 귀 움찔
   happy: 0, dizzy: 0,
+  reactionKind: '', reactionT: 0, reactionDur: 0,
   defeatT: 0,
   rollSpin: 0,
   tripT: 0,
@@ -664,7 +665,7 @@ const CAPTIONS = {
   belly: ['거기 좋아', '믿으니까 보여줘', '배는 조심히', '배 보이는 중', '하늘 보는 중', '말랑 공개 중'],
   eat: ['맛있다', '나 이거 좋아', '살았다', '입 바쁨', '냠냠 처리 중', '밥그릇 감시 중'],
   fetch: ['공 줘!', '내가 갈게', '잡아볼래', '공 추격 중', '입 준비 중', '공만 보는 중'],
-  wheel: ['나 빨라?', '한 바퀴 더', '어지럽진 않아', '발 시험 중', '바퀴 안 출근', '달리기 하는 척'],
+  wheel: ['나 빨라?', '한 바퀴 더', '어지럽진 않아', '발 시험 중', '바퀴 출근 중', '달리기 하는 척'],
   butterfly: ['저거 뭐야?', '잡아볼래', '기다려 봐', '눈 따라가는 중', '작은 거 추적 중', '코까지 출동'],
   battle: ['나 해볼게', '괜찮아', '보고 있어', '진지한 척', '발에 힘 주는 중', '작은 용기 장착'],
   travel: ['같이 가', '어디야?', '나간다', '이동 중', '발 출근 중', '밖으로 굴러가는 중'],
@@ -677,6 +678,11 @@ const BOUNCE_LINES = ['통!', '퐁!', '또 튄다', '나 돌아왔어', '벽 있
 const PETTING_LINES = ['좋아…', '거기 좋아', '조금만 더', '나 이거 좋아', '손 따뜻해', '가만히 있을래', '눈 풀리는 중', '기분 녹는 중', '털 정리되는 중', '행복 저장 중'];
 const BOND_LINES = ['옆에 있을래', '나 너 좋아', '같이 있자', '멀리 가지 마', '너 오면 좋아', '손 기다리는 중', '옆자리 지키는 중', '껌딱지 준비 중'];
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
+function petReact(kind, dur = 0.6) {
+  pet.reactionKind = kind;
+  pet.reactionDur = dur;
+  pet.reactionT = Math.max(pet.reactionT || 0, dur);
+}
 function poseTargetForBehavior(name) {
   return {
     belly: name === 'belly' ? 1 : 0,
