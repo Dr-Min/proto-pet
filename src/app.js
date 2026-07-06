@@ -76,6 +76,42 @@ genes.body = `hsl(${genes.hue} ${genes.sat}% ${genes.light}%)`;
 genes.bodyDark = `hsl(${genes.hue} ${Math.max(24, genes.sat - 8)}% ${Math.max(68, genes.light - 12)}%)`;
 genes.belly = `hsla(${genes.hue + 8} 70% 96% / 0.58)`;
 
+const STAGES = ['egg', 'baby', 'adult'];
+const STAGE_PREVIEW = new URLSearchParams(location.search).get('stage');
+const FAST_PREVIEW = new URLSearchParams(location.search).get('fast') === '1';
+const STAGE_SCALES = {
+  egg: { body: 0.74, eye: 1, eyeYOffset: 0, ear: 0, tail: 0, leg: 0, speed: 0, trip: 0, hunger: 0, energy: 0, zoomies: 0 },
+  baby: { body: 0.62, eye: 1.35, eyeYOffset: 0.06, ear: 0.85, tail: 0.7, leg: 0.6, speed: 0.85, trip: 1.8, hunger: 1.2, energy: 1.25, zoomies: 1.3 },
+  adult: { body: 1.12, eye: 1, eyeYOffset: 0, ear: 1, tail: 1.1, leg: 1.15, speed: 1.1, trip: 0.7, hunger: 1, energy: 1, zoomies: 1 },
+};
+function validStage(stage) { return STAGES.includes(stage); }
+function stagePreview() { return validStage(STAGE_PREVIEW) ? STAGE_PREVIEW : ''; }
+function isStagePreview() { return stagePreview() !== ''; }
+function currentStage() {
+  if (isStagePreview()) return stagePreview();
+  if (typeof careStats === 'undefined' || !validStage(careStats.stage)) return 'egg';
+  return careStats.stage;
+}
+function stageScale(name) {
+  const stage = currentStage();
+  const target = STAGE_SCALES[stage][name];
+  if (typeof pet !== 'undefined' && pet.stageTween && !isStagePreview()) {
+    const from = STAGE_SCALES[pet.stageTween.from][name];
+    const to = STAGE_SCALES[pet.stageTween.to][name];
+    const t = clamp(pet.stageTween.t / pet.stageTween.dur, 0, 1);
+    return lerp(from, to, 1 - Math.pow(1 - t, 3));
+  }
+  return target;
+}
+function stagedRadius() { return pet.r * depthScale() * stageScale('body'); }
+function stageAgeSeconds() {
+  if (typeof careStats === 'undefined') return 0;
+  const changedAt = Number.isFinite(careStats.stageChangedAt) ? careStats.stageChangedAt : Date.now();
+  return Math.max(0, (Date.now() - changedAt) / 1000);
+}
+function eggHatchSeconds() { return FAST_PREVIEW ? 5 : 20; }
+function adultGrowthSeconds() { return FAST_PREVIEW ? 60 : 24 * 3600; }
+
 // ---------- 펫 상태 ----------
 const pet = {
   x: 0, y: 0,          // 지면 위치 (y가 클수록 앞/아래)
@@ -98,12 +134,23 @@ const pet = {
   captionT: 0,
   landCaption: '',
   landingT: 0,
+  eggShakeT: 0,
+  hatchFxT: 0,
+  stageTween: null,
   zTimer: 0,
   lumps: [],           // 몸통 비대칭 울퉁불퉁 (개체 고유)
+  eggSpots: [],
 };
 pet.x = W / 2; pet.y = H * 0.62;
 pet.target.x = pet.x; pet.target.y = pet.y;
 for (let i = 0; i < 14; i++) pet.lumps.push((geneRand() * 2 - 1) * genes.lump);
+for (let i = 0; i < 3; i++) {
+  pet.eggSpots.push({
+    x: genePick(-0.34, 0.34),
+    y: genePick(-0.36, 0.28),
+    r: genePick(0.055, 0.105),
+  });
+}
 
 // PC에서 보이는 현재 비율을 기준으로 모바일에서도 같은 체감 크기를 유지한다.
 function applySize() { pet.r = 46; }
@@ -135,10 +182,10 @@ const feet = [-0.62, -0.22, 0.22, 0.62].map((ox, i) => ({
 let stepClock = 0;
 
 function footBodyTarget(f) {
-  const s = depthScale(), r = pet.r * s;
+  const s = depthScale(), r = stagedRadius(), legScale = stageScale('leg');
   return {
     x: pet.x + f.ox * r * 0.9,
-    y: pet.y + pet.jy + r * 0.34 + Math.abs(f.ox) * 3 * s,
+    y: pet.y + pet.jy + r * (0.34 * legScale) + Math.abs(f.ox) * 3 * s * legScale,
   };
 }
 
@@ -173,7 +220,11 @@ function updateHeldFeet(dt) {
 }
 
 function updateFeet(dt) {
-  const s = depthScale(), r = pet.r * s;
+  if (currentStage() === 'egg') {
+    reanchorFeetToBody(1);
+    return;
+  }
+  const s = depthScale(), r = stagedRadius(), legScale = stageScale('leg');
   const speed = Math.hypot(pet.vx, pet.vy);
   stepClock += dt;
   if (input.mode === 'drag') {
@@ -186,7 +237,7 @@ function updateFeet(dt) {
   }
   for (const f of feet) {
     const idealX = pet.x + f.ox * r;
-    const idealY = pet.y + Math.abs(f.ox) * 4 * s;
+    const idealY = pet.y + Math.abs(f.ox) * 4 * s * legScale;
     if (f.lift < 0) {
       const d = Math.hypot(idealX - f.x, idealY - f.y);
       const thresh = speed > 150 ? 10 : 16;
@@ -240,7 +291,7 @@ function updateChain(ch, ax, ay, dt, gravity, windX) {
       const a = ch.pts[i - 1], b = ch.pts[i];
       const dx = b.x - a.x, dy = b.y - a.y;
       const d = Math.hypot(dx, dy) || 1;
-      const diff = (d - ch.segLen * depthScale()) / d;
+      const diff = (d - ch.segLen * depthScale() * stageScale('tail')) / d;
       b.x -= dx * diff; b.y -= dy * diff;
     }
   }
@@ -300,6 +351,7 @@ const BEHAVIORS = {
   sleep:   { w: 0.6, dur: [6, 10] },
   eat:     { w: 0, dur: [60, 60] },
   fetch:   { w: 0, dur: [60, 60] },
+  battle:  { w: 0, dur: [60, 60] },
 };
 const CAPTIONS = {
   wander: ['어슬렁어슬렁', '산책 중', '어디 가는진 모름'],
@@ -311,6 +363,7 @@ const CAPTIONS = {
   sleep: ['Zzz…', '꿈나라'],
   eat: ['밥이다!!', '우걱우걱'],
   fetch: ['공이다!!', '잡으러 감'],
+  battle: ['진지해짐', '나가봄'],
 };
 const PICKUP_LINES = ['어? 나?', '들렸어…', '왜 공중이야', '잠깐만', '발이 없어짐'];
 const CARRY_LINES = ['어디가…', '나 이동중…', '발 안 닿아…', '공중 산책', '주인 손이다'];
@@ -321,6 +374,7 @@ const PETTING_LINES = ['좋아…', '거기 좋아', '손이다 손', '나 지�
 const BOND_LINES = ['옆에 있을래', '너 냄새 안다', '나 너 좋아', '같이 있자'];
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
 function setBehavior(name) {
+  if (currentStage() === 'egg' && name !== 'stare') name = 'stare';
   pet.behavior = name;
   const b = BEHAVIORS[name];
   pet.behaviorT = rand(b.dur[0], b.dur[1]);
@@ -335,10 +389,11 @@ function pickTarget() {
   pet.target.y = rand(H * 0.42, H * 0.82);
 }
 function nextBehavior() {
+  if (currentStage() === 'egg') return setBehavior('stare');
   if (food && needs.hunger < 0.98) return setBehavior('eat');
   if (typeof tryResumeFetch === 'function' && tryResumeFetch()) return;
   if (needs.energy < 0.16) return setBehavior('sleep');
-  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch');
+  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch' && n !== 'battle');
   let total = entries.reduce((s, [n, b]) => s + behaviorWeight(n, b), 0);
   let roll = Math.random() * total;
   for (const [name, b] of entries) { roll -= behaviorWeight(name, b); if (roll <= 0) return setBehavior(name); }
@@ -347,7 +402,7 @@ function nextBehavior() {
 
 window.__petDebug = {
   snapshot() {
-    const s = depthScale(), r = pet.r * s;
+    const r = stagedRadius();
     const anchors = feet.map(f => footBodyTarget(f));
     return {
       viewport: { width: W, height: H },
@@ -360,11 +415,15 @@ window.__petDebug = {
         landingT: pet.landingT,
         needs: { ...needs },
         mood: careMood(),
+        stage: currentStage(),
+        stagePreview: stagePreview(),
+        stageAge: stageAgeSeconds(),
         traits: typeof careTraitNames === 'function' ? careTraitNames() : [],
         careStats: { ...careStats },
         genes: { ...genes },
         bondMilestone,
         food: food ? { ...food } : null,
+        battle: typeof battle === 'undefined' || !battle ? null : { ...battle },
         ball: typeof ball === 'undefined' || !ball ? null : { ...ball },
       },
       visualTop: pet.y + pet.jy - r,

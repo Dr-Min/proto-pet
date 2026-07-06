@@ -3,6 +3,7 @@ function update(dt) {
   input.tapCooldown = Math.max(0, input.tapCooldown - dt);
   const dragging = input.mode === 'drag';
   const airborne = !dragging && (Math.abs(pet.jy) > 0.01 || Math.abs(pet.jvy) > 0.01);
+  const eggStage = currentStage() === 'egg';
 
   if (!dragging) pet.behaviorT -= dt;
   pet.captionT += dt;
@@ -10,7 +11,7 @@ function update(dt) {
 
   // 이동
   let desiredVX = 0, desiredVY = 0;
-  if (!dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
+  if (!eggStage && !dragging && pet.behavior === 'fetch' && food && needs.hunger < 0.98) {
     if (ball && ball.phase === 'carried') {
       const mouth = carriedBallPoint();
       ball.x = mouth.x;
@@ -20,13 +21,13 @@ function update(dt) {
     }
     setBehavior('eat');
   }
-  if (!dragging && !airborne && pet.behavior === 'eat' && pet.tripT <= 0) {
+  if (!eggStage && !dragging && !airborne && pet.behavior === 'eat' && pet.tripT <= 0) {
     if (!food) setBehavior('stare');
     else {
       const dx = food.x - pet.x, dy = food.y - pet.y, d = Math.hypot(dx, dy);
       if (d > 34) {
-        desiredVX = dx / d * 150;
-        desiredVY = dy / d * 150;
+        desiredVX = dx / d * 150 * stageScale('speed');
+        desiredVY = dy / d * 150 * stageScale('speed');
         pet.munchT = 0;
       } else {
         pet.munchT += dt;
@@ -51,14 +52,14 @@ function update(dt) {
       }
     }
   }
-  if (!dragging && !airborne && pet.behavior === 'fetch' && pet.tripT <= 0 && !food) {
+  if (!eggStage && !dragging && !airborne && pet.behavior === 'fetch' && pet.tripT <= 0 && !food) {
     if (!ball) {
       setBehavior('stare');
     } else if (ball.fetchState === 'chase') {
       const dx = ball.x - pet.x, dy = ball.y - pet.y, d = Math.hypot(dx, dy);
       if (d > 30) {
-        desiredVX = dx / d * ball.fetchSpeed;
-        desiredVY = dy / d * ball.fetchSpeed;
+        desiredVX = dx / d * ball.fetchSpeed * stageScale('speed');
+        desiredVY = dy / d * ball.fetchSpeed * stageScale('speed');
       } else {
         catchBall();
       }
@@ -69,8 +70,8 @@ function update(dt) {
         const owner = ownerPlayPoint(0.8);
         const dx = owner.x - pet.x, dy = owner.y - pet.y, d = Math.hypot(dx, dy);
         if (d > 34) {
-          desiredVX = dx / d * 220;
-          desiredVY = dy / d * 220;
+          desiredVX = dx / d * 220 * stageScale('speed');
+          desiredVY = dy / d * 220 * stageScale('speed');
         } else {
           const mouth = carriedBallPoint();
           ball.x = mouth.x;
@@ -82,9 +83,9 @@ function update(dt) {
       }
     }
   }
-  const moving = !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
+  const moving = !eggStage && !dragging && !airborne && (pet.behavior === 'wander' || pet.behavior === 'zoomies' || pet.behavior === 'sniff');
   if (moving && pet.tripT <= 0) {
-    const speed = pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62;
+    const speed = (pet.behavior === 'zoomies' ? 260 : pet.behavior === 'sniff' ? 26 : 62) * stageScale('speed');
     const dx = pet.target.x - pet.x, dy = pet.target.y - pet.y;
     const d = Math.hypot(dx, dy);
     if (d > 14) { desiredVX = dx / d * speed; desiredVY = dy / d * speed; }
@@ -104,7 +105,7 @@ function update(dt) {
   }
   pet.y = clamp(pet.y, H * 0.4, H * 0.85);
   if (airborne) {
-    const sideLimit = pet.r * depthScale() * 1.05;
+    const sideLimit = stagedRadius() * 1.05;
     if (pet.x < sideLimit) {
       pet.x = sideLimit;
       pet.vx = Math.abs(pet.vx) * 0.84;
@@ -121,7 +122,8 @@ function update(dt) {
 
   // 가끔 자빠짐 (하찮음의 핵심)
   const sp = Math.hypot(pet.vx, pet.vy);
-  if (!dragging && pet.jy === 0 && sp > 40 && pet.tripT <= 0 && Math.random() < dt * (pet.behavior === 'zoomies' ? 0.35 : 0.07)) {
+  const fetchTrip = pet.behavior === 'fetch' && typeof fetchTripMultiplier === 'function' ? fetchTripMultiplier() : 1;
+  if (!eggStage && !dragging && pet.jy === 0 && sp > 40 && pet.tripT <= 0 && Math.random() < dt * (pet.behavior === 'zoomies' ? 0.35 : 0.07) * stageScale('trip') * fetchTrip) {
     pet.tripT = 0.9;
     pet.squashVel -= 5;
     pet.vx *= 0.15; pet.vy *= 0.15;
@@ -140,12 +142,12 @@ function update(dt) {
   if (!dragging && (pet.jvy !== 0 || pet.jy !== 0)) {
     pet.jvy += 900 * dt; pet.jy += pet.jvy * dt;
     const s = depthScale();
-    const top = pet.y + pet.jy - pet.r * s;
+    const top = pet.y + pet.jy - stagedRadius();
     const topLimit = topBounceLimit();
     if (top < topLimit && pet.jvy < 0) {
-      pet.jy = topLimit + pet.r * s - pet.y;
+      pet.jy = topLimit + stagedRadius() - pet.y;
       pet.jvy = Math.abs(pet.jvy) * 0.72;
-      bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.jvy), x: pet.x, y: pet.y + pet.jy - pet.r * s });
+      bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.jvy), x: pet.x, y: pet.y + pet.jy - stagedRadius() });
     }
     if (pet.jy >= 0) {
       const impact = pet.jvy;
@@ -211,7 +213,7 @@ function update(dt) {
   }
 
   updateFeet(dt);
-  const ts = depthScale(), tr = pet.r * ts;
+  const ts = depthScale(), tr = stagedRadius();
   const tailBob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
   // 기분 좋으면 살랑살랑 흔들림
   const wag = Math.sin(pet.wobblePhase * 5) * (120 + pet.happy * 1600 + needs.bond * 260);

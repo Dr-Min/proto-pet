@@ -95,7 +95,7 @@ function assert(condition, message) {
 function testFetchComplete() {
   const context = makeContext();
   setRandom(context, [0.2, 0.2, 0.5, 0.5]);
-  run(context, 'needs.energy = 0.9; needs.bond = 0.2; __elements.get("playBtn").listeners.click();');
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.9; needs.bond = 0.2; __elements.get("playBtn").listeners.click();');
   tickUntil(context, 'careStats.fetchCount === 1', 'fetch completion');
   const state = run(context, '({ fetchCount: careStats.fetchCount, memory: careStats.lastCareLine, bond: needs.bond, energy: needs.energy, happy: pet.happy, ballGone: ball === null || ball.phase === "fading" })');
   assert(state.fetchCount === 1, 'fetchCount increments after completion');
@@ -109,7 +109,7 @@ function testFetchComplete() {
 function testFetchRefusal() {
   const context = makeContext();
   setRandom(context, [0.2, 0.2, 0.5, 0.5]);
-  run(context, 'needs.energy = 0.2; requestPlayBall();');
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.2; requestPlayBall();');
   tickUntil(context, 'ball && ball.declined === true', 'low-energy refusal');
   const state = run(context, '({ caption: pet.caption, ballStillThere: ball !== null, fetchCount: careStats.fetchCount })');
   assert(['지금은 패스…', '공은 내일'].includes(state.caption), 'low energy refusal caption is used');
@@ -120,7 +120,7 @@ function testFetchRefusal() {
 function testFetchAbandon() {
   const context = makeContext();
   setRandom(context, [0.2, 0.2, 0.5, 0.5]);
-  run(context, 'needs.energy = 0.32; requestPlayBall();');
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.32; requestPlayBall();');
   tickUntil(context, 'ball && ball.fetchState === "return"', 'return phase');
   run(context, 'needs.energy = 0.29; update(1 / 60);');
   const state = run(context, '({ caption: pet.caption, abandoned: ball && ball.abandoned, phase: ball && ball.phase, fetchCount: careStats.fetchCount })');
@@ -130,7 +130,28 @@ function testFetchAbandon() {
   assert(state.fetchCount === 0, 'abandon does not increment fetchCount');
 }
 
+function testFetchPracticeChangesMovement() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; careStats.fetchCount = 0;');
+  const fresh = run(context, '({ speed: fetchChaseSpeed(220), trip: fetchTripMultiplier() })');
+  run(context, 'careStats.fetchCount = 8;');
+  const practiced = run(context, '({ speed: fetchChaseSpeed(220), trip: fetchTripMultiplier() })');
+  assert(practiced.speed > fresh.speed, 'fetch practice increases chase speed');
+  assert(practiced.trip < fresh.trip, 'fetch practice lowers fetch-trip chance');
+}
+
+function testFetchPracticeCaptionCanAppear() {
+  const context = makeContext();
+  setRandom(context, [0.1, 0.5, 0.5, 0.5]);
+  run(context, 'careStats.stage = "adult"; careStats.fetchCount = 4; needs.energy = 0.9; recordFetchComplete();');
+  const state = run(context, '({ caption: pet.caption, fetchCount: careStats.fetchCount })');
+  assert(state.fetchCount === 5, 'fetch complete still increments count before practice caption');
+  assert(state.caption === '이제 좀 익숙함', 'practice caption can appear after repeated fetch');
+}
+
 testFetchComplete();
 testFetchRefusal();
 testFetchAbandon();
+testFetchPracticeChangesMovement();
+testFetchPracticeCaptionCanAppear();
 console.log('fetch harness passed');

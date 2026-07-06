@@ -23,7 +23,15 @@ const input = {
 // ---------- 상호작용 ----------
 function petHitTest(x, y, scale = 1.7) {
   const s = depthScale();
-  return dist(x, y, pet.x, pet.y + pet.jy - pet.r * s) < pet.r * s * scale;
+  if (currentStage() === 'egg') {
+    const rx = pet.r * s * 0.62 * scale;
+    const ry = pet.r * s * 0.82 * scale;
+    const dx = (x - pet.x) / rx;
+    const dy = (y - (pet.y + pet.jy - pet.r * s * 0.68)) / ry;
+    return dx * dx + dy * dy < 1;
+  }
+  const r = stagedRadius();
+  return dist(x, y, pet.x, pet.y + pet.jy - r) < r * scale;
 }
 
 function isTouchPointer(e) { return e.pointerType === 'touch' || e.pointerType === 'pen'; }
@@ -32,6 +40,10 @@ function dragThreshold(e) { return isTouchPointer(e) ? 18 : 12; }
 function rubThreshold(e) { return isTouchPointer(e) ? 7 : 4; }
 
 function surprisePet() {
+  if (isEggStage()) {
+    nudgeEgg();
+    return;
+  }
   if (input.tapCooldown > 0) return;
   input.tapCooldown = 0.16;
   if (pet.jy > -4) pet.jvy = -240;
@@ -113,6 +125,13 @@ function finishPointer(e) {
   const wasDrag = input.mode === 'drag';
   const wasPetting = input.mode === 'pet';
   if (wasDrag) {
+    if (isEggStage()) {
+      pet.vx = 0;
+      pet.vy = 0;
+      pet.jvy = 0;
+      pet.jy = 0;
+      nudgeEgg('여기 놓임');
+    } else {
     const releaseAge = performance.now() - (input.lastMoveAt || input.downAt);
     const fresh = clamp(1 - releaseAge / 320, 0, 1);
     const throwVX = input.releaseVX * fresh;
@@ -129,6 +148,7 @@ function finishPointer(e) {
     if (recordRoughPlay(ROUGHNESS_THROW_GAIN)) pet.landCaption = '';
     pet.behavior = 'stare';
     pet.behaviorT = Math.max(pet.behaviorT, 2.2);
+    }
   } else if (!wasPetting && elapsed < 260 && moved < rubThreshold(e) * 1.4 && petHitTest(e.clientX, e.clientY, 1.8)) {
     surprisePet();
   }
@@ -186,6 +206,15 @@ function updatePetting(dt) {
   const over = Math.hypot(mouse.x - pet.x, mouse.y - (pet.y + pet.jy - pet.r * s)) < pet.r * s * 1.5;
   const moved = Math.hypot(mouse.x - mouse.px, mouse.y - mouse.py);
   if (over && moved > 2 && pet.behavior !== 'zoomies') {
+    if (isEggStage()) {
+      warmEgg(moved);
+      if (pet.captionT > 1) {
+        pet.caption = '따뜻함 저장 중';
+        pet.captionT = 0;
+      }
+      mouse.px = mouse.x; mouse.py = mouse.y;
+      return;
+    }
     pet.happy = clamp(pet.happy + moved * 0.004, 0, 1);
     affectNeed('bond', moved * 0.00011);
     affectNeed('energy', moved * 0.000025);

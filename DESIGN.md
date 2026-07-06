@@ -19,6 +19,7 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Pet/outline | --pet-outline | rgba(96,74,56,0.35) | n/a | Soft outline |
 | Pet/cheek | --pet-cheek | rgba(240,140,130,0.18) | n/a | Cuddly blush, intensified by happy state |
 | Pet/foodie-mark | --pet-foodie-mark | rgba(176,128,82,0.36) | n/a | Small belly dots for foodie trait |
+| Pet/egg-crack | --pet-egg-crack | rgba(96,74,56,0.42) | n/a | Hairline cracks on a warm egg |
 | Care/hunger | --care-hunger | #a8c686 | n/a | Hunger healthy fill |
 | Care/energy | --care-energy | #8fb7d9 | n/a | Energy healthy fill |
 | Care/bond | --care-bond | #e78aa1 | n/a | Bond fill |
@@ -27,8 +28,12 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Care/warm | --care-warm | #e8b87f | n/a | Feed button |
 | Care/cool | --care-cool | #b8c7d7 | n/a | Rest button |
 | Care/play | --care-play | #dba6b4 | n/a | Play/fetch button |
+| Care/battle | --care-battle | #c7b1d8 | n/a | Battle and cheer button |
 | Play/ball | --play-ball | #d98f7a | n/a | Fetch ball body |
 | Play/ball-seam | --play-ball-seam | rgba(96,74,56,0.4) | n/a | Fetch ball stitch line |
+| Battle/foe | --battle-foe | #c9b7a2 | n/a | Small sparring opponent body |
+| Battle/foe-dark | --battle-foe-dark | rgba(90,70,55,0.32) | n/a | Opponent outline and face |
+| Pet/grime | --pet-grime | rgba(96,74,56,0.18) | n/a | Subtle dust marks after long absence |
 | Food/kibble-base | --food-kibble-base | #f0c98b | n/a | Default round food bowl |
 | Food/kibble-top | --food-kibble-top | #d59b57 | n/a | Default round food mound |
 | Food/kibble-bit | --food-kibble-bit | #8c6042 | n/a | Default food bits |
@@ -157,9 +162,27 @@ All spacing derives from a base of 4px.
 - **Structure**: canvas ball launched from the lower center by the play action.
 - **Variants**: soft rose-orange ball body with one muted stitch curve.
 - **Spacing**: target lands inside the lower play field and at least 120px from the pet.
-- **States**: flying, rolling, waiting, carried, fading out, timed out.
+- **States**: flying, rolling, waiting, chased, carried, fading out, timed out, practiced.
 - **Accessibility**: the play action is a native button and pet captions report acceptance, refusal, completion, and timeout.
-- **Motion**: ball reuses the pet's gravity scale, small bounces, ground friction, and existing chase/trip movement.
+- **Motion**: ball reuses the pet's gravity scale, small bounces, ground friction, and existing chase/trip movement. Repeated fetch play subtly raises chase speed and lowers fetch-trip chance without exposing a number.
+
+### Battle Loop
+
+- **Structure**: a single action button starts adult-only auto battle, then becomes cheer while a battle is active.
+- **Variants**: unavailable before adult, start battle, cheer, ignored cheer, win, tired return.
+- **Spacing**: no new gauge; battle uses canvas-only opponent and keeps the bottom control cluster compact on 320px+ mobile.
+- **States**: inactive, active, cheered, won, tired.
+- **Accessibility**: battle and cheer are native button actions, and every battle outcome has a visible pet caption and memory line.
+- **Motion**: opponent is a simple procedural blob; pet movement, dust, hearts, squash, and wobble reuse the existing simulation.
+
+### AI Line Fallback
+
+- **Structure**: optional `/api/pet-line` proxy can generate a short pet-voice line; client falls back to static captions when unavailable.
+- **Variants**: static-only local mode, server fallback, generated line.
+- **Spacing**: no visible UI.
+- **States**: idle, requested, accepted, failed silently.
+- **Accessibility**: generated lines are text captions only; existing static text remains the reliable baseline.
+- **Motion**: none.
 
 ### Gene-Based Pet Shape
 
@@ -169,6 +192,15 @@ All spacing derives from a base of 4px.
 - **States**: persistent per browser profile, testable with `?seed=`.
 - **Accessibility**: variation must not affect care controls.
 - **Motion**: shares the same procedural animation rig.
+
+### Growth Stage
+
+- **Structure**: saved care state tracks `egg`, `baby`, and `adult`; URL preview may force a stage without changing saved progress.
+- **Variants**: egg uses a single tinted oval with seed-based spots; baby keeps a smaller body, bigger lower eyes, shorter legs, smaller ears, and shorter tail; adult keeps the current PC-friendly silhouette with a slightly larger body and steadier movement.
+- **Spacing**: stage scale changes the canvas pet only; bottom care UI remains the same three-gauge structure.
+- **States**: egg, newly hatched baby, growing baby, newly adult, adult.
+- **Accessibility**: unavailable actions are shown with subdued button state and still answer with pet captions when pressed.
+- **Motion**: egg warms through rubbing and small wobble, hatching uses existing dust and heart particles, adult growth uses a short scale tween.
 
 ### Care Mood Face
 

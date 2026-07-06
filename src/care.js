@@ -7,7 +7,7 @@ const careStats = {
   lastNapAt: 0,
   petStrokes: 0,
   lastPetAt: 0,
-  lastCareLine: '오늘 아직 아무 일 없음',
+  lastCareLine: '아직 세상 구경 전',
   lastCareAt: 0,
   favoriteMeals: 0,
   routineBits: 0,
@@ -16,9 +16,16 @@ const careStats = {
   traitMask: 0,
   fetchCount: 0,
   lastPlayAt: 0,
+  stage: 'egg',
+  stageChangedAt: Date.now(),
+  hatchWarmth: 0,
+  battleWins: 0,
+  lastBattleAt: 0,
+  grime: 0,
 };
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
+let battle = null;
 const SAVE_KEY = 'protopet-care-v1';
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const ROUGHNESS_THROW_GAIN = 0.34;
@@ -34,7 +41,17 @@ const FETCH_START_LINES = ['공이다!!', '잡으러 감'];
 const FETCH_CAUGHT_LINES = ['잡았다', '입에 넣음'];
 const FETCH_DONE_LINES = ['가져왔다', '나 잘했지'];
 const FETCH_REFUSE_LINES = ['지금은 패스…', '공은 내일'];
+const FETCH_SKILL_LINES = ['이제 좀 익숙함'];
+const EGG_LINES = ['콩', '아직 안 나감', '안에서 듣는 중'];
+const HATCH_WARM_LINES = ['따뜻함 저장 중', '안쪽이 포근함'];
+const BATTLE_START_LINES = ['나가봄', '앞에 뭐 있음', '진지해짐'];
+const BATTLE_WIN_LINES = ['이겼나 봄', '나 좀 했음', '앞에 없어짐'];
+const BATTLE_LOSE_LINES = ['좀 누울래', '오늘은 여기까지', '다리 쉬는 중'];
+const BATTLE_CHEER_LINES = ['들었음', '힘 조금 남', '나 해봄'];
+const BATTLE_IGNORE_LINES = ['못 들은 척함', '내 맘대로 함'];
+const AI_LINE_COOLDOWN = 12000;
 let sessionFetchRecorded = false;
+let nextAiLineAt = 0;
 const CARE_TRAITS = {
   cuddly: { bit: 1, line: '손길 없으면 허전해짐', caption: '손 찾는 중' },
   foodie: { bit: 2, line: '나 밥 좋아하는 거 들킴', caption: '밥 냄새 기억함' },
@@ -91,6 +108,12 @@ function saveCareState() {
       traitMask: careStats.traitMask,
       fetchCount: careStats.fetchCount,
       lastPlayAt: careStats.lastPlayAt,
+      stage: careStats.stage,
+      stageChangedAt: careStats.stageChangedAt,
+      hatchWarmth: careStats.hatchWarmth,
+      battleWins: careStats.battleWins,
+      lastBattleAt: careStats.lastBattleAt,
+      grime: careStats.grime,
       bondMilestone,
       ts: Date.now(),
     }));
@@ -120,6 +143,11 @@ function loadCareState() {
     const savedTraitMask = Number(saved.traitMask);
     const savedFetchCount = Number(saved.fetchCount);
     const savedLastPlayAt = Number(saved.lastPlayAt);
+    const savedStageChangedAt = Number(saved.stageChangedAt);
+    const savedHatchWarmth = Number(saved.hatchWarmth);
+    const savedBattleWins = Number(saved.battleWins);
+    const savedLastBattleAt = Number(saved.lastBattleAt);
+    const savedGrime = Number(saved.grime);
     needs.hunger = clamp((Number.isFinite(savedHunger) ? savedHunger : needs.hunger) - away * 0.00012, 0, 1);
     needs.energy = clamp((Number.isFinite(savedEnergy) ? savedEnergy : needs.energy) + away * 0.0002, 0, 1);
     needs.bond = clamp(Number.isFinite(savedBond) ? savedBond : needs.bond, 0, 1);
@@ -138,9 +166,15 @@ function loadCareState() {
     careStats.traitMask = Math.floor(clamp(Number.isFinite(savedTraitMask) ? savedTraitMask : careStats.traitMask, 0, 7));
     careStats.fetchCount = Math.max(0, Math.floor(Number.isFinite(savedFetchCount) ? savedFetchCount : careStats.fetchCount));
     careStats.lastPlayAt = Math.max(0, Number.isFinite(savedLastPlayAt) ? savedLastPlayAt : careStats.lastPlayAt);
+    careStats.stage = migrateStage(saved.stage, saved);
+    careStats.stageChangedAt = Math.max(0, Number.isFinite(savedStageChangedAt) ? savedStageChangedAt : Date.now());
+    careStats.hatchWarmth = clamp(Number.isFinite(savedHatchWarmth) ? savedHatchWarmth : (careStats.stage === 'egg' ? 0 : 1), 0, 1);
+    careStats.battleWins = Math.max(0, Math.floor(Number.isFinite(savedBattleWins) ? savedBattleWins : careStats.battleWins));
+    careStats.lastBattleAt = Math.max(0, Number.isFinite(savedLastBattleAt) ? savedLastBattleAt : careStats.lastBattleAt);
+    careStats.grime = clamp((Number.isFinite(savedGrime) ? savedGrime : careStats.grime) + (away > 3 * 3600 ? away * 0.000012 : 0), 0, 1);
     bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     if (away > 60) {
-      pet.caption = '기다렸어…';
+      pet.caption = careStats.grime > 0.55 ? '먼지 좀 붙음' : '기다렸어…';
       pet.captionT = 0;
     }
   } catch (_) {}
@@ -153,6 +187,118 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveC
 function affectNeed(name, delta) {
   needs[name] = clamp(needs[name] + delta, 0, 1);
   if (name === 'bond') updateBondMilestone();
+}
+function adultConditionCount() {
+  let count = 0;
+  if (careStats.mealsFed >= 6) count += 1;
+  if (careStats.napsTaken >= 3) count += 1;
+  if (careStats.petStrokes >= 150) count += 1;
+  return count;
+}
+function migrateStage(savedStage, saved) {
+  if (validStage(savedStage)) return savedStage;
+  const hasHistory = Number(saved.mealsFed) > 0 || Number(saved.napsTaken) > 0 || Number(saved.petStrokes) > 0 || Number(saved.fetchCount) > 0;
+  if (!hasHistory) return 'egg';
+  return adultConditionCount() >= 2 ? 'adult' : 'baby';
+}
+function isEggStage() { return currentStage() === 'egg'; }
+function isBabyStage() { return currentStage() === 'baby'; }
+function canPlayBallNow() { return currentStage() === 'adult'; }
+function fetchSkillLevel() {
+  return clamp(careStats.fetchCount / 8, 0, 1);
+}
+function fetchChaseSpeed(baseSpeed) {
+  return baseSpeed * (1 + fetchSkillLevel() * 0.32);
+}
+function fetchTripMultiplier() {
+  return 1 - fetchSkillLevel() * 0.55;
+}
+function battleFocusChance() {
+  return clamp(0.35 + needs.bond * 0.42 + careStats.fetchCount * 0.018 + (hasCareTrait('mellow') ? 0.04 : 0), 0.2, 0.92);
+}
+function battlePower() {
+  const foodBoost = hasCareTrait('foodie') && needs.hunger > 0.5 ? 0.08 : 0;
+  return 0.86 + fetchSkillLevel() * 0.2 + needs.energy * 0.18 + needs.bond * 0.18 + foodBoost;
+}
+function requestAiLine(event, fallback) {
+  if (typeof fetch !== 'function') return;
+  if (Date.now() < nextAiLineAt) return;
+  nextAiLineAt = Date.now() + AI_LINE_COOLDOWN;
+  fetch('/api/pet-line', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      event,
+      mood: careMood(),
+      stage: currentStage(),
+      needs: { hunger: needs.hunger, energy: needs.energy, bond: needs.bond },
+      traits: careTraitNames(),
+      memory: careStats.lastCareLine,
+    }),
+  })
+    .then(res => res.ok ? res.json() : null)
+    .then(data => {
+      if (!data || typeof data.line !== 'string') return;
+      const line = data.line.trim();
+      if (!line || pet.captionT < 0.8) return;
+      pet.caption = line;
+      pet.captionT = 0;
+      if (fallback) rememberCare(line);
+    })
+    .catch(() => {});
+}
+function nudgeEgg(line) {
+  pet.eggShakeT = Math.max(pet.eggShakeT, 0.7);
+  pet.squashVel = clamp(pet.squashVel - 1.2, -8, 8);
+  pet.caption = line || randomLine(EGG_LINES);
+  pet.captionT = 0;
+}
+function warmEgg(amount) {
+  if (!isEggStage() || isStagePreview()) return;
+  careStats.hatchWarmth = clamp(careStats.hatchWarmth + amount * 0.0012, 0, 1);
+  pet.eggShakeT = Math.max(pet.eggShakeT, 0.36);
+  if (careStats.hatchWarmth > 0.32 && pet.captionT > 1.2) {
+    pet.caption = randomLine(HATCH_WARM_LINES);
+    pet.captionT = 0;
+  }
+}
+function transitionStage(stage) {
+  if (!validStage(stage) || isStagePreview()) return false;
+  const from = careStats.stage;
+  if (from === stage) return false;
+  careStats.stage = stage;
+  careStats.stageChangedAt = Date.now();
+  careStats.hatchWarmth = stage === 'egg' ? 0 : 1;
+  pet.stageTween = from !== 'egg' && stage !== 'egg' ? { from, to: stage, t: 0, dur: 1.5 } : null;
+  return true;
+}
+function tryHatchEgg() {
+  if (!isEggStage() || isStagePreview()) return false;
+  if (careStats.hatchWarmth < 1 || stageAgeSeconds() < eggHatchSeconds()) return false;
+  if (!transitionStage('baby')) return false;
+  rememberCare('알에서 나온 날');
+  pet.caption = '…누구세요';
+  pet.captionT = 0;
+  pet.hatchFxT = 1.2;
+  pet.happy = Math.max(pet.happy, 0.72);
+  pet.jy = 0;
+  pet.jvy = 0;
+  for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-20, 20), pet.y + rand(-10, 8));
+  for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(0.9, 1.5));
+  return true;
+}
+function canGrowAdult() {
+  return isBabyStage() && !isStagePreview() && stageAgeSeconds() >= adultGrowthSeconds() && adultConditionCount() >= 2;
+}
+function tryGrowAdultOnSleep() {
+  if (!canGrowAdult() || !transitionStage('adult')) return false;
+  rememberCare('어른이 된 날');
+  pet.caption = '나 좀 큰 듯';
+  pet.captionT = 0;
+  pet.happy = 1;
+  for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
+  for (let i = 0; i < 5; i++) spawn('dust', pet.x + rand(-26, 26), pet.y + rand(-6, 8));
+  return true;
 }
 function recordRoughPlay(amount) {
   roughPlayState.roughness = clamp(roughPlayState.roughness + amount, 0, 1);
@@ -200,6 +346,20 @@ function launchBall() {
   };
 }
 function requestPlayBall() {
+  if (battle) {
+    pet.caption = '지금 바쁨';
+    pet.captionT = 0;
+    return;
+  }
+  if (!canPlayBallNow()) {
+    if (isEggStage()) nudgeEgg('아직 세상 구경 전');
+    else {
+      pet.caption = '아직 공 몰라';
+      pet.captionT = 0;
+      pet.squashVel = clamp(pet.squashVel - 1.4, -8, 8);
+    }
+    return;
+  }
   if (ball) {
     pet.caption = '공 여기 있어';
     pet.captionT = 0;
@@ -210,6 +370,7 @@ function requestPlayBall() {
   pet.captionT = 0;
 }
 function startFetchBall() {
+  if (!canPlayBallNow()) return false;
   if (!ball || food || ball.abandoned || ball.fetchState === 'return') return false;
   if (needs.energy < 0.25) {
     ball.declined = true;
@@ -219,7 +380,7 @@ function startFetchBall() {
   }
   ball.fetchStarted = true;
   ball.fetchState = ball.phase === 'carried' ? 'return' : 'chase';
-  ball.fetchSpeed = hasCareTrait('mellow') && Math.random() < 0.2 ? 62 : 220;
+  ball.fetchSpeed = hasCareTrait('mellow') && Math.random() < 0.2 ? 62 : fetchChaseSpeed(220);
   setBehavior('fetch');
   if (ball.fetchSpeed === 62) pet.caption = '천천히 가지러 감';
   pet.captionT = 0;
@@ -286,12 +447,144 @@ function recordFetchComplete() {
   if (firstFetch) rememberCare('공 물어오기 배움');
   else if (!sessionFetchRecorded) rememberCare('공 가져다줌');
   sessionFetchRecorded = true;
-  pet.caption = randomLine(FETCH_DONE_LINES);
+  const learnedFetch = careStats.fetchCount >= 3 && Math.random() < clamp(careStats.fetchCount * 0.04, 0.18, 0.42);
+  pet.caption = learnedFetch ? randomLine(FETCH_SKILL_LINES) : randomLine(FETCH_DONE_LINES);
   pet.captionT = 0;
   pet.happy = Math.max(pet.happy, 0.8);
   for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(1.0, 1.65));
+  requestAiLine('fetch_done', false);
+}
+function requestBattle() {
+  if (isEggStage()) {
+    nudgeEgg('아직 세상 구경 전');
+    return;
+  }
+  if (!canPlayBallNow()) {
+    pet.caption = '아직 싸움 몰라';
+    pet.captionT = 0;
+    return;
+  }
+  if (food) {
+    pet.caption = '밥 먼저 봄';
+    pet.captionT = 0;
+    setBehavior('eat');
+    return;
+  }
+  if (needs.energy < 0.28) {
+    pet.caption = '오늘은 누울래';
+    pet.captionT = 0;
+    affectNeed('bond', 0.004);
+    return;
+  }
+  if (battle) {
+    cheerBattle();
+    return;
+  }
+  const foeX = pet.x < W / 2 ? W * 0.72 : W * 0.28;
+  battle = {
+    x: clamp(foeX, 90, W - 90),
+    y: clamp(pet.y + rand(-50, 45), H * 0.48, H * 0.78),
+    hp: 1,
+    petHp: clamp(0.62 + needs.energy * 0.36 + needs.bond * 0.18, 0.45, 1),
+    t: 0,
+    hitT: 0,
+    foeHitT: 0,
+    cheerT: 0,
+    nextAct: 0.4,
+    phase: 'active',
+  };
+  if (ball) ball = null;
+  pet.behavior = 'battle';
+  pet.behaviorT = 60;
+  pet.caption = randomLine(BATTLE_START_LINES);
+  pet.captionT = 0;
+  rememberCare('처음 싸움 구경한 날');
+  requestAiLine('battle_start', false);
+}
+function cheerBattle() {
+  if (!battle || battle.phase !== 'active') return;
+  if (battle.cheerT > 0.2) {
+    pet.caption = '방금 들음';
+    pet.captionT = 0;
+    return;
+  }
+  battle.cheerT = 2.4;
+  if (Math.random() < battleFocusChance()) {
+    battle.hp = clamp(battle.hp - 0.08 - needs.bond * 0.06, 0, 1);
+    pet.happy = Math.max(pet.happy, 0.7);
+    pet.caption = randomLine(BATTLE_CHEER_LINES);
+    spawn('heart', pet.x + rand(-18, 18), pet.y - pet.r * depthScale() * rand(1.0, 1.5));
+    affectNeed('bond', 0.006);
+  } else {
+    pet.caption = randomLine(BATTLE_IGNORE_LINES);
+    affectNeed('bond', 0.002);
+  }
+  pet.captionT = 0;
+}
+function finishBattle(won) {
+  if (!battle) return;
+  const battleY = battle.y;
+  battle = null;
+  pet.behavior = 'stare';
+  pet.behaviorT = 2.4;
+  careStats.lastBattleAt = Date.now();
+  affectNeed('energy', won ? -0.08 : -0.14);
+  if (won) {
+    careStats.battleWins += 1;
+    affectNeed('bond', 0.028);
+    rememberCare(careStats.battleWins === 1 ? '처음 이겨본 날' : '싸움에서 돌아온 날');
+    pet.caption = randomLine(BATTLE_WIN_LINES);
+    pet.happy = Math.max(pet.happy, 0.85);
+    for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
+  } else {
+    rememberCare('싸우고 푹 쉬는 날');
+    pet.caption = randomLine(BATTLE_LOSE_LINES);
+    pet.squashVel = clamp(pet.squashVel - 4, -10, 10);
+    for (let i = 0; i < 6; i++) spawn('dust', pet.x + rand(-26, 26), battleY + rand(-6, 8));
+  }
+  pet.captionT = 0;
+  requestAiLine(won ? 'battle_win' : 'battle_tired', false);
+}
+function updateBattle(dt) {
+  if (!battle) return;
+  if (battle.phase !== 'active') return;
+  battle.t += dt;
+  battle.hitT = Math.max(0, battle.hitT - dt);
+  battle.foeHitT = Math.max(0, battle.foeHitT - dt);
+  battle.cheerT = Math.max(0, battle.cheerT - dt);
+  const dx = battle.x - pet.x, dy = battle.y - pet.y, d = Math.hypot(dx, dy) || 1;
+  pet.target.x = battle.x - Math.sign(dx || pet.dir) * 46;
+  pet.target.y = battle.y + 8;
+  if (d > 72) {
+    pet.vx = lerp(pet.vx, dx / d * 105 * stageScale('speed'), 1 - Math.exp(-8 * dt));
+    pet.vy = lerp(pet.vy, dy / d * 82 * stageScale('speed'), 1 - Math.exp(-8 * dt));
+    return;
+  }
+  battle.nextAct -= dt;
+  pet.vx = lerp(pet.vx, Math.sin(battle.t * 8) * 24, 1 - Math.exp(-9 * dt));
+  pet.vy = lerp(pet.vy, Math.cos(battle.t * 5) * 12, 1 - Math.exp(-9 * dt));
+  if (battle.nextAct > 0) return;
+  battle.nextAct = rand(0.48, 0.82);
+  const focused = Math.random() < battleFocusChance();
+  if (focused) {
+    battle.hp = clamp(battle.hp - 0.08 * battlePower(), 0, 1);
+    battle.hitT = 0.22;
+    pet.squashVel = clamp(pet.squashVel - 1.6, -9, 9);
+    spawn('dust', battle.x + rand(-14, 14), battle.y + rand(-6, 6));
+  } else {
+    battle.petHp = clamp(battle.petHp - 0.045, 0, 1);
+    battle.foeHitT = 0.22;
+    pet.squashVel = clamp(pet.squashVel - 2.4, -10, 10);
+    if (pet.captionT > 1.1) {
+      pet.caption = '헛발질함';
+      pet.captionT = 0;
+    }
+  }
+  if (battle.hp <= 0) finishBattle(true);
+  else if (battle.petHp <= 0 || battle.t > 18) finishBattle(false);
 }
 function careMood() {
+  if (isEggStage()) return 'egg';
   if (needs.hunger < 0.24) return 'hungry';
   if (needs.energy < 0.18) return 'tired';
   if (needs.bond < 0.16 && careStats.petStrokes < 24) return 'shy';
@@ -382,6 +675,15 @@ function mealCaption(foodType) {
   return '처음 밥이다';
 }
 function requestRest() {
+  if (battle) {
+    pet.caption = '끝나고 누울래';
+    pet.captionT = 0;
+    return;
+  }
+  if (isEggStage()) {
+    nudgeEgg('잠은 안에서 자는 중');
+    return;
+  }
   if (food && needs.hunger < 0.7) {
     pet.caption = '밥 먹고 잘래';
     pet.captionT = 0;
@@ -406,9 +708,15 @@ function requestRest() {
   pet.captionT = 0;
   pet.zTimer = 0.2;
   pet.squashVel = clamp(pet.squashVel - 1.5, -8, 8);
+  tryGrowAdultOnSleep();
 }
 function recordPetting(amount) {
+  if (isEggStage()) {
+    warmEgg(amount);
+    return;
+  }
   const now = Date.now();
+  careStats.grime = clamp(careStats.grime - amount * 0.00022, 0, 1);
   careStats.petStrokes += amount;
   if (now - careStats.lastPetAt > 1400) rememberCare(needs.bond > 0.45 ? '쓰다듬받고 골골거림' : '손길을 기억함');
   if (amount > 2.4) noteCareAction('pet');
@@ -416,13 +724,26 @@ function recordPetting(amount) {
   careStats.lastPetAt = now;
 }
 function updateCare(dt, { airborne, speed }) {
+  updateBattle(dt);
+  if (pet.stageTween) {
+    pet.stageTween.t += dt;
+    if (pet.stageTween.t >= pet.stageTween.dur) pet.stageTween = null;
+  }
+  if (pet.hatchFxT > 0) pet.hatchFxT = Math.max(0, pet.hatchFxT - dt);
+  if (pet.eggShakeT > 0) pet.eggShakeT = Math.max(0, pet.eggShakeT - dt);
+  if (isEggStage()) {
+    if (tryHatchEgg()) return;
+    if (!isStagePreview()) careStats.hatchWarmth = clamp(careStats.hatchWarmth - dt * 0.004, 0, 1);
+    return;
+  }
   roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);
-  affectNeed('hunger', -dt * (0.00042 + speed * 0.000003));
-  affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012));
+  affectNeed('hunger', -dt * (0.00042 + speed * 0.000003) * stageScale('hunger'));
+  affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012) * stageScale('energy'));
   if (!airborne && input.mode !== 'drag' && !food && pet.behavior !== 'sleep' && needs.energy < 0.1) {
     setBehavior('sleep');
     pet.caption = '스르륵…';
     pet.captionT = 0;
+    tryGrowAdultOnSleep();
   }
   if (needs.hunger < 0.24 && pet.captionT > 4) {
     pet.caption = '밥 생각 중…';
@@ -440,6 +761,7 @@ function behaviorWeight(name, base) {
   if (name === 'sleep') w *= needs.energy < 0.3 ? 5 : needs.energy < 0.6 ? 2 : 1;
   if (name === 'plop') w *= needs.energy < 0.4 ? 2.2 : 1;
   if (name === 'zoomies' || name === 'wiggle') w *= needs.energy < 0.35 ? 0.15 : 1;
+  if (name === 'zoomies') w *= stageScale('zoomies');
   if (name === 'sniff') w *= needs.hunger < 0.5 ? 2.2 : 1;
   if (name === 'stare') w *= 1 + needs.bond * 1.8;
   if (name === 'wiggle') w *= 1 + needs.bond * 1.2;
