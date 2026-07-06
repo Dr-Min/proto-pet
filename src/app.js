@@ -171,6 +171,69 @@ function carriedBallPoint() {
 function topBounceLimit() { return Math.max(78, H * 0.1); }
 function outlineWidth(r) { return clamp(r * 0.043, 1.8, 2.15); }
 
+function makeLumps(rng, count, range) {
+  const lumps = [];
+  for (let i = 0; i < count; i++) lumps.push((rng() * 2 - 1) * range);
+  return lumps;
+}
+function makeWalkGrass(rng, count) {
+  const clusters = [];
+  for (let i = 0; i < count; i++) {
+    const blades = [];
+    const bladeCount = 3 + Math.floor(rng() * 3);
+    for (let j = 0; j < bladeCount; j++) {
+      blades.push({
+        ox: (j - (bladeCount - 1) / 2) * (0.012 + rng() * 0.006),
+        h: 0.038 + rng() * 0.026,
+        lean: -0.45 + rng() * 0.9,
+      });
+    }
+    clusters.push({
+      x: 0.12 + rng() * 0.76,
+      y: 0.48 + rng() * 0.34,
+      phase: rng() * Math.PI * 2,
+      blades,
+    });
+  }
+  return clusters;
+}
+function makePlaceWorld() {
+  const walkRng = makeGeneRng(0x2A11CE);
+  const battleRng = makeGeneRng(0xBA771E);
+  return {
+    walk: {
+      clouds: [
+        { x: 0.2, y: 0.16, rx: 0.09, ry: 0.026, speed: 7, phase: walkRng() * 9, lumps: makeLumps(walkRng, 9, 0.16) },
+        { x: 0.72, y: 0.22, rx: 0.07, ry: 0.022, speed: 4.5, phase: walkRng() * 9, lumps: makeLumps(walkRng, 8, 0.13) },
+      ],
+      grass: makeWalkGrass(walkRng, 6),
+      props: [
+        { kind: 'shrub', x: 0.18, y: 0.61, rx: 0.055, ry: 0.028, phase: walkRng() * 8, lumps: makeLumps(walkRng, 10, 0.18) },
+        { kind: 'stone', x: 0.76, y: 0.68, rx: 0.034, ry: 0.02, phase: walkRng() * 8, lumps: makeLumps(walkRng, 9, 0.14) },
+        { kind: 'shrub', x: 0.62, y: 0.55, rx: 0.044, ry: 0.024, phase: walkRng() * 8, lumps: makeLumps(walkRng, 10, 0.16) },
+      ],
+      sniffSpots: [
+        { x: 0.26, y: 0.62, phase: walkRng() * 8 },
+        { x: 0.68, y: 0.73, phase: walkRng() * 8 },
+      ],
+      butterfly: { x: 0.56, y: 0.44, rx: 0.18, ry: 0.09, phase: walkRng() * 8 },
+    },
+    battle: {
+      ringLumps: makeLumps(battleRng, 18, 0.075),
+      flags: [
+        { x: 0.2, y: 0.51, side: 1, phase: battleRng() * 8 },
+        { x: 0.8, y: 0.51, side: -1, phase: battleRng() * 8 },
+      ],
+      footprints: [
+        { x: 0.37, y: 0.67, r: -0.3, phase: battleRng() * 8 },
+        { x: 0.58, y: 0.73, r: 0.24, phase: battleRng() * 8 },
+        { x: 0.49, y: 0.59, r: 0.1, phase: battleRng() * 8 },
+      ],
+    },
+  };
+}
+const placeWorld = makePlaceWorld();
+
 // ---------- 발: 절차적 걸음 ----------
 // 발은 땅에 붙어 있다가, 몸이 지나가서 너무 멀어지면 앞쪽으로 폴짝 옮겨 딛는다
 const feet = [-0.62, -0.22, 0.22, 0.62].map((ox, i) => ({
@@ -351,6 +414,7 @@ const BEHAVIORS = {
   sleep:   { w: 0.6, dur: [6, 10] },
   eat:     { w: 0, dur: [60, 60] },
   fetch:   { w: 0, dur: [60, 60] },
+  butterfly: { w: 0, dur: [60, 60] },
   battle:  { w: 0, dur: [60, 60] },
   travel:  { w: 0, dur: [60, 60] },
 };
@@ -364,6 +428,7 @@ const CAPTIONS = {
   sleep: ['Zzz…', '꿈나라'],
   eat: ['밥이다!!', '우걱우걱'],
   fetch: ['공이다!!', '잡으러 감'],
+  butterfly: ['잡으러 감', '저거 움직임'],
   battle: ['진지해짐', '나가봄'],
   travel: ['나감', '어디 가는 중'],
 };
@@ -396,7 +461,7 @@ function nextBehavior() {
   if (food && needs.hunger < 0.98) return setBehavior('eat');
   if (typeof tryResumeFetch === 'function' && tryResumeFetch()) return;
   if (needs.energy < 0.16) return setBehavior('sleep');
-  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch' && n !== 'battle' && n !== 'travel');
+  const entries = Object.entries(BEHAVIORS).filter(([n]) => n !== pet.behavior && n !== 'eat' && n !== 'fetch' && n !== 'butterfly' && n !== 'battle' && n !== 'travel');
   let total = entries.reduce((s, [n, b]) => s + behaviorWeight(n, b), 0);
   let roll = Math.random() * total;
   for (const [name, b] of entries) { roll -= behaviorWeight(name, b); if (roll <= 0) return setBehavior(name); }
@@ -428,6 +493,8 @@ window.__petDebug = {
         food: food ? { ...food } : null,
         battle: typeof battle === 'undefined' || !battle ? null : { ...battle },
         ball: typeof ball === 'undefined' || !ball ? null : { ...ball },
+        butterfly: typeof butterfly === 'undefined' ? null : { ...butterfly },
+        walkVisit: typeof walkVisit === 'undefined' ? null : { ...walkVisit },
         place: typeof currentPlace === 'function' ? currentPlace() : 'home',
         travel: typeof travelState === 'function' ? travelState() : null,
       },

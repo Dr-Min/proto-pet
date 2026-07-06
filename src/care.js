@@ -55,6 +55,11 @@ const TRAVEL_BATTLE_LINES = ['싸움터 감', '밖에 일 있음', '진지하게
 const TRAVEL_WALK_LINES = ['밖에 감', '냄새 맡으러 감', '발 바쁨'];
 const WALK_ARRIVE_LINES = ['바깥 냄새 남', '풀 냄새 발견', '여기 넓다'];
 const RETURN_HOME_LINES = ['집이다', '돌아옴', '바닥 익숙함'];
+const WALK_DISCOVERY_LINES = ['풀 냄새 좋은 데 찾음', '냄새 좋은 바닥 찾음'];
+const WALK_DISCOVERY_CAPTIONS = ['여기 냄새 좋음', '킁킁 성공'];
+const BUTTERFLY_START_LINES = ['저거 움직임', '잡으러 감'];
+const BUTTERFLY_MISS_LINES = ['놓쳤다'];
+const BUTTERFLY_NOSE_LINES = ['코에 뭐 있음'];
 const AI_LINE_COOLDOWN = 12000;
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
@@ -74,6 +79,24 @@ const roughPlayState = {
   flightMemoryRecorded: false,
 };
 let bondMilestone = 0;
+const walkVisit = {
+  active: false,
+  discoveries: 0,
+  maxDiscoveries: 0,
+  nextDiscoveryAt: 0,
+  targetSpot: 0,
+  sniffing: false,
+  sniffT: 0,
+};
+const butterfly = {
+  active: false,
+  t: 0,
+  cooldown: 7,
+  x: 0,
+  y: 0,
+  chaseT: 0,
+  noseT: 0,
+};
 
 function bondStage(value) {
   let stage = 0;
@@ -218,6 +241,26 @@ function clearPlaceObjects() {
   food = null;
   ball = null;
 }
+function beginWalkVisit() {
+  walkVisit.active = true;
+  walkVisit.discoveries = 0;
+  walkVisit.maxDiscoveries = Math.random() < 0.55 ? 1 : 2;
+  walkVisit.nextDiscoveryAt = rand(3.5, 7.5);
+  walkVisit.targetSpot = Math.random() < 0.5 ? 0 : 1;
+  walkVisit.sniffing = false;
+  walkVisit.sniffT = 0;
+  butterfly.active = false;
+  butterfly.noseT = 0;
+  butterfly.chaseT = 0;
+  butterfly.cooldown = rand(4.5, 8.5);
+}
+function endWalkVisit() {
+  walkVisit.active = false;
+  walkVisit.sniffing = false;
+  butterfly.active = false;
+  butterfly.noseT = 0;
+  butterfly.chaseT = 0;
+}
 function travelArrivalPoint(to) {
   if (to === 'battle') return { x: W * 0.46, y: H * 0.66 };
   if (to === 'walk') return { x: W * 0.52, y: H * 0.65 };
@@ -245,6 +288,7 @@ function startTravel(to, options = {}) {
   }
   const exitSide = pet.x < W / 2 ? -1 : 1;
   const targetY = clamp(pet.y + rand(-24, 24), H * 0.5, H * 0.78);
+  if (to !== 'walk') endWalkVisit();
   travel = {
     to,
     phase: 'leaving',
@@ -291,6 +335,7 @@ function completeTravelStep() {
   const shouldStartBattle = travel.startBattle;
   travel = null;
   if (destination === 'walk') {
+    beginWalkVisit();
     rememberCare('밖 냄새 맡은 날');
     affectNeed('energy', -0.025);
     affectNeed('bond', 0.012);
@@ -330,6 +375,128 @@ function battleFocusChance() {
 function battlePower() {
   const foodBoost = hasCareTrait('foodie') && needs.hunger > 0.5 ? 0.08 : 0;
   return 0.86 + fetchSkillLevel() * 0.2 + needs.energy * 0.18 + needs.bond * 0.18 + foodBoost;
+}
+function grantWalkDiscoveryShinyPebble() {
+  return 0;
+}
+function walkSniffSpot() {
+  const spots = placeWorld.walk.sniffSpots;
+  return spots[walkVisit.targetSpot % spots.length];
+}
+function completeWalkDiscovery() {
+  walkVisit.discoveries += 1;
+  walkVisit.sniffing = false;
+  walkVisit.sniffT = 0;
+  walkVisit.targetSpot += 1;
+  walkVisit.nextDiscoveryAt = rand(8, 15);
+  rememberCare(randomLine(WALK_DISCOVERY_LINES));
+  grantWalkDiscoveryShinyPebble();
+  pet.caption = randomLine(WALK_DISCOVERY_CAPTIONS);
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.55);
+  pet.behaviorT = Math.max(pet.behaviorT, 1.4);
+  for (let i = 0; i < 3; i++) spawn('dust', pet.x + rand(-14, 14), pet.y + rand(-4, 8));
+}
+function updateWalkDiscovery(dt) {
+  if (!walkVisit.active || walkVisit.discoveries >= walkVisit.maxDiscoveries) return;
+  if (input.mode === 'drag' || battle || travel || food || ball || pet.behavior === 'sleep' || pet.behavior === 'butterfly') return;
+  walkVisit.nextDiscoveryAt -= dt;
+  if (!walkVisit.sniffing && walkVisit.nextDiscoveryAt <= 0) {
+    const spot = walkSniffSpot();
+    walkVisit.sniffing = true;
+    walkVisit.sniffT = 0;
+    pet.target.x = spot.x * W;
+    pet.target.y = spot.y * H;
+    setBehavior('sniff');
+    pet.caption = '킁킁';
+    pet.captionT = 0;
+  }
+  if (!walkVisit.sniffing) return;
+  walkVisit.sniffT += dt;
+  const spot = walkSniffSpot();
+  const sx = spot.x * W;
+  const sy = spot.y * H;
+  pet.target.x = sx;
+  pet.target.y = sy;
+  if (dist(pet.x, pet.y, sx, sy) < 34 || walkVisit.sniffT > 5.2) completeWalkDiscovery();
+}
+function updateButterflyPosition() {
+  const spec = placeWorld.walk.butterfly;
+  const phase = spec.phase + butterfly.t * 1.55;
+  const loopX = Math.sin(phase) * spec.rx * W;
+  const loopY = Math.sin(phase * 2) * spec.ry * H;
+  butterfly.x = spec.x * W + loopX;
+  butterfly.y = spec.y * H + loopY;
+  if (pet.behavior !== 'butterfly') return;
+  const dx = butterfly.x - pet.x;
+  const dy = butterfly.y - pet.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const evade = 24 + butterfly.chaseT * 18;
+  butterfly.x = clamp(butterfly.x + dx / d * evade, 36, W - 36);
+  butterfly.y = clamp(butterfly.y + dy / d * evade - butterfly.chaseT * 5, H * 0.34, H * 0.72);
+}
+function startButterflyChase() {
+  butterfly.chaseT = 0;
+  setBehavior('butterfly');
+  pet.caption = randomLine(BUTTERFLY_START_LINES);
+  pet.captionT = 0;
+  pet.happy = Math.max(pet.happy, 0.62);
+}
+function missButterfly(onNose) {
+  if (!butterfly.active) return;
+  butterfly.chaseT = 0;
+  if (onNose) {
+    butterfly.noseT = 1.35;
+    pet.caption = randomLine(BUTTERFLY_NOSE_LINES);
+    pet.squashVel = clamp(pet.squashVel - 1.2, -8, 8);
+  } else {
+    butterfly.active = false;
+    butterfly.cooldown = rand(10, 18);
+    pet.caption = randomLine(BUTTERFLY_MISS_LINES);
+  }
+  pet.captionT = 0;
+  pet.behavior = 'stare';
+  pet.behaviorT = Math.max(pet.behaviorT, 1.6);
+}
+function updateButterfly(dt) {
+  if (!walkVisit.active) return;
+  if (butterfly.noseT > 0) {
+    butterfly.noseT = Math.max(0, butterfly.noseT - dt);
+    butterfly.x = pet.x + pet.dir * stagedRadius() * 0.42;
+    butterfly.y = pet.y + pet.jy - stagedRadius() * 0.8;
+    if (butterfly.noseT <= 0) {
+      butterfly.active = false;
+      butterfly.cooldown = rand(12, 20);
+    }
+    return;
+  }
+  if (!butterfly.active) {
+    butterfly.cooldown -= dt;
+    if (butterfly.cooldown <= 0 && !food && !ball && !battle && !travel && input.mode !== 'drag') {
+      butterfly.active = true;
+      butterfly.t = 0;
+      butterfly.chaseT = 0;
+      updateButterflyPosition();
+    }
+    return;
+  }
+  butterfly.t += dt;
+  updateButterflyPosition();
+  const d = dist(pet.x, pet.y, butterfly.x, butterfly.y);
+  if (pet.behavior === 'butterfly') {
+    butterfly.chaseT += dt;
+    if (d < 32 || butterfly.chaseT > 4.2) missButterfly(Math.random() < 0.22);
+    return;
+  }
+  if (input.mode !== 'drag' && pet.behavior !== 'sleep' && d < 150 && pet.captionT > 0.7) startButterflyChase();
+}
+function updateWalkPlace(dt) {
+  if (place !== 'walk' || travel || isEggStage()) {
+    if (walkVisit.active && place !== 'walk') endWalkVisit();
+    return;
+  }
+  updateButterfly(dt);
+  updateWalkDiscovery(dt);
 }
 function requestAiLine(event, fallback) {
   if (typeof fetch !== 'function') return;
@@ -897,6 +1064,7 @@ function updateCare(dt, { airborne, speed }) {
     if (!isStagePreview()) careStats.hatchWarmth = clamp(careStats.hatchWarmth - dt * 0.004, 0, 1);
     return;
   }
+  updateWalkPlace(dt);
   roughPlayState.roughness = Math.max(0, roughPlayState.roughness - dt * ROUGHNESS_DECAY_PER_SECOND);
   affectNeed('hunger', -dt * (0.00042 + speed * 0.000003) * stageScale('hunger'));
   affectNeed('energy', pet.behavior === 'sleep' ? dt * 0.045 : -dt * (0.0014 + speed * 0.000012) * stageScale('energy'));

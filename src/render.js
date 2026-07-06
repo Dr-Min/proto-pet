@@ -8,10 +8,24 @@ const PLAY_BALL_SEAM = 'rgba(96,74,56,0.4)';
 const BATTLE_FOE = '#c9b7a2';
 const BATTLE_FOE_DARK = 'rgba(90,70,55,0.32)';
 const PET_GRIME = 'rgba(96,74,56,0.18)';
+const SURFACE_PAGE = '#f4efe4';
+const SURFACE_FLOOR = '#ece5d3';
 const WALK_FLOOR = '#e1e7d1';
+const WALK_SKY = '#f7f3e6';
+const WALK_HILL = '#d7dfc7';
 const WALK_PATH = '#d7ccb7';
+const WALK_GRASS = 'rgba(104,132,86,0.38)';
+const WALK_SHRUB = '#c7d3aa';
+const WALK_STONE = '#c8c1ae';
+const WALK_CLOUD = 'rgba(255,251,240,0.72)';
+const WALK_BUTTERFLY = '#d8b0a3';
+const WALK_SPARK = 'rgba(232,184,127,0.55)';
 const BATTLE_FLOOR = '#e2d8c7';
+const BATTLE_SKY = '#eee8dc';
+const BATTLE_SAND = '#d8c8b1';
 const BATTLE_RING = 'rgba(120,96,72,0.22)';
+const BATTLE_FLAG = '#c9a8a0';
+const BATTLE_FOOTPRINT = 'rgba(112,91,70,0.13)';
 
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
@@ -102,41 +116,250 @@ function drawBattleObject() {
   ctx.restore();
 }
 
+function drawLumpyBlobShape(cx, cy, rx, ry, lumps, t, wobble) {
+  const n = lumps.length;
+  const lastA = (n - 1) / n * Math.PI * 2;
+  let prevN = 1 + lumps[n - 1] + Math.sin(lastA * 3 + t) * wobble;
+  let curN = 1 + lumps[0] + Math.sin(t) * wobble;
+  let prevX = cx + Math.cos(lastA) * rx * prevN;
+  let prevY = cy + Math.sin(lastA) * ry * prevN;
+  let curX = cx + rx * curN;
+  let curY = cy;
+  ctx.beginPath();
+  ctx.moveTo((prevX + curX) / 2, (prevY + curY) / 2);
+  for (let i = 0; i < n; i++) {
+    const next = (i + 1) % n;
+    const nextA = next / n * Math.PI * 2;
+    const nextN = 1 + lumps[next] + Math.sin(nextA * 3 + t) * wobble;
+    const nextX = cx + Math.cos(nextA) * rx * nextN;
+    const nextY = cy + Math.sin(nextA) * ry * nextN;
+    ctx.quadraticCurveTo(curX, curY, (curX + nextX) / 2, (curY + nextY) / 2);
+    curX = nextX;
+    curY = nextY;
+  }
+  ctx.closePath();
+}
+
+function drawHomeWorld() {
+  const floorY = H * 0.38;
+  ctx.fillStyle = SURFACE_PAGE;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = SURFACE_FLOOR;
+  ctx.fillRect(0, floorY, W, H - floorY);
+}
+
+function drawWalkHill(floorY, y, h, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = WALK_HILL;
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.quadraticCurveTo(W * 0.25, y - h * 0.55, W * 0.5, y - h * 0.18);
+  ctx.quadraticCurveTo(W * 0.75, y + h * 0.14, W, y - h * 0.36);
+  ctx.lineTo(W, floorY);
+  ctx.lineTo(0, floorY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawWalkTrail() {
+  const y = H * 0.69;
+  const wide = Math.min(72, W * 0.16);
+  const narrow = Math.max(14, wide * 0.28);
+  ctx.fillStyle = WALK_PATH;
+  ctx.beginPath();
+  ctx.moveTo(-45, y - narrow * 0.15);
+  ctx.bezierCurveTo(W * 0.18, y - wide * 0.62, W * 0.38, y + wide * 0.45, W * 0.58, y - wide * 0.08);
+  ctx.bezierCurveTo(W * 0.78, y - wide * 0.54, W * 0.92, y + narrow * 0.4, W + 45, y - narrow * 0.05);
+  ctx.lineTo(W + 45, y + narrow * 0.85);
+  ctx.bezierCurveTo(W * 0.88, y + wide * 0.85, W * 0.7, y + wide * 0.32, W * 0.54, y + wide * 0.7);
+  ctx.bezierCurveTo(W * 0.34, y + wide * 1.14, W * 0.16, y + wide * 0.12, -45, y + narrow * 0.7);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawWalkGrass(t) {
+  ctx.strokeStyle = WALK_GRASS;
+  ctx.lineCap = 'round';
+  for (const cluster of placeWorld.walk.grass) {
+    const bx = cluster.x * W;
+    const by = cluster.y * H;
+    const s = depthScaleAt(by);
+    ctx.lineWidth = Math.max(1.2, 1.5 * s);
+    for (const blade of cluster.blades) {
+      const ox = blade.ox * W;
+      const sway = Math.sin(t * 1.8 + cluster.phase + ox * 0.02) * 7 * s;
+      const h = blade.h * H * s;
+      ctx.beginPath();
+      ctx.moveTo(bx + ox, by);
+      ctx.quadraticCurveTo(bx + ox + blade.lean * 8 * s + sway * 0.3, by - h * 0.55, bx + ox + sway, by - h);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawWalkProps(t) {
+  for (const prop of placeWorld.walk.props) {
+    const x = prop.x * W;
+    const y = prop.y * H;
+    const s = depthScaleAt(y);
+    const wobble = Math.sin(t * 1.7 + prop.phase) * 0.025;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1 + wobble, 1 - wobble * 0.6);
+    drawLumpyBlobShape(0, 0, prop.rx * W * s, prop.ry * H * s, prop.lumps, t + prop.phase, 0.018);
+    ctx.fillStyle = prop.kind === 'stone' ? WALK_STONE : WALK_SHRUB;
+    ctx.fill();
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = outlineWidth(34 * s);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawWalkClouds(t) {
+  for (const cloud of placeWorld.walk.clouds) {
+    const pad = cloud.rx * W + 60;
+    const x = ((cloud.x * W + t * cloud.speed + pad) % (W + pad * 2)) - pad;
+    const y = cloud.y * H;
+    drawLumpyBlobShape(x, y, cloud.rx * W, cloud.ry * H, cloud.lumps, t * 0.8 + cloud.phase, 0.022);
+    ctx.fillStyle = WALK_CLOUD;
+    ctx.fill();
+  }
+}
+
+function drawWalkSniffSpots(t) {
+  if (!walkVisit || !walkVisit.active || walkVisit.discoveries >= walkVisit.maxDiscoveries) return;
+  const spot = placeWorld.walk.sniffSpots[walkVisit.targetSpot % placeWorld.walk.sniffSpots.length];
+  const x = spot.x * W;
+  const y = spot.y * H;
+  const s = depthScaleAt(y);
+  const pulse = 0.55 + Math.sin(t * 2 + spot.phase) * 0.18;
+  ctx.save();
+  ctx.globalAlpha = walkVisit.sniffing ? pulse : 0.24;
+  ctx.fillStyle = WALK_SPARK;
+  ctx.beginPath();
+  ctx.ellipse(x, y - 5 * s, 6 * s, 2.8 * s, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawButterfly(t) {
+  if (!butterfly || (!butterfly.active && butterfly.noseT <= 0)) return;
+  const s = depthScaleAt(butterfly.y);
+  const flap = Math.sin(t * 24 + butterfly.t * 3);
+  ctx.save();
+  ctx.translate(butterfly.x, butterfly.y);
+  ctx.rotate(Math.sin(t * 3 + butterfly.t) * 0.18);
+  ctx.fillStyle = WALK_BUTTERFLY;
+  ctx.globalAlpha = 0.78;
+  ctx.beginPath();
+  ctx.ellipse(-4 * s, -1 * s, 4.8 * s, (2.7 + flap * 1.1) * s, -0.55, 0, Math.PI * 2);
+  ctx.ellipse(4 * s, -1 * s, 4.8 * s, (2.7 - flap * 1.1) * s, 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = Math.max(1, 1.2 * s);
+  ctx.beginPath();
+  ctx.moveTo(0, -5 * s);
+  ctx.quadraticCurveTo(1.5 * s, -1 * s, 0, 5 * s);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWalkWorld(t) {
+  const floorY = H * 0.39;
+  ctx.fillStyle = WALK_SKY;
+  ctx.fillRect(0, 0, W, H);
+  drawWalkClouds(t);
+  drawWalkHill(floorY, floorY + H * 0.035, H * 0.08, 0.78);
+  drawWalkHill(floorY, floorY + H * 0.07, H * 0.06, 0.48);
+  ctx.fillStyle = WALK_FLOOR;
+  ctx.fillRect(0, floorY, W, H - floorY);
+  drawWalkTrail();
+  drawWalkSniffSpots(t);
+  drawWalkGrass(t);
+  drawWalkProps(t);
+  if (!butterfly || butterfly.noseT <= 0) drawButterfly(t);
+}
+
+function drawBattleFlag(flag, t) {
+  const x = flag.x * W;
+  const y = flag.y * H;
+  const s = depthScaleAt(y);
+  const poleH = 42 * s;
+  const wave = Math.sin(t * 3.6 + flag.phase) * 5 * s;
+  ctx.strokeStyle = BATTLE_RING;
+  ctx.lineWidth = Math.max(1.5, 2 * s);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y + 14 * s);
+  ctx.lineTo(x, y - poleH);
+  ctx.stroke();
+  ctx.fillStyle = BATTLE_FLAG;
+  ctx.beginPath();
+  ctx.moveTo(x, y - poleH + 5 * s);
+  ctx.quadraticCurveTo(x + flag.side * (20 * s + wave), y - poleH + 1 * s, x + flag.side * 31 * s, y - poleH + 11 * s);
+  ctx.quadraticCurveTo(x + flag.side * (18 * s + wave * 0.4), y - poleH + 19 * s, x, y - poleH + 18 * s);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawBattleFootprints() {
+  ctx.fillStyle = BATTLE_FOOTPRINT;
+  for (const fp of placeWorld.battle.footprints) {
+    const x = fp.x * W;
+    const y = fp.y * H;
+    const s = depthScaleAt(y);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(fp.r);
+    ctx.beginPath();
+    ctx.ellipse(-7 * s, -2 * s, 6 * s, 2.8 * s, -0.25, 0, Math.PI * 2);
+    ctx.ellipse(7 * s, 5 * s, 6 * s, 2.8 * s, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawBattleWorld(t) {
+  const floorY = H * 0.39;
+  ctx.fillStyle = BATTLE_SKY;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = BATTLE_FLOOR;
+  ctx.fillRect(0, floorY, W, H - floorY);
+  const cx = W * 0.5;
+  const cy = H * 0.67;
+  const rx = Math.min(W * 0.34, 184);
+  const ry = H * 0.135;
+  drawLumpyBlobShape(cx, cy, rx * 0.96, ry * 1.1, placeWorld.battle.ringLumps, t * 0.15, 0.006);
+  ctx.fillStyle = BATTLE_SAND;
+  ctx.fill();
+  ctx.strokeStyle = BATTLE_RING;
+  ctx.lineWidth = Math.max(3, W * 0.005);
+  drawLumpyBlobShape(cx, cy, rx, ry, placeWorld.battle.ringLumps, t * 0.12, 0.01);
+  ctx.stroke();
+  ctx.strokeStyle = BATTLE_RING;
+  ctx.lineWidth = Math.max(1.5, W * 0.0025);
+  ctx.beginPath();
+  ctx.moveTo(cx - rx * 0.74, cy + Math.sin(t) * 2);
+  ctx.quadraticCurveTo(cx, cy - ry * 0.12, cx + rx * 0.74, cy + Math.cos(t * 0.7) * 2);
+  ctx.stroke();
+  for (const flag of placeWorld.battle.flags) drawBattleFlag(flag, t);
+  drawBattleFootprints();
+}
+
 function drawWorld(t) {
   const placeName = typeof currentPlace === 'function' ? currentPlace() : 'home';
-  const floorY = H * 0.38;
-  ctx.fillStyle = placeName === 'walk' ? '#f1efe0' : '#f4efe4';
-  ctx.fillRect(0, 0, W, H);
   if (placeName === 'walk') {
-    ctx.fillStyle = WALK_FLOOR;
-    ctx.fillRect(0, floorY, W, H - floorY);
-    ctx.fillStyle = WALK_PATH;
-    ctx.beginPath();
-    ctx.ellipse(W * 0.5, H * 0.76, Math.min(W * 0.34, 190), H * 0.07, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(120,140,96,0.18)';
-    for (let i = 0; i < 6; i++) {
-      const x = (i + 0.5) * W / 6 + Math.sin(t + i) * 8;
-      ctx.fillRect(x, floorY + 22 + (i % 2) * 16, 18, 2);
-    }
+    drawWalkWorld(t);
     return;
   }
   if (placeName === 'battle') {
-    ctx.fillStyle = BATTLE_FLOOR;
-    ctx.fillRect(0, floorY, W, H - floorY);
-    ctx.strokeStyle = BATTLE_RING;
-    ctx.lineWidth = Math.max(2, W * 0.004);
-    ctx.beginPath();
-    ctx.ellipse(W * 0.5, H * 0.66, Math.min(W * 0.34, 180), H * 0.13, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(W * 0.2, H * 0.66);
-    ctx.lineTo(W * 0.8, H * 0.66);
-    ctx.stroke();
+    drawBattleWorld(t);
     return;
   }
-  ctx.fillStyle = '#ece5d3';
-  ctx.fillRect(0, floorY, W, H - floorY);
+  drawHomeWorld();
 }
 
 function drawBlob(cx, cy, rx, ry) {
@@ -415,6 +638,7 @@ function draw(t) {
     ctx.beginPath(); ctx.arc(fx + eyeGap * 1.7, fy + r * 0.2, 5 * s, 0, Math.PI * 2); ctx.fill();
   }
   if (ball && ball.phase === 'carried') drawBallObject(1);
+  if (butterfly && butterfly.noseT > 0) drawButterfly(t);
 
   drawParticlesLayer();
   drawPetCaption();

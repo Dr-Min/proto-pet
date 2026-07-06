@@ -35,9 +35,21 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Battle/foe | --battle-foe | #c9b7a2 | n/a | Small sparring opponent body |
 | Battle/foe-dark | --battle-foe-dark | rgba(90,70,55,0.32) | n/a | Opponent outline and face |
 | World/walk-floor | --world-walk-floor | #e1e7d1 | n/a | Outdoor walk ground plane |
+| World/walk-sky | --world-walk-sky | #f7f3e6 | n/a | Brighter outdoor walk sky |
+| World/walk-hill | --world-walk-hill | #d7dfc7 | n/a | Far walk hill bands |
 | World/walk-path | --world-walk-path | #d7ccb7 | n/a | Outdoor walk path |
+| World/walk-grass | --world-walk-grass | rgba(104,132,86,0.38) | n/a | Swaying walk grass blades |
+| World/walk-shrub | --world-walk-shrub | #c7d3aa | n/a | Lumpy walk shrubs |
+| World/walk-stone | --world-walk-stone | #c8c1ae | n/a | Lumpy walk stones |
+| World/walk-cloud | --world-walk-cloud | rgba(255,251,240,0.72) | n/a | Soft drifting walk cloud blobs |
+| World/walk-butterfly | --world-walk-butterfly | #d8b0a3 | n/a | Small uncatchable walk butterfly |
+| World/walk-spark | --world-walk-spark | rgba(232,184,127,0.55) | n/a | Subtle discovery spot glint |
 | World/battle-floor | --world-battle-floor | #e2d8c7 | n/a | Training ground plane |
+| World/battle-sky | --world-battle-sky | #eee8dc | n/a | Dimmer training-ground sky |
+| World/battle-sand | --world-battle-sand | #d8c8b1 | n/a | Inner sand band for training ring |
 | World/battle-ring | --world-battle-ring | rgba(120,96,72,0.22) | n/a | Subtle sparring ring marks |
+| World/battle-flag | --world-battle-flag | #c9a8a0 | n/a | Muted fluttering training flags |
+| World/battle-footprint | --world-battle-footprint | rgba(112,91,70,0.13) | n/a | Faint old footprint marks |
 | Pet/grime | --pet-grime | rgba(96,74,56,0.18) | n/a | Subtle dust marks after long absence |
 | Food/kibble-base | --food-kibble-base | #f0c98b | n/a | Default round food bowl |
 | Food/kibble-top | --food-kibble-top | #d59b57 | n/a | Default round food mound |

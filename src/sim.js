@@ -84,6 +84,22 @@ function update(dt) {
       }
     }
   }
+  if (!movingToPlace && !eggStage && !dragging && !airborne && pet.behavior === 'butterfly' && pet.tripT <= 0) {
+    if (!butterfly || !butterfly.active) {
+      setBehavior('stare');
+    } else {
+      const dx = butterfly.x - pet.x;
+      const dy = butterfly.y - pet.y;
+      const d = Math.hypot(dx, dy) || 1;
+      if (d > 30) {
+        const chaseSpeed = typeof fetchChaseSpeed === 'function' ? fetchChaseSpeed(190) : 190;
+        desiredVX = dx / d * chaseSpeed * stageScale('speed');
+        desiredVY = dy / d * chaseSpeed * stageScale('speed');
+      } else if (typeof missButterfly === 'function') {
+        missButterfly(Math.random() < 0.22);
+      }
+    }
+  }
   if (movingToPlace && pet.tripT <= 0) {
     const dx = movingToPlace.x - pet.x, dy = movingToPlace.y - pet.y;
     const d = Math.hypot(dx, dy) || 1;
