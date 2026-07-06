@@ -319,18 +319,13 @@ function draw(t) {
   for (const e of eyes) {
     const ex = fx + e.ox + gx;
     const ey = fy + e.oy + gy;
-    if (held || justLanded) {
+    if (held || falling || justLanded) {
       const pinch = e.ox < 0 ? 1 : -1;
       ctx.beginPath();
       ctx.moveTo(ex - 4.2 * pinch * s, ey - 2.6 * s);
       ctx.lineTo(ex, ey + 0.8 * s);
       ctx.lineTo(ex - 4.2 * pinch * s, ey + 4.2 * s);
       ctx.stroke();
-    } else if (falling) {
-      const eyeLift = 0.8 * s;
-      ctx.beginPath();
-      ctx.ellipse(ex, ey + eyeLift, e.r * 1.25, e.r * 1.55, 0, 0, Math.PI * 2);
-      ctx.fill();
     } else if (closed) {
       ctx.beginPath();
       ctx.moveTo(ex - 3.5, ey);
