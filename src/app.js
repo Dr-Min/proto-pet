@@ -339,6 +339,7 @@ const pet = {
   rollSpin: 0,
   tripT: 0,
   behavior: 'stare', behaviorT: 2,
+  pose: { behavior: 'stare', t: 9, belly: 0, sleep: 0, sniff: 0, plop: 0, wiggle: 0, battle: 0, travel: 0 },
   munchT: 0,
   target: { x: 0, y: 0 },
   caption: '…',
@@ -676,6 +677,32 @@ const BOUNCE_LINES = ['통!', '퐁!', '또 튄다', '나 돌아왔어', '벽 있
 const PETTING_LINES = ['좋아…', '거기 좋아', '조금만 더', '나 이거 좋아', '손 따뜻해', '가만히 있을래', '눈 풀리는 중', '기분 녹는 중', '털 정리되는 중', '행복 저장 중'];
 const BOND_LINES = ['옆에 있을래', '나 너 좋아', '같이 있자', '멀리 가지 마', '너 오면 좋아', '손 기다리는 중', '옆자리 지키는 중', '껌딱지 준비 중'];
 function randomLine(lines) { return lines[Math.floor(Math.random() * lines.length)]; }
+function poseTargetForBehavior(name) {
+  return {
+    belly: name === 'belly' ? 1 : 0,
+    sleep: name === 'sleep' ? 1 : 0,
+    sniff: name === 'sniff' ? 1 : 0,
+    plop: name === 'plop' ? 1 : 0,
+    wiggle: name === 'wiggle' ? 1 : 0,
+    battle: name === 'battle' ? 1 : 0,
+    travel: name === 'travel' ? 1 : 0,
+  };
+}
+function updatePetPose(dt) {
+  if (!pet.pose) pet.pose = { behavior: pet.behavior, t: 9, ...poseTargetForBehavior(pet.behavior) };
+  if (pet.pose.behavior !== pet.behavior) {
+    pet.pose.behavior = pet.behavior;
+    pet.pose.t = 0;
+  } else {
+    pet.pose.t += dt;
+  }
+  const target = poseTargetForBehavior(pet.behavior);
+  const follow = 1 - Math.exp(-8.5 * dt);
+  const slowFollow = 1 - Math.exp(-5.2 * dt);
+  for (const key of Object.keys(target)) {
+    pet.pose[key] = lerp(pet.pose[key] || 0, target[key], key === 'belly' || key === 'sleep' ? slowFollow : follow);
+  }
+}
 function setBehavior(name) {
   if (currentStage() === 'egg' && name !== 'stare') name = 'stare';
   pet.behavior = name;

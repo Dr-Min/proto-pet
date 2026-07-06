@@ -982,6 +982,16 @@ function drawEgg(t) {
   ctx.restore();
 }
 
+function poseValue(name) {
+  return clamp(pet.pose && Number.isFinite(pet.pose[name]) ? pet.pose[name] : 0, 0, 1);
+}
+
+function posePulse() {
+  const age = pet.pose && Number.isFinite(pet.pose.t) ? pet.pose.t : 9;
+  if (age >= 0.48) return 0;
+  return Math.sin(age / 0.48 * Math.PI);
+}
+
 function draw(t) {
   ctx.clearRect(0, 0, W, H);
   drawWorld(t);
@@ -998,18 +1008,37 @@ function draw(t) {
   if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);
 
   const s = depthScale(), r = stagedRadius();
-  const bellyPose = pet.behavior === 'belly';
+  const bellyBlend = poseValue('belly');
+  const sleepBlend = poseValue('sleep');
+  const sniffBlend = poseValue('sniff');
+  const plopBlend = poseValue('plop');
+  const wiggleBlend = poseValue('wiggle');
+  const loafBlend = clamp(Math.max(sleepBlend * 0.42, plopBlend * 0.78), 0, 1);
   const defeatedPose = (pet.defeatT || 0) > 0;
   const sy = pet.squash, sx = 1 + (1 - sy) * 0.85;
   const sp = Math.hypot(pet.vx, pet.vy);
-  const bob = bellyPose ? 0 : Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
-  const breathe = (pet.behavior === 'sleep' ? Math.sin(t * 1.6) * 0.035 : Math.sin(t * 2.6) * 0.015);
-  const cy = bellyPose ? pet.y + pet.jy - r * 0.46 : pet.y + pet.jy + bob - r * sy;
+  const normalBob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
+  const bob = normalBob * (1 - bellyBlend);
+  const breathe = lerp(Math.sin(t * 2.6) * 0.015, Math.sin(t * 1.6) * 0.035, sleepBlend);
+  const normalCy = pet.y + pet.jy + bob - r * sy;
+  const bellyCy = pet.y + pet.jy - r * 0.46;
+  const cy = lerp(normalCy, bellyCy, bellyBlend) + loafBlend * r * 0.08;
+  const settle = posePulse();
+  const bodyScaleX = lerp(sx + breathe, 1.28 + breathe, bellyBlend) + loafBlend * 0.12 + settle * 0.025;
+  const bodyScaleY = clamp(lerp(sy - breathe, 0.68 - breathe * 0.45, bellyBlend) - loafBlend * 0.1 - settle * 0.018, 0.5, 1.55);
 
   // 그림자
   ctx.fillStyle = 'rgba(120,100,70,0.18)';
   ctx.beginPath();
-  ctx.ellipse(pet.x, pet.y + 4, r * (bellyPose ? 1.45 : 1.15) * sx * (1 - pet.jy * -0.002), r * (bellyPose ? 0.22 : 0.28), 0, 0, Math.PI * 2);
+  ctx.ellipse(
+    pet.x,
+    pet.y + 4,
+    r * (lerp(1.15, 1.45, bellyBlend) + loafBlend * 0.2) * sx * (1 - pet.jy * -0.002),
+    r * clamp(lerp(0.28, 0.22, bellyBlend) - loafBlend * 0.035, 0.16, 0.32),
+    0,
+    0,
+    Math.PI * 2
+  );
   ctx.fill();
 
   // 밥그릇
@@ -1034,7 +1063,12 @@ function draw(t) {
   drawBattleResult();
 
   // 꼬리 (몸 뒤)
-  if (!bellyPose) drawTail(tail, 8);
+  if (bellyBlend < 0.98) {
+    ctx.save();
+    ctx.globalAlpha *= 1 - bellyBlend;
+    drawTail(tail, 8);
+    ctx.restore();
+  }
 
   ctx.fillStyle = bodyColor();
   if (defeatedPose) {
@@ -1042,45 +1076,53 @@ function draw(t) {
     ctx.beginPath();
     ctx.ellipse(pet.x - pet.dir * r * 0.22, cy + r * 0.48, r * 0.46, r * 0.08, -0.15, 0, Math.PI * 2);
     ctx.fill();
-  } else if (bellyPose) {
-    const pawBob = Math.sin(t * 2.3) * r * 0.025;
-    for (const paw of [
-      { x: -0.56, y: -0.08 },
-      { x: 0.55, y: -0.06 },
-      { x: -0.42, y: 0.34 },
-      { x: 0.43, y: 0.35 },
-    ]) {
-      ctx.beginPath();
-      ctx.ellipse(pet.x + paw.x * r, cy + paw.y * r + pawBob, 6.2 * s * stageScale('leg'), 4.2 * s * stageScale('leg'), paw.x * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-    }
   } else {
-    // 다리 (뭉툭한 캡슐)
-    ctx.strokeStyle = bodyColor(); ctx.lineWidth = 9 * s * stageScale('leg'); ctx.lineCap = 'round';
-    for (const f of feet) {
-      ctx.beginPath();
-      ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * sy);
-      ctx.lineTo(f.x, f.y);
-      ctx.stroke();
+    if (bellyBlend > 0.02) {
+      ctx.save();
+      ctx.globalAlpha *= bellyBlend;
+      const pawBob = Math.sin(t * 2.3) * r * 0.025;
+      for (const paw of [
+        { x: -0.56, y: -0.08 },
+        { x: 0.55, y: -0.06 },
+        { x: -0.42, y: 0.34 },
+        { x: 0.43, y: 0.35 },
+      ]) {
+        ctx.beginPath();
+        ctx.ellipse(pet.x + paw.x * r, cy + paw.y * r + pawBob, 6.2 * s * stageScale('leg'), 4.2 * s * stageScale('leg'), paw.x * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
-    // 발끝
-    for (const f of feet) { ctx.beginPath(); ctx.arc(f.x, f.y, 5.5 * s * stageScale('leg'), 0, Math.PI * 2); ctx.fill(); }
+    if (bellyBlend < 0.98) {
+      ctx.save();
+      ctx.globalAlpha *= 1 - bellyBlend;
+      // 다리 (뭉툭한 캡슐)
+      ctx.strokeStyle = bodyColor(); ctx.lineWidth = 9 * s * stageScale('leg'); ctx.lineCap = 'round';
+      for (const f of feet) {
+        ctx.beginPath();
+        ctx.moveTo(pet.x + f.ox * r * 0.8, cy + r * 0.5 * bodyScaleY);
+        ctx.lineTo(f.x, f.y);
+        ctx.stroke();
+      }
+      // 발끝
+      for (const f of feet) { ctx.beginPath(); ctx.arc(f.x, f.y, 5.5 * s * stageScale('leg'), 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
   }
 
   // 몸통 (머리 겸용 한 덩어리)
   ctx.save();
   ctx.translate(pet.x, cy);
   if (defeatedPose) ctx.rotate(pet.rollSpin || Math.sin(t * 7) * 0.2);
-  if (pet.behavior === 'wiggle') ctx.rotate(Math.sin(t * 14) * 0.13);
+  if (wiggleBlend > 0.01) ctx.rotate(Math.sin(t * 14) * 0.13 * wiggleBlend);
   if (pet.tripT > 0) ctx.rotate(pet.dir * pet.tripT * 0.35);
-  if (bellyPose) ctx.scale(1.28 + breathe, 0.68 - breathe * 0.45);
-  else ctx.scale(sx + breathe, sy - breathe);
+  ctx.scale(bodyScaleX, bodyScaleY);
   drawEars(r, 'outer');
   drawBlob(0, 0, r * 1.05 * geneValue('bodyAspect', 1), r);
   ctx.fillStyle = bodyColor(); ctx.fill();
   ctx.strokeStyle = OUTLINE; ctx.lineWidth = outlineWidth(r); ctx.stroke();
   // 배 무늬
-  ctx.beginPath(); ctx.ellipse(0, r * (bellyPose ? 0.1 : 0.45), r * (bellyPose ? 0.66 : 0.55), r * (bellyPose ? 0.5 : 0.4), 0, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.ellipse(0, r * lerp(0.45, 0.1, bellyBlend), r * lerp(0.55, 0.66, bellyBlend), r * lerp(0.4, 0.5, bellyBlend), 0, 0, Math.PI * 2);
   ctx.fillStyle = bellyColor(); ctx.fill();
   if (petHasTrait('foodie')) {
     ctx.fillStyle = PET_FOODIE_MARK;
@@ -1105,17 +1147,15 @@ function draw(t) {
   ctx.restore();
 
   // 얼굴
-  const sniffing = pet.behavior === 'sniff';
-  const headDip = sniffing ? r * 0.35 + Math.sin(t * 9) * 2 : 0;
-  const fx = pet.x + pet.dir * r * 0.22 * sx;
-  const fy = cy - r * 0.25 * sy + headDip + r * stageScale('eyeYOffset');
-  const eyeGap = r * 0.3 * sx;
+  const headDip = sniffBlend * (r * 0.35 + Math.sin(t * 9) * 2);
+  const fx = pet.x + pet.dir * r * 0.22 * bodyScaleX;
+  const fy = cy - r * 0.25 * bodyScaleY + headDip + r * stageScale('eyeYOffset');
+  const eyeGap = r * 0.3 * bodyScaleX;
   const gx = pet.gazeX * 3.2, gy = pet.gazeY * 2.4;
-  const sleeping = pet.behavior === 'sleep';
   const held = input.mode === 'drag';
   const falling = pet.jy < -8 && pet.landCaption;
   const justLanded = pet.landingT > 0;
-  const closed = sleeping || pet.blink > 0 || (pet.behavior === 'plop' && pet.squash < 0.7);
+  const eyeClose = clamp(sleepBlend + (pet.blink > 0 ? 1 : 0) + plopBlend * clamp((0.78 - pet.squash) / 0.3, 0, 1), 0, 1);
   const mood = careMood();
   const hungryEyes = mood === 'hungry';
   const tiredEyes = mood === 'tired';
@@ -1148,32 +1188,43 @@ function draw(t) {
       ctx.lineTo(ex, ey + 0.8 * s);
       ctx.lineTo(ex - 4.2 * pinch * s, ey + 4.2 * s);
       ctx.stroke();
-    } else if (closed) {
-      ctx.beginPath();
-      ctx.moveTo(ex - 3.5, ey);
-      ctx.lineTo(ex + 3.5, ey);
-      ctx.stroke();
-    } else if (tiredEyes) {
-      ctx.beginPath();
-      ctx.moveTo(ex - 4.6 * s, ey + 0.6 * s);
-      ctx.quadraticCurveTo(ex, ey + 3.3 * s, ex + 4.6 * s, ey + 0.6 * s);
-      ctx.stroke();
-    } else if (hungryEyes) {
-      ctx.beginPath();
-      ctx.ellipse(ex, ey + 0.5 * s, e.r * 1.22, e.r * 1.45, 0, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (shyEyes) {
-      ctx.beginPath();
-      ctx.arc(ex - Math.sign(e.ox) * 0.9 * s, ey + 0.8 * s, e.r * 0.72, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (happyEyes) {
-      ctx.beginPath();
-      ctx.arc(ex, ey + 2, 4 * s, Math.PI * 1.15, Math.PI * 1.85);
-      ctx.stroke();
     } else {
-      ctx.beginPath();
-      ctx.arc(ex, ey, e.r, 0, Math.PI * 2);
-      ctx.fill();
+      if (eyeClose < 0.98) {
+        ctx.save();
+        ctx.globalAlpha *= 1 - eyeClose;
+        if (tiredEyes) {
+          ctx.beginPath();
+          ctx.moveTo(ex - 4.6 * s, ey + 0.6 * s);
+          ctx.quadraticCurveTo(ex, ey + 3.3 * s, ex + 4.6 * s, ey + 0.6 * s);
+          ctx.stroke();
+        } else if (hungryEyes) {
+          ctx.beginPath();
+          ctx.ellipse(ex, ey + 0.5 * s, e.r * 1.22, e.r * 1.45, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (shyEyes) {
+          ctx.beginPath();
+          ctx.arc(ex - Math.sign(e.ox) * 0.9 * s, ey + 0.8 * s, e.r * 0.72, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (happyEyes) {
+          ctx.beginPath();
+          ctx.arc(ex, ey + 2, 4 * s, Math.PI * 1.15, Math.PI * 1.85);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(ex, ey, e.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      if (eyeClose > 0.02) {
+        ctx.save();
+        ctx.globalAlpha *= eyeClose;
+        ctx.beginPath();
+        ctx.moveTo(ex - 3.5, ey);
+        ctx.lineTo(ex + 3.5, ey);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   }
   // 어지러움 소용돌이
@@ -1183,7 +1234,7 @@ function draw(t) {
     ctx.restore();
   }
   // 입: 항상 같은 ω 모양을 유지한다
-  const my = fy + r * 0.28 * sy + gy * 0.5;
+  const my = fy + r * 0.28 * bodyScaleY + gy * 0.5;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(fx + gx * 0.7 - 2.4 * s, my, 2.4 * s, 0.15 * Math.PI, 0.85 * Math.PI);

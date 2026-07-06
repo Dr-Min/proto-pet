@@ -354,11 +354,13 @@ All spacing derives from a base of 4px.
 | Micro | immediate | n/a | Gauge updates |
 | Press | browser frame | transform | Button active scale |
 | Pet motion | simulation loop | spring-like | Body squash, feet, tail |
+| Pet pose change | 0.35-0.65s | lerp/spring-like | Behavior transitions such as sleep, plop, belly, eating return |
 
 ### Rules
 
 - Keep UI motion minimal; the pet animation carries the personality.
 - Animate only transform or canvas-rendered motion.
+- Behavior changes must preserve visual continuity: body scale, body center, feet/paws, eyes, and face position follow the new pose through `pet.pose` blending rather than switching frames immediately.
 - Pointer interactions must support both mouse and touch.
 
 ## 7. Depth & Surface

@@ -285,6 +285,7 @@ function update(dt) {
   }
 
   updateFeet(dt);
+  updatePetPose(dt);
   const ts = depthScale(), tr = stagedRadius();
   const tailBob = Math.abs(Math.sin(pet.walkPhase)) * -4 * (sp > 10 ? 1 : 0);
   // 기분 좋으면 살랑살랑 흔들림
