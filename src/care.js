@@ -1120,6 +1120,35 @@ function tryGrowAdultOnSleep() {
   for (let i = 0; i < 5; i++) spawn('dust', pet.x + rand(-26, 26), pet.y + rand(-6, 8));
   return true;
 }
+function growAdultForDebug() {
+  if (isStagePreview()) {
+    pet.caption = '미리보기 중';
+    pet.captionT = 0;
+    return false;
+  }
+  if (currentStage() === 'adult') {
+    pet.caption = '이미 다 컸음';
+    pet.captionT = 0;
+    return false;
+  }
+  const from = currentStage();
+  careStats.hatchWarmth = 1;
+  if (!transitionStage('adult')) return false;
+  rememberCare('테스트로 어른 된 날');
+  needs.hunger = Math.max(needs.hunger, 0.72);
+  needs.energy = Math.max(needs.energy, 0.82);
+  needs.bond = Math.max(needs.bond, 0.18);
+  pet.caption = from === 'egg' ? '갑자기 커짐' : '나 좀 커졌나';
+  pet.captionT = 0;
+  pet.happy = 1;
+  pet.hatchFxT = Math.max(pet.hatchFxT || 0, from === 'egg' ? 0.7 : 0);
+  pet.jy = 0;
+  pet.jvy = 0;
+  for (let i = 0; i < 7; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(0.9, 1.8));
+  for (let i = 0; i < 7; i++) spawn('dust', pet.x + rand(-28, 28), pet.y + rand(-8, 10));
+  saveCareState();
+  return true;
+}
 function recordRoughPlay(amount) {
   roughPlayState.roughness = clamp(roughPlayState.roughness + amount, 0, 1);
   if (roughPlayState.roughness <= ROUGHNESS_PENALTY_THRESHOLD) return false;

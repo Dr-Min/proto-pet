@@ -2,6 +2,10 @@
     --surface-page: #f4efe4;
     --text-muted: #9a8f7d;
     --text-ui: #8a7f6c;
+    --font-hand: "Gaegu", "Apple SD Gothic Neo", -apple-system, sans-serif;
+    --drawn-ink: #6f5a45;
+    --drawn-ink-soft: rgba(111,90,69,0.32);
+    --drawn-paper-line: rgba(111,90,69,0.18);
     --care-hunger: #a8c686;
     --care-energy: #8fb7d9;
     --care-bond: #e78aa1;
@@ -27,26 +31,39 @@
 	    --day-evening-tone: rgba(217,143,122,0.06);
 	    --day-night-tone: rgba(64,78,118,0.10);
 	  }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; font-family: var(--font-hand); }
   canvas { display: block; touch-action: none; }
   #hint {
     position: fixed; top: 14px; left: 16px; right: 76px;
-    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+    font: 400 16px/1.35 var(--font-hand);
     color: var(--text-muted); user-select: none; pointer-events: none;
+    transform: rotate(-0.4deg);
+  }
+  #debugAdultBtn {
+    position: fixed; top: 58px; left: 14px; z-index: 3;
+    min-width: 54px; min-height: 36px; padding: 7px 11px;
+    border: 2px solid var(--drawn-ink-soft);
+    border-radius: 17px 19px 16px 20px;
+    background: rgba(244,239,228,0.68);
+    color: var(--drawn-ink);
+    font: 700 15px/1.1 var(--font-hand);
+    cursor: pointer; touch-action: manipulation;
+    transform: rotate(-1.2deg);
   }
   #memoryBtn {
     position: fixed; top: 6px; right: 12px; z-index: 3;
     min-width: 56px; min-height: 44px; padding: 10px 0;
     border: none; background: transparent; color: var(--text-muted);
-    font: 400 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+    font: 700 17px/1.2 var(--font-hand);
     cursor: pointer; touch-action: manipulation;
+    transform: rotate(1.3deg);
   }
   #ui {
     position: fixed; left: 0; right: 0; bottom: 0;
     box-sizing: border-box;
     padding: 8px 12px calc(12px + env(safe-area-inset-bottom));
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-    font: 12px -apple-system, "Apple SD Gothic Neo", sans-serif; color: var(--text-ui);
+    font: 400 15px/1.25 var(--font-hand); color: var(--text-ui);
     user-select: none;
   }
   #gauges, #actions { display: flex; align-items: center; justify-content: center; gap: 10px; }
@@ -59,27 +76,36 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--text-ui);
+    font-weight: 700;
+    transform: rotate(-0.35deg);
   }
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .bar { width: clamp(56px, 17vw, 84px); height: 10px; background: rgba(150,135,110,.25); border-radius: 5px; overflow: hidden; }
+  .bar { width: clamp(56px, 17vw, 84px); height: 11px; background: rgba(150,135,110,.2); border: 2px solid var(--drawn-paper-line); border-radius: 999px; overflow: hidden; transform: rotate(-0.5deg); }
   .bar i { display: block; height: 100%; width: 50%; background: var(--care-hunger); border-radius: 5px; }
 	  #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn, #battleCloseBtn, #battleChallengeBtn {
-    min-height: 44px; padding: 10px 14px; border: none; border-radius: 22px;
-    background: var(--care-warm); color: #5a4632;
-    font: 600 14px -apple-system, "Apple SD Gothic Neo", sans-serif;
+    --tilt: 0deg;
+    min-height: 44px; padding: 9px 14px; border: 2px solid var(--drawn-ink-soft); border-radius: 26px 22px 25px 23px;
+    background: var(--care-warm); color: var(--drawn-ink);
+    font: 700 17px/1.12 var(--font-hand);
     cursor: pointer; touch-action: manipulation; white-space: nowrap;
+    transform: rotate(var(--tilt));
   }
   #feedBtn, #restBtn, #playBtn, #moreBtn { flex: 1 1 0; min-width: 0; }
-  #restBtn { background: var(--care-cool); color: #3f4d58; }
-  #playBtn { background: var(--care-play); color: #5b3f49; }
-  #moreBtn { background: var(--surface-panel); color: var(--text-ui); font-size: 18px; line-height: 1; }
-  #returnBtn { display: none; width: 100%; background: var(--care-walk); color: #46573d; }
-	  #walkBtn { background: var(--care-walk); color: #46573d; }
-	  #battleBtn { background: var(--care-battle); color: #4d4358; }
-	  #shopBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn, #battleCloseBtn { background: transparent; color: var(--text-ui); }
-	  #battleChallengeBtn { width: 100%; margin-top: 12px; background: var(--care-battle); color: #4d4358; }
-	  #memoryBtn:active, #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #memoryCloseBtn:active, #shopCloseBtn:active, #battleCloseBtn:active, #battleChallengeBtn:active, .shop-buy:active, .rematch-btn:active { transform: scale(0.96); }
-	  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #notebookBtn.is-locked, #battleChallengeBtn.is-locked, .shop-buy:disabled, .rematch-btn:disabled {
+  #feedBtn { --tilt: -1deg; }
+  #restBtn { --tilt: 0.7deg; background: var(--care-cool); color: #3f4d58; }
+  #playBtn { --tilt: -0.4deg; background: var(--care-play); color: #5b3f49; }
+  #moreBtn { --tilt: 1deg; background: var(--surface-panel); color: var(--text-ui); font-size: 22px; line-height: 0.9; }
+  #returnBtn { --tilt: -0.5deg; display: none; width: 100%; background: var(--care-walk); color: #46573d; }
+	  #walkBtn { --tilt: -0.8deg; background: var(--care-walk); color: #46573d; }
+	  #battleBtn { --tilt: 0.9deg; background: var(--care-battle); color: #4d4358; }
+	  #shopBtn { --tilt: -0.25deg; }
+	  #notebookBtn { --tilt: 0.55deg; }
+	  #shopBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn, #battleCloseBtn { background: transparent; color: var(--text-ui); border-color: transparent; }
+	  #battleChallengeBtn { --tilt: -0.4deg; width: 100%; margin-top: 12px; background: var(--care-battle); color: #4d4358; }
+	  #debugAdultBtn:active { transform: rotate(-1.2deg) scale(0.96); }
+	  #memoryBtn:active { transform: rotate(1.3deg) scale(0.96); }
+	  #feedBtn:active, #restBtn:active, #playBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #memoryCloseBtn:active, #shopCloseBtn:active, #battleCloseBtn:active, #battleChallengeBtn:active, .shop-buy:active, .rematch-btn:active { transform: rotate(var(--tilt)) scale(0.96); }
+	  #debugAdultBtn.is-locked, #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #notebookBtn.is-locked, #battleChallengeBtn.is-locked, .shop-buy:disabled, .rematch-btn:disabled {
 	    opacity: 0.58;
 	    filter: saturate(0.72);
 	  }
@@ -97,6 +123,7 @@
     box-sizing: border-box;
     padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
     background: var(--surface-panel);
+    border-top: 2px solid var(--drawn-ink-soft);
     display: flex; flex-direction: column; gap: 4px;
     transform: translateY(110%);
     transition: transform 180ms ease-out;
@@ -117,6 +144,7 @@
     text-align: left;
     border-radius: 0;
     padding: 12px 10px;
+    font-size: 18px;
   }
   .bottom-sheet button:active { background: var(--surface-panel-deep); }
 	  .notebook-panel, .memory-panel, .shop-panel, .battle-panel {
@@ -126,8 +154,10 @@
     padding: 12px 14px 16px;
     overflow: auto;
     background: var(--surface-panel);
+    border: 2px solid var(--drawn-ink-soft);
+    border-radius: 18px 20px 16px 22px;
 	    color: var(--text-ui);
-	    font: 13px/1.6 -apple-system, "Apple SD Gothic Neo", sans-serif;
+	    font: 400 16px/1.35 var(--font-hand);
 	  }
 	  .notebook-close, .memory-close, .shop-close, .battle-close {
 	    float: right;
@@ -136,8 +166,8 @@
 	  }
 	  .notebook-content, .memory-content, .shop-content, .battle-content { clear: both; }
 	  .notebook-panel h2, .notebook-panel h3, .notebook-panel p, .memory-panel h2, .memory-panel h3, .shop-panel h2, .shop-panel h3, .shop-panel p, .battle-panel h2, .battle-panel h3, .battle-panel p { margin: 0; }
-	  .notebook-panel h2, .memory-panel h2, .shop-panel h2, .battle-panel h2 { font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--text-ui); }
-	  .notebook-panel h3, .memory-panel h3, .shop-panel h3, .battle-panel h3 { margin-top: 16px; font-size: 12px; line-height: 1.4; font-weight: 600; color: var(--text-muted); }
+	  .notebook-panel h2, .memory-panel h2, .shop-panel h2, .battle-panel h2 { font-size: 21px; line-height: 1.15; font-weight: 700; color: var(--drawn-ink); transform: rotate(-0.5deg); }
+	  .notebook-panel h3, .memory-panel h3, .shop-panel h3, .battle-panel h3 { margin-top: 16px; font-size: 17px; line-height: 1.2; font-weight: 700; color: var(--text-muted); }
 	  .notebook-panel ul, .memory-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
 	  .notebook-panel li, .memory-panel li { padding: 5px 0; color: var(--text-ui); }
 	  .notebook-panel li + li, .memory-panel li + li { margin-top: 2px; }
@@ -157,7 +187,7 @@
 	  }
 	  .paw-mark.is-filled { opacity: 0.9; }
 	  .body-observation { grid-column: 2; color: var(--text-ui); }
-	  .body-stat-hint { grid-column: 2; margin-top: -4px; color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+	  .body-stat-hint { grid-column: 2; margin-top: -4px; color: var(--text-muted); font-size: 14px; line-height: 1.25; }
 	  .memory-groups section:first-child h3 { margin-top: 10px; }
 	  .shop-balance { color: var(--text-muted); }
 	  .shop-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -166,10 +196,12 @@
 	  .shop-name { font-weight: 600; color: var(--text-ui); }
 	  .shop-note { color: var(--text-muted); }
 	  .shop-buy {
-	    min-height: 44px; min-width: 72px; padding: 8px 10px; border: none; border-radius: 22px;
+	    --tilt: 0.6deg;
+	    min-height: 44px; min-width: 72px; padding: 8px 10px; border: 2px solid var(--drawn-ink-soft); border-radius: 22px 25px 21px 24px;
 	    background: var(--surface-panel-deep); color: var(--text-ui);
-	    font: 600 13px -apple-system, "Apple SD Gothic Neo", sans-serif;
+	    font: 700 16px/1.12 var(--font-hand);
 	    cursor: pointer; touch-action: manipulation;
+	    transform: rotate(var(--tilt));
 	  }
 	  .battle-opponent-card {
 	    display: grid;
@@ -185,20 +217,25 @@
 	  .battle-rematch-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 	  .rematch-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; min-height: 44px; }
 	  .rematch-btn {
-	    min-height: 44px; min-width: 76px; padding: 8px 10px; border: none; border-radius: 22px;
+	    --tilt: -0.6deg;
+	    min-height: 44px; min-width: 76px; padding: 8px 10px; border: 2px solid var(--drawn-ink-soft); border-radius: 22px 25px 21px 24px;
 	    background: var(--surface-panel-deep); color: var(--text-ui);
-	    font: 600 13px -apple-system, "Apple SD Gothic Neo", sans-serif;
+	    font: 700 16px/1.12 var(--font-hand);
 	    cursor: pointer; touch-action: manipulation;
+	    transform: rotate(var(--tilt));
 	  }
   @media (max-width: 380px) {
-    #ui { gap: 7px; padding-left: 10px; padding-right: 10px; font-size: 11px; }
+    #hint { font-size: 15px; right: 70px; }
+    #debugAdultBtn { top: 86px; left: 12px; min-height: 34px; padding: 6px 10px; font-size: 14px; }
+    #memoryBtn { font-size: 16px; right: 10px; }
+    #ui { gap: 7px; padding-left: 10px; padding-right: 10px; font-size: 14px; }
     #gauges, #actions { gap: 7px; }
     #memoryLine { max-width: calc(100vw - 20px); }
     .g { gap: 4px; }
     .bar { width: 48px; }
     #actions { gap: 6px; width: min(340px, calc(100vw - 20px)); }
-	    #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn { min-height: 44px; padding: 9px 10px; font-size: 12px; }
-	    #moreBtn { font-size: 18px; }
+	    #feedBtn, #restBtn, #playBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #notebookBtn { min-height: 44px; padding: 8px 9px; font-size: 16px; }
+	    #moreBtn { font-size: 21px; }
 	    .shop-item { grid-template-columns: 62px 1fr auto; gap: 8px; }
 	    .shop-preview { width: 62px; }
 	    .battle-opponent-card { grid-template-columns: 82px 1fr; }

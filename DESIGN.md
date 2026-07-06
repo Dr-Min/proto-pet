@@ -4,6 +4,8 @@
 
 The app should feel like a small, soft pet living on a warm paper floor. The signature is a low-tech, slightly silly creature with tactile care controls: feeding, resting, and petting should feel immediate rather than menu-driven.
 
+The UI now leans into a hand-drawn pocket-world language inspired by small playful iOS toys: the interface should look written into the pet's world, not placed on top as product chrome. This means hand-lettered text, soft uneven outlines, lightly tilted controls, and doodle-like panels. It must remain original to Proto Pet: no copied Grug font, no copied icons, no cave-person phrasing.
+
 ## 2. Color
 
 ### Palette
@@ -14,6 +16,9 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 | Surface/floor | --surface-floor | #ece5d3 | n/a | Ground plane |
 | Text/muted | --text-muted | #9a8f7d | n/a | Top hint |
 | Text/ui | --text-ui | #8a7f6c | n/a | Bottom labels and memory line |
+| Drawn/ink | --drawn-ink | #6f5a45 | n/a | Hand-drawn UI outlines and primary text |
+| Drawn/ink-soft | --drawn-ink-soft | rgba(111,90,69,0.32) | n/a | Soft sketch borders |
+| Drawn/paper-line | --drawn-paper-line | rgba(111,90,69,0.18) | n/a | Gauge tracks and panel divider lines |
 | Pet/body | --pet-body | #efd9b8 | n/a | Default pet body, varied slightly by gene seed |
 | Pet/body-dark | --pet-body-dark | #dfc49c | n/a | Default legs and darker body parts, varied slightly by gene seed |
 | Pet/outline | --pet-outline | rgba(96,74,56,0.35) | n/a | Soft outline |
@@ -89,14 +94,15 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 
 | Level | Size | Weight | Line Height | Tracking | Usage |
 |-------|------|--------|-------------|----------|-------|
-| Body/sm | 14px | 600 | 1.4 | 0 | Buttons |
-| Caption | 13px | 400 | 1.6 | 0 | Hint and pet captions |
-| UI label | 12px | 400 | 1.4 | 0 | Gauges, memory line |
-| UI label/sm | 11px | 400 | 1.4 | 0 | Narrow mobile gauges |
+| Body/sm | 16px | 700 | 1.25 | 0 | Buttons |
+| Caption | 16px | 400 | 1.35 | 0 | Hint and pet captions |
+| UI label | 15px | 400 | 1.25 | 0 | Gauges, memory line |
+| UI label/sm | 14px | 400 | 1.25 | 0 | Narrow mobile gauges |
 
 ### Font Stack
 
-- Primary: -apple-system, "Apple SD Gothic Neo", sans-serif
+- Primary/hand: "Gaegu", "Apple SD Gothic Neo", -apple-system, sans-serif
+- Fallback/system: -apple-system, "Apple SD Gothic Neo", sans-serif
 - Mono: not used
 - Serif: not used
 
@@ -105,6 +111,8 @@ The app should feel like a small, soft pet living on a warm paper floor. The sig
 - Keep text compact; this is a toy surface, not a dashboard.
 - Do not use viewport-scaled type.
 - Letter spacing stays at 0.
+- The default UI and pet captions use the hand stack. If the webfont fails, the system fallback is acceptable; do not block the game.
+- Do not copy another app's custom lettering. Proto Pet's hand style is soft, uneven, and Korean-readable.
 
 ## 4. Spacing & Layout
 
@@ -141,6 +149,7 @@ All spacing derives from a base of 4px.
 - **States**: normal, low.
 - **Accessibility**: visible text label is required.
 - **Motion**: fill width updates directly with care state.
+- **Surface**: track uses a soft sketch border and rounded pill; it should feel drawn, not like a system progress bar.
 
 ### Care Action Button
 
@@ -150,6 +159,17 @@ All spacing derives from a base of 4px.
 - **States**: default, active.
 - **Accessibility**: native button semantics.
 - **Motion**: active press uses `transform: scale(0.96)`.
+- **Surface**: pastel fill, soft ink outline, and a tiny stable tilt per button. Tilt must never break touch target alignment or text fit.
+
+### Debug Growth Button
+
+- **Structure**: native `button` fixed in the upper-left play space.
+- **Purpose**: temporary development control for forcing the pet to adult stage during battle testing.
+- **Spacing**: keep it below the hint when narrow screens wrap the hint.
+- **States**: default, active, locked-looking when already adult or in stage preview.
+- **Accessibility**: explicit accessible label; minimum touch target remains usable on mobile.
+- **Surface**: small paper-label button using the hand font, soft ink outline, and stable tilt.
+- **Constraint**: this is not part of the player-facing care economy and should stay visually secondary.
 
 ### Care Memory Line
 
@@ -168,6 +188,7 @@ All spacing derives from a base of 4px.
 - **States**: closed, open, empty fallback through saved memory migration.
 - **Accessibility**: native buttons open and close the panel; grouped headings are visible text.
 - **Motion**: no decorative animation.
+- **Surface**: tonal paper panel with a sketch outline; no drop shadows.
 
 ### Care Routine Memory
 

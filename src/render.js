@@ -37,6 +37,7 @@ const DAY_MORNING_TONE = 'rgba(232,184,127,0.04)';
 const DAY_TONE = 'rgba(0,0,0,0)';
 const DAY_EVENING_TONE = 'rgba(217,143,122,0.06)';
 const DAY_NIGHT_TONE = 'rgba(64,78,118,0.10)';
+const HAND_FONT = '"Gaegu", "Apple SD Gothic Neo", -apple-system, sans-serif';
 
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
@@ -50,11 +51,11 @@ function drawParticlesLayer() {
     const a = 1 - p.t / p.life;
     if (p.type === 'heart') {
       ctx.fillStyle = `rgba(235,110,120,${a})`;
-      ctx.font = `${11 + a * 4}px sans-serif`;
+      ctx.font = `700 ${12 + a * 5}px ${HAND_FONT}`;
       ctx.fillText('♥', p.x, p.y);
     } else if (p.type === 'z') {
       ctx.fillStyle = `rgba(140,125,105,${a})`;
-      ctx.font = `${10 + (1 - a) * 8}px sans-serif`;
+      ctx.font = `700 ${11 + (1 - a) * 8}px ${HAND_FONT}`;
       ctx.fillText('z', p.x + (1 - a) * 14, p.y - (1 - a) * 20);
     } else if (p.type === 'spark') {
       ctx.fillStyle = `rgba(232,184,127,${a * 0.9})`;
@@ -71,7 +72,7 @@ function drawPetCaption() {
   const capAlpha = clamp(1.4 - pet.captionT * 0.25, 0, 1);
   if (capAlpha <= 0) return;
   ctx.fillStyle = `rgba(130,115,95,${capAlpha})`;
-  ctx.font = '13px -apple-system, "Apple SD Gothic Neo", sans-serif';
+  ctx.font = `400 17px ${HAND_FONT}`;
   ctx.textAlign = 'center';
   ctx.fillText(pet.caption, pet.x, pet.y + 34);
   ctx.textAlign = 'left';

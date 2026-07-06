@@ -4,6 +4,7 @@ const gH = document.getElementById('gH'), gE = document.getElementById('gE'), gB
 const feedBtn = document.getElementById('feedBtn');
 const restBtn = document.getElementById('restBtn');
 const playBtn = document.getElementById('playBtn');
+const debugAdultBtn = document.getElementById('debugAdultBtn');
 const memoryBtn = document.getElementById('memoryBtn');
 const moreBtn = document.getElementById('moreBtn');
 const returnBtn = document.getElementById('returnBtn');
@@ -95,6 +96,9 @@ restBtn.addEventListener('click', () => {
 });
 playBtn.addEventListener('click', () => {
   requestPlayBall();
+});
+debugAdultBtn.addEventListener('click', () => {
+  growAdultForDebug();
 });
 memoryBtn.addEventListener('click', () => {
   openMemory();
@@ -398,6 +402,7 @@ function updateGauges() {
   setButtonLocked(feedBtn, stage === 'egg');
   setButtonLocked(restBtn, stage === 'egg');
   setButtonLocked(playBtn, stage !== 'adult');
+  setButtonLocked(debugAdultBtn, stage === 'adult' || isStagePreview());
   setButtonLocked(walkBtn, stage === 'egg' || Boolean(battle));
   setButtonLocked(battleBtn, stage !== 'adult');
   setButtonLocked(shopBtn, false);
