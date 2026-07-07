@@ -184,7 +184,12 @@ function update(dt) {
       bounceReact({ lines: BOUNCE_LINES, strength: Math.abs(pet.vx), x: pet.x, y: pet.y + pet.jy });
     }
   } else if (movingToPlace || movingToBattleDefeat) {
-    pet.x = clamp(pet.x, -90, W + 90);
+    const minX = movingToBattleDefeat ? Math.min(-90, movingToBattleDefeat.x - 30) : -90;
+    const maxX = movingToBattleDefeat ? Math.max(W + 90, movingToBattleDefeat.x + 30) : W + 90;
+    pet.x = clamp(pet.x, minX, maxX);
+  } else if (typeof currentPlace === 'function' && currentPlace() === 'battle' && typeof battleArenaBounds === 'function') {
+    const bounds = battleArenaBounds();
+    pet.x = clamp(pet.x, bounds.left + 38, bounds.right - 38);
   } else {
     pet.x = clamp(pet.x, 80, W - 80);
   }

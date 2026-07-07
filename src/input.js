@@ -39,8 +39,9 @@ function petHitTest(x, y, scale = 1.7) {
 function isTouchPointer(e) { return e.pointerType === 'touch' || e.pointerType === 'pen'; }
 function isTouchType(type) { return type === 'touch' || type === 'pen'; }
 function dragThreshold(e) { return isTouchPointer(e) ? 18 : 12; }
-function rubThreshold(e) { return isTouchPointer(e) ? 7 : 4; }
+function rubThreshold(e) { return isTouchPointer(e) ? 12 : 4; }
 function touchDragHoldMs() { return 420; }
+function touchPetToDragDistance(e) { return dragThreshold(e) * 2.45; }
 function furniturePressThreshold() { return isTouchType(input.pointerType) ? 24 : 18; }
 function furnitureRemovePointerHit(x, y) {
   const zone = document.getElementById('furnitureRemoveZone');
@@ -240,9 +241,15 @@ cv.addEventListener('pointerdown', e => {
   mouse.px = e.clientX; mouse.py = e.clientY;
   const hitsPet = petHitTest(e.clientX, e.clientY, 1.85);
   const hitsOutingSign = !hitsPet && typeof outingSignHitTest === 'function' && outingSignHitTest(e.clientX, e.clientY);
-  const hitFurniture = hitsPet || hitsOutingSign || currentPlace() !== 'home' || isTraveling() ? '' : furnitureHitTest(e.clientX, e.clientY);
+  const hitsBodyBoard = !hitsPet && !hitsOutingSign && typeof bodyStatusBoardHitTest === 'function' && bodyStatusBoardHitTest(e.clientX, e.clientY);
+  const hitFurniture = hitsPet || hitsOutingSign || hitsBodyBoard || currentPlace() !== 'home' || isTraveling() ? '' : furnitureHitTest(e.clientX, e.clientY);
   if (hitsOutingSign) {
     if (typeof openOutingSheet === 'function') openOutingSheet();
+    e.preventDefault();
+    return;
+  }
+  if (hitsBodyBoard) {
+    if (typeof openBodyStatusPanel === 'function') openBodyStatusPanel();
     e.preventDefault();
     return;
   }
@@ -289,6 +296,8 @@ cv.addEventListener('pointermove', e => {
     startDrag(e);
   } else if (input.mode === 'pending' && frameMove > rubThreshold(e)) {
     input.mode = 'pet';
+  } else if (input.mode === 'pet' && isTouchPointer(e) && elapsed >= touchDragHoldMs() && fromStart > touchPetToDragDistance(e)) {
+    startDrag(e);
   } else if (input.mode === 'pet' && !isTouchPointer(e) && fromStart > dragThreshold(e) * 1.45 && elapsed > 120) {
     startDrag(e);
   }

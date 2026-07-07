@@ -191,9 +191,9 @@ All spacing derives from a base of 4px.
 
 ### Outing Sign
 
-- **Structure**: canvas-drawn wall-hung sign in the home scene labeled `외출`. It replaces the visible top `외출` button.
-- **Surface**: rectangular paper/wooden sign, not a pill; it uses soft sketch borders, hanging strings, nail dots, and a small drop shadow so it reads like room furniture.
-- **Spacing**: lives on the wall layer below the relationship rank and above the floor line. It must remain tappable on 320px+ mobile without blocking the pet.
+- **Structure**: canvas-drawn freestanding room sign labeled `외출`. It replaces the visible top `외출` button.
+- **Surface**: a small hand-drawn signboard on two short posts with a grounded base shadow. It must not use hanging strings, nail dots, or wall-mounted details.
+- **Spacing**: lives in the home scene below the relationship rank and visually planted into the room floor/wall boundary. It must remain tappable on 320px+ mobile without blocking the pet.
 - **States**: visible only in the home scene. Tapping it opens the outing bottom sheet for 산책, 전투, and 상점.
 - **Accessibility**: a visually hidden native `외출` button may remain as the keyboard/screen-reader fallback; the visible player-facing trigger is the room sign.
 - **Motion**: no decorative animation.
@@ -205,6 +205,24 @@ All spacing derives from a base of 4px.
 - **States**: unavailable while away, traveling, egg-stage, or already battling.
 - **Accessibility**: native buttons; each refused action answers with pet text.
 - **Motion**: same bottom-sheet slide as other menus.
+
+### Body Status Board
+
+- **Structure**: canvas-drawn freestanding room sign labeled `몸`. It is a default home object, not a shop purchase and not a removable furniture reward.
+- **Surface**: small warm paper board on two short posts, using `--furniture-wheel`, `--furniture-wheel-dark`, `--drawn-ink`, and paper-line tones. It should feel handmade, not like a digital monitor.
+- **Spacing**: lives in the home scene near the room floor/wall boundary, separate from the top relationship rank and the bottom care economy. It must remain tappable on 320px+ mobile without stealing pet drag/petting priority.
+- **States**: visible only in the home scene. Tapping it opens the body status panel; egg/travel/away states lock the hidden fallback button and should not open the panel.
+- **Accessibility**: a visually hidden native `몸` button may remain as the keyboard/screen-reader fallback; the canvas sign is the player-facing trigger.
+- **Motion**: no decorative animation.
+
+### Body Status Panel
+
+- **Structure**: tonal paper overlay panel opened from the Body Status Board. It shows 튼튼, 빠름, 힘 as 0~100 progress rows.
+- **Surface**: same sketch-paper overlay language as notebook and memory; no digital dashboard chrome.
+- **Spacing**: compact rows with label, numeric progress, drawn track, paw marks, remaining-to-100 text, and one small growth hint.
+- **States**: closed, open, 0/100 through 100/100. Numbers are allowed only in this on-demand panel, never as a persistent home HUD.
+- **Accessibility**: progress is visible as text and not only color. Close button remains a native button.
+- **Motion**: panel open/close follows the existing overlay language; meter fills do not need animated count-up yet.
 
 ### Record Menu
 
@@ -268,6 +286,9 @@ All spacing derives from a base of 4px.
 - **Spacing**: no new gauge; battle uses canvas-only opponent and keeps the bottom control cluster compact on 320px+ mobile.
 - **States**: inactive, active, cheered, won, tired.
 - **Accessibility**: battle and cheer are native button actions, and every battle outcome has a visible pet caption and memory line.
+- **Arena Scale**: the battle arena is wider than the viewport. During battle, the pet and opponent render around 80-85% of home scale so mobile can show terrain, opponent, and movement context at once.
+- **Camera**: battle-only camera follows the midpoint between pet and opponent. HUD and outcome plaques stay screen-fixed; pet, opponent, particles, terrain, and captions live inside the camera transform.
+- **Terrain**: battle arenas may include hand-drawn ridges, stones, and bounds rendered with the same lumpy canvas grammar. Matching static Matter bodies make hits bounce against terrain, not only flat walls.
 - **Canvas HUD**: battle health uses a quiet in-world status strip with pet/opponent face dots and opposing fills, not floating dashboard labels such as "나/상대".
 - **Outcome Readout**: win/loss appears as a short hand-drawn plaque in the battle ground. Loss should visibly hand off into the return-home motion.
 - **Motion**: opponent is a simple procedural blob that enters from outside the map, then fights through recoil/knockback. A defeated opponent stays in the scene, bounces off the battle bounds, and only gets a small halo after settling; the player pet loss uses the xx-eyed roll-home motion.
@@ -305,7 +326,7 @@ All spacing derives from a base of 4px.
 - **Structure**: notebook-only body section for tough, quick, and power using five procedural DOM paw marks.
 - **Variants**: each stat pairs marks with one observation sentence and one smaller muted growth-path hint.
 - **Spacing**: two-column compact rows fit narrow mobile panels.
-- **States**: 0 to 5 filled marks, with no numeric stat text.
+- **States**: 0 to 5 filled marks, with no numeric stat text. Numeric 0~100 body progress belongs only to the Body Status Panel.
 - **Accessibility**: text observation accompanies the non-numeric visual scale.
 - **Motion**: static in the panel; body change is shown through pet movement.
 

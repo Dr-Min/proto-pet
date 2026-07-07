@@ -17,6 +17,7 @@
 <button id="debugAdultBtn" type="button" aria-label="디버그: 성체로 성장">성체</button>
 <button id="memoryBtn" aria-expanded="false" aria-controls="memoryPanel">기억</button>
 <button id="outingBtn" class="screen-reader-only" aria-expanded="false" aria-controls="outingSheet">외출</button>
+<button id="bodyStatusBtn" class="screen-reader-only" aria-expanded="false" aria-controls="bodyStatusPanel">몸</button>
 <div id="topMenu" aria-label="주요 메뉴">
   <button id="moreBtn" aria-expanded="false" aria-controls="moreSheet">기록</button>
 </div>
@@ -94,6 +95,15 @@
   <div class="memory-content">
     <h2>기억</h2>
     <div id="memoryGroups" class="memory-groups"></div>
+  </div>
+</section>
+<div id="bodyStatusScrim" class="overlay-scrim" hidden></div>
+<section id="bodyStatusPanel" class="body-status-panel" aria-label="몸 상태" hidden>
+  <button id="bodyStatusCloseBtn" class="body-status-close" aria-label="닫기">닫기</button>
+  <div class="body-status-content">
+    <h2>몸</h2>
+    <p id="bodyStatusSummary"></p>
+    <div id="bodyStatusStats" class="body-status-stats"></div>
   </div>
 </section>
 <div id="shopScrim" class="overlay-scrim" hidden></div>

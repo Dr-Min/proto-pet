@@ -103,6 +103,7 @@ const BATTLE_FOE_DEFEAT_SETTLE_SPEED = 0.52;
 const BATTLE_FOE_DEFEAT_MIN_SECONDS = 0.9;
 const BATTLE_FOE_DEFEAT_MAX_SECONDS = 4.2;
 const BATTLE_PHYSICS_STEP_MAX = 1000 / 30;
+const BATTLE_CAMERA_FOLLOW = 7.5;
 const LEAGUES = [
   {
     id: 'yard',
@@ -991,8 +992,9 @@ function updateBattleReturn(dt) {
 function battleDefeatReturnTarget() {
   if (!battleDefeatReturn) return null;
   if (battleDefeatReturn.phase === 'rollingOut') {
+    const bounds = battleArenaBounds();
     return {
-      x: battleDefeatReturn.exitSide < 0 ? -90 : W + 90,
+      x: battleDefeatReturn.exitSide < 0 ? bounds.left - 110 : bounds.right + 110,
       y: battleDefeatReturn.y,
     };
   }
@@ -1538,9 +1540,12 @@ function startBattleHere(opponentId = '') {
   battleDefeatReturn = null;
   pet.defeatT = 0;
   pet.rollSpin = 0;
-  const foeX = clamp(pet.x < W / 2 ? W * 0.72 : W * 0.28, 90, W - 90);
-  const entrySide = foeX > W / 2 ? 1 : -1;
-  const entryX = entrySide > 0 ? W + 74 : -74;
+  const worldW = battleWorldWidth();
+  const bounds = battleArenaBounds();
+  const petStartX = worldW * 0.42;
+  const foeX = worldW * 0.62;
+  const entrySide = foeX > petStartX ? 1 : -1;
+  const entryX = entrySide > 0 ? bounds.right + 108 : bounds.left - 108;
   const plan = resolveBattleCore({
     seed: (genes.seed ^ opponent.seed ^ careStats.battleWins) | 0,
     pet: playerBattleCoreSide(),
@@ -1548,6 +1553,10 @@ function startBattleHere(opponentId = '') {
   });
   const defeated = isOpponentDefeated(opponent.id);
   const battleY = clamp(pet.y + rand(-50, 45), H * 0.48, H * 0.78);
+  pet.x = petStartX;
+  pet.y = battleY + 8;
+  pet.target.x = pet.x;
+  pet.target.y = pet.y;
   battle = {
     x: entryX,
     baseX: foeX,
@@ -1575,6 +1584,8 @@ function startBattleHere(opponentId = '') {
     haloT: 0,
     haloVisible: false,
     resultShown: false,
+    worldWidth: worldW,
+    camera: battleCameraTarget(),
   };
   if (ball) ball = null;
   pet.behavior = 'battle';
@@ -1588,12 +1599,7 @@ function matterApi() {
   return typeof globalThis !== 'undefined' && globalThis.Matter ? globalThis.Matter : null;
 }
 function battlePhysicsBounds() {
-  return {
-    left: 70,
-    right: W - 70,
-    top: H * 0.46,
-    bottom: H * 0.82,
-  };
+  return battleArenaBounds();
 }
 function initBattlePhysics() {
   const Matter = matterApi();
@@ -1603,9 +1609,10 @@ function initBattlePhysics() {
   const engine = Engine.create({ enableSleeping: false });
   engine.gravity.x = 0;
   engine.gravity.y = 0;
-  const wall = 80;
-  const petRadius = clamp(stagedRadius() * 0.68, 24, 42);
-  const foeRadius = clamp(24 * depthScaleAt(battle.y), 19, 34);
+  const wall = 90;
+  const arenaW = bounds.right - bounds.left;
+  const petRadius = clamp(stagedRadius() * 0.68 * battleActorScale(), 20, 35);
+  const foeRadius = clamp(24 * depthScaleAt(battle.y) * battleActorScale(), 16, 28);
   const common = {
     restitution: 0.86,
     friction: 0.08,
@@ -1625,27 +1632,46 @@ function initBattlePhysics() {
     density: 0.0048,
   });
   const walls = [
-    Bodies.rectangle(W / 2, bounds.top - wall / 2, W, wall, { isStatic: true, restitution: 0.95 }),
-    Bodies.rectangle(W / 2, bounds.bottom + wall / 2, W, wall, { isStatic: true, restitution: 0.95 }),
-    Bodies.rectangle(bounds.left - wall / 2, H / 2, wall, H, { isStatic: true, restitution: 0.95 }),
-    Bodies.rectangle(bounds.right + wall / 2, H / 2, wall, H, { isStatic: true, restitution: 0.95 }),
+    Bodies.rectangle(bounds.left + arenaW / 2, bounds.top - wall / 2, arenaW + wall * 2, wall, { isStatic: true, restitution: 0.95, label: 'battle-wall-top' }),
+    Bodies.rectangle(bounds.left + arenaW / 2, bounds.bottom + wall / 2, arenaW + wall * 2, wall, { isStatic: true, restitution: 0.95, label: 'battle-wall-bottom' }),
+    Bodies.rectangle(bounds.left - wall / 2, H / 2, wall, H, { isStatic: true, restitution: 0.95, label: 'battle-wall-left' }),
+    Bodies.rectangle(bounds.right + wall / 2, H / 2, wall, H, { isStatic: true, restitution: 0.95, label: 'battle-wall-right' }),
   ];
+  const terrain = battleTerrainSpecs().map(spec => {
+    if (spec.kind === 'stone') {
+      return Bodies.circle(spec.x, spec.y, spec.r, {
+        isStatic: true,
+        restitution: 0.92,
+        friction: 0.05,
+        label: `battle-terrain-${spec.id}`,
+      });
+    }
+    return Bodies.rectangle(spec.x, spec.y, spec.w, spec.h, {
+      isStatic: true,
+      angle: spec.angle,
+      restitution: 0.9,
+      friction: 0.06,
+      chamfer: { radius: Math.min(spec.h * 0.55, 14) },
+      label: `battle-terrain-${spec.id}`,
+    });
+  });
   Body.setVelocity(petBody, { x: pet.vx / 60, y: pet.vy / 60 });
-  World.add(engine.world, [petBody, foeBody, ...walls]);
+  World.add(engine.world, [petBody, foeBody, ...walls, ...terrain]);
   battle.physics = {
     engine,
     petBody,
     foeBody,
     walls,
+    terrain,
     bounds,
-    width: W,
+    width: battleWorldWidth(),
     height: H,
   };
   return true;
 }
 function ensureBattlePhysics() {
   if (!battle) return false;
-  if (battle.physics && battle.physics.width === W && battle.physics.height === H) return true;
+  if (battle.physics && battle.physics.width === battleWorldWidth() && battle.physics.height === H) return true;
   return initBattlePhysics();
 }
 function steerBattleBody(body, targetX, targetY, amount) {
@@ -1656,6 +1682,14 @@ function steerBattleBody(body, targetX, targetY, amount) {
   const d = Math.hypot(dx, dy) || 1;
   const force = amount * body.mass;
   Matter.Body.applyForce(body, body.position, { x: dx / d * force, y: dy / d * force });
+}
+function updateBattleCamera(dt) {
+  if (!battle) return;
+  const target = battleCameraTarget();
+  if (!battle.camera) battle.camera = target;
+  const k = 1 - Math.exp(-BATTLE_CAMERA_FOLLOW * dt);
+  battle.camera.x = lerp(battle.camera.x, target.x, k);
+  battle.camera.y = lerp(battle.camera.y, target.y, k);
 }
 function syncBattleFromPhysics() {
   if (!battle || !battle.physics) return;
@@ -1677,7 +1711,7 @@ function updateBattlePhysics(dt) {
   const foeBody = battle.physics.foeBody;
   const opponent = opponentById(battle.opponentId);
   const personality = opponent ? opponent.personality : '침착';
-  const directionAway = battle.baseX < W / 2 ? -1 : 1;
+  const directionAway = battle.baseX < battleWorldWidth() / 2 ? -1 : 1;
   const dx = foeBody.position.x - petBody.position.x;
   const dy = foeBody.position.y - petBody.position.y;
   const d = Math.hypot(dx, dy) || 1;
@@ -1705,6 +1739,7 @@ function updateBattlePhysics(dt) {
   }
   Engine.update(battle.physics.engine, Math.min(dt * 1000, BATTLE_PHYSICS_STEP_MAX));
   syncBattleFromPhysics();
+  updateBattleCamera(dt);
   return true;
 }
 function applyBattleRoundImpact(round) {
@@ -1803,6 +1838,9 @@ function updateBattleEntry(dt) {
   battle.angle += -battle.entrySide * dt * 7.5;
   pet.target.x = battle.baseX - battle.entrySide * 54;
   pet.target.y = battle.baseY + 8;
+  pet.x = lerp(pet.x, pet.target.x, 1 - Math.exp(-5 * dt));
+  pet.y = lerp(pet.y, pet.target.y, 1 - Math.exp(-5 * dt));
+  updateBattleCamera(dt);
   if (Math.abs(battle.baseX - battle.x) <= 4) {
     battle.x = battle.baseX;
     battle.y = battle.baseY;
@@ -1842,6 +1880,7 @@ function updateBattleDefeated(dt) {
     battle.defeatT += dt;
     battle.x += (battle.defeatDir || 1) * 260 * dt;
     battle.angle += (battle.defeatDir || 1) * dt * 6;
+    updateBattleCamera(dt);
     if (!battle.haloVisible && battle.defeatT >= 0.9) {
       battle.haloVisible = true;
       battle.haloT = 0;
@@ -1874,6 +1913,7 @@ function updateBattleDefeated(dt) {
   const maxSpeed = 15.5;
   if (speed > maxSpeed) Body.setVelocity(foeBody, { x: foeBody.velocity.x / speed * maxSpeed, y: foeBody.velocity.y / speed * maxSpeed });
   syncBattleFromPhysics();
+  updateBattleCamera(dt);
   const settled = battle.defeatT >= BATTLE_FOE_DEFEAT_MIN_SECONDS && speed < BATTLE_FOE_DEFEAT_SETTLE_SPEED;
   if (!battle.haloVisible && (settled || battle.defeatT >= BATTLE_FOE_DEFEAT_MAX_SECONDS)) {
     battle.haloVisible = true;
@@ -1904,7 +1944,7 @@ function finishBattle(won) {
   const battleY = battle.y;
   const opponent = battle.opponentId ? opponentById(battle.opponentId) : null;
   const rematch = Boolean(battle.rematch);
-  const returnSide = Math.abs(pet.vx) > 90 ? Math.sign(pet.vx) : pet.x < W / 2 ? -1 : 1;
+  const returnSide = Math.abs(pet.vx) > 90 ? Math.sign(pet.vx) : pet.x < battleWorldWidth() / 2 ? -1 : 1;
   pet.behavior = 'stare';
   pet.behaviorT = 2.4;
   careStats.lastBattleAt = nowTime();
@@ -2014,7 +2054,7 @@ function updateBattle(dt) {
 function updateBattleFoeMotion(dt) {
   const opponent = opponentById(battle.opponentId);
   const personality = opponent ? opponent.personality : '침착';
-  const directionAway = battle.baseX < W / 2 ? -1 : 1;
+  const directionAway = battle.baseX < battleWorldWidth() / 2 ? -1 : 1;
   let targetX = battle.baseX;
   let targetY = battle.baseY;
   if (personality === '겁쟁이') {
@@ -2027,8 +2067,10 @@ function updateBattleFoeMotion(dt) {
     targetX += Math.sin(battle.t * 2.2) * 16;
     targetY += Math.cos(battle.t * 2.2) * 8;
   }
-  battle.x = lerp(battle.x, clamp(targetX, 84, W - 84), 1 - Math.exp(-5 * dt));
-  battle.y = lerp(battle.y, clamp(targetY, H * 0.48, H * 0.8), 1 - Math.exp(-5 * dt));
+  const bounds = battlePhysicsBounds();
+  battle.x = lerp(battle.x, clamp(targetX, bounds.left + 34, bounds.right - 34), 1 - Math.exp(-5 * dt));
+  battle.y = lerp(battle.y, clamp(targetY, bounds.top + 34, bounds.bottom - 34), 1 - Math.exp(-5 * dt));
+  updateBattleCamera(dt);
 }
 function playBattlePlanRounds() {
   if (!battle || !battle.plan || !Array.isArray(battle.plan.rounds)) return;

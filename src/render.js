@@ -105,10 +105,19 @@ function drawBallObject(alpha = 1) {
   ctx.restore();
 }
 
+function applyBattleViewTransform() {
+  const camera = typeof battleCameraState === 'function'
+    ? battleCameraState()
+    : { x: W * 0.5, y: H * 0.66, scale: 1, screenX: W * 0.5, screenY: H * 0.62 };
+  ctx.translate(camera.screenX, camera.screenY);
+  ctx.scale(camera.scale, camera.scale);
+  ctx.translate(-camera.x, -camera.y);
+}
+
 function drawBattleObject() {
   if (!battle) return;
   const bs = depthScaleAt(battle.y);
-  const br = 22 * bs;
+  const br = 22 * bs * (typeof battleActorScale === 'function' ? battleActorScale() : 1);
   const defeated = battle.phase === 'defeated';
   const physicsAngle = Number.isFinite(battle.angle) ? Math.sin(battle.angle) * 0.34 : 0;
   const entryRoll = battle.phase === 'entering' ? battle.angle : 0;
@@ -132,7 +141,6 @@ function drawBattleObject() {
     ctx.fillStyle = '#d97883';
     ctx.fillRect(-br * 0.62, -br * 0.95, br * 1.24 * battle.hp, br * 0.1);
     ctx.restore();
-    drawBattleHud();
   }
 }
 
@@ -374,40 +382,120 @@ function drawHomeWorld(t) {
   ctx.fillStyle = SURFACE_FLOOR;
   ctx.fillRect(0, floorY, W, H - floorY);
   drawWallFurniture(t);
+  drawBodyStatusBoard(t);
   drawOutingSign(t);
+}
+
+function drawBodyStatusBoard(t) {
+  if (typeof bodyStatusBoardAnchor !== 'function') return;
+  const board = bodyStatusBoardAnchor();
+  const groundY = board.groundY || H * 0.39;
+  const postBottom = groundY - board.y;
+  ctx.save();
+  ctx.translate(board.x, board.y);
+  ctx.rotate(0.035);
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.fillStyle = FURNITURE_WHEEL;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 4.6;
+  ctx.beginPath();
+  ctx.moveTo(-board.w * 0.22, board.h * 0.3);
+  ctx.lineTo(-board.w * 0.2, postBottom);
+  ctx.moveTo(board.w * 0.22, board.h * 0.28);
+  ctx.lineTo(board.w * 0.2, postBottom);
+  ctx.stroke();
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(-board.w * 0.36, postBottom);
+  ctx.lineTo(board.w * 0.36, postBottom);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(111,90,69,0.06)';
+  ctx.beginPath();
+  ctx.ellipse(0, postBottom + board.h * 0.12, board.w * 0.36, board.h * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,251,240,0.88)';
+  ctx.beginPath();
+  ctx.moveTo(-board.w * 0.46, -board.h * 0.36);
+  ctx.quadraticCurveTo(-board.w * 0.18, -board.h * 0.52, board.w * 0.4, -board.h * 0.42);
+  ctx.quadraticCurveTo(board.w * 0.52, -board.h * 0.1, board.w * 0.44, board.h * 0.34);
+  ctx.quadraticCurveTo(0, board.h * 0.5, -board.w * 0.46, board.h * 0.32);
+  ctx.quadraticCurveTo(-board.w * 0.54, 0, -board.w * 0.46, -board.h * 0.36);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = DRAWN_INK;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.max(17, board.h * 0.45)}px ${HAND_FONT}`;
+  ctx.fillText('몸', 0, -board.h * 0.08);
+  ctx.strokeStyle = 'rgba(111,90,69,0.22)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 3; i++) {
+    const y = board.h * (0.16 + i * 0.13);
+    ctx.beginPath();
+    ctx.moveTo(-board.w * 0.22, y);
+    ctx.lineTo(board.w * 0.22, y + Math.sin(t * 1.3 + i) * 0.8);
+    ctx.stroke();
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 
 function drawOutingSign(t) {
   if (typeof outingSignAnchor !== 'function') return;
   const sign = outingSignAnchor();
-  const sway = Math.sin(t * 1.1) * 0.01;
+  const groundY = sign.groundY || H * 0.39;
   ctx.save();
   ctx.translate(sign.x, sign.y);
-  ctx.rotate(-0.045 + sway);
+  ctx.rotate(-0.035);
   ctx.strokeStyle = FURNITURE_WHEEL_DARK;
-  ctx.lineWidth = 1.6;
+  ctx.fillStyle = FURNITURE_WHEEL;
   ctx.lineCap = 'round';
-  for (const sx of [-0.32, 0.32]) {
-    ctx.beginPath();
-    ctx.moveTo(sx * sign.w, -sign.h * 0.92);
-    ctx.lineTo(sx * sign.w, -sign.h * 0.48);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(sx * sign.w, -sign.h * 0.98, 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = FURNITURE_WHEEL_DARK;
-    ctx.fill();
-  }
+  ctx.lineJoin = 'round';
+  const postTop = sign.h * 0.34;
+  const postBottom = groundY - sign.y;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(-sign.w * 0.24, postTop);
+  ctx.lineTo(-sign.w * 0.22, postBottom);
+  ctx.moveTo(sign.w * 0.24, postTop);
+  ctx.lineTo(sign.w * 0.22, postBottom);
+  ctx.stroke();
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(-sign.w * 0.42, postBottom);
+  ctx.lineTo(sign.w * 0.42, postBottom);
+  ctx.stroke();
   ctx.fillStyle = 'rgba(111,90,69,0.07)';
   ctx.beginPath();
-  ctx.ellipse(0, sign.h * 0.52, sign.w * 0.43, sign.h * 0.11, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, postBottom + sign.h * 0.12, sign.w * 0.44, sign.h * 0.1, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,251,240,0.82)';
-  const signLumps = placeWorld.home.furnitureLumps.sign || placeWorld.home.furnitureLumps.cushion || [0, 0.02, -0.01, 0.015, -0.02, 0.01, 0, -0.015];
-  drawLumpyBlobShape(0, 0, sign.w * 0.5, sign.h * 0.5, signLumps, t * 0.35, 0.006);
+  ctx.fillStyle = 'rgba(255,251,240,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(-sign.w * 0.48, -sign.h * 0.38);
+  ctx.quadraticCurveTo(-sign.w * 0.32, -sign.h * 0.56, -sign.w * 0.08, -sign.h * 0.5);
+  ctx.lineTo(sign.w * 0.38, -sign.h * 0.48);
+  ctx.quadraticCurveTo(sign.w * 0.52, -sign.h * 0.34, sign.w * 0.48, -sign.h * 0.05);
+  ctx.lineTo(sign.w * 0.46, sign.h * 0.36);
+  ctx.quadraticCurveTo(sign.w * 0.12, sign.h * 0.52, -sign.w * 0.44, sign.h * 0.38);
+  ctx.quadraticCurveTo(-sign.w * 0.54, sign.h * 0.12, -sign.w * 0.48, -sign.h * 0.38);
+  ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = FURNITURE_WHEEL_DARK;
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.fillStyle = 'rgba(210,189,165,0.28)';
+  ctx.beginPath();
+  ctx.moveTo(-sign.w * 0.42, -sign.h * 0.1);
+  ctx.quadraticCurveTo(-sign.w * 0.03, -sign.h * 0.2, sign.w * 0.41, -sign.h * 0.08);
+  ctx.lineTo(sign.w * 0.4, sign.h * 0.1);
+  ctx.quadraticCurveTo(0, 0, -sign.w * 0.42, sign.h * 0.1);
+  ctx.closePath();
+  ctx.fill();
   ctx.fillStyle = DRAWN_INK;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -831,7 +919,8 @@ function drawWalkWorld(t) {
 }
 
 function drawBattleFlag(flag, t) {
-  const x = flag.x * W;
+  const worldW = typeof battleWorldWidth === 'function' ? battleWorldWidth() : W;
+  const x = flag.x * worldW;
   const y = flag.y * H;
   const s = depthScaleAt(y);
   const poleH = 42 * s;
@@ -854,8 +943,9 @@ function drawBattleFlag(flag, t) {
 
 function drawBattleFootprints() {
   ctx.fillStyle = BATTLE_FOOTPRINT;
+  const worldW = typeof battleWorldWidth === 'function' ? battleWorldWidth() : W;
   for (const fp of placeWorld.battle.footprints) {
-    const x = fp.x * W;
+    const x = fp.x * worldW;
     const y = fp.y * H;
     const s = depthScaleAt(y);
     ctx.save();
@@ -869,31 +959,78 @@ function drawBattleFootprints() {
   }
 }
 
+function drawBattleTerrain(t) {
+  if (typeof battleTerrainSpecs !== 'function') return;
+  const lumps = placeWorld.battle.terrainLumps || {};
+  for (const spec of battleTerrainSpecs()) {
+    const wobble = Math.sin(t * 1.2 + spec.x * 0.01) * 0.01;
+    ctx.save();
+    ctx.translate(spec.x, spec.y);
+    ctx.rotate((spec.angle || 0) + wobble);
+    if (spec.kind === 'stone') {
+      drawLumpyBlobShape(0, 0, spec.r * 1.18, spec.r * 0.82, lumps[spec.id === 'low-stone' ? 'lowStone' : 'highStone'], t * 0.18, 0.012);
+      ctx.fillStyle = BATTLE_RING;
+      ctx.fill();
+      ctx.strokeStyle = BATTLE_RING;
+      ctx.lineWidth = Math.max(1.8, spec.r * 0.07);
+      ctx.stroke();
+    } else {
+      drawLumpyBlobShape(0, 0, spec.w * 0.5, spec.h * 0.82, lumps[spec.id === 'left-ridge' ? 'leftRidge' : 'rightRidge'], t * 0.12, 0.006);
+      ctx.globalAlpha *= 0.72;
+      ctx.fillStyle = BATTLE_SAND;
+      ctx.fill();
+      ctx.globalAlpha /= 0.72;
+      ctx.strokeStyle = BATTLE_RING;
+      ctx.lineWidth = Math.max(2, spec.h * 0.11);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
 function drawBattleWorld(t) {
-  const floorY = H * 0.39;
   ctx.fillStyle = BATTLE_SKY;
   ctx.fillRect(0, 0, W, H);
+  const worldW = typeof battleWorldWidth === 'function' ? battleWorldWidth() : W;
+  const bounds = typeof battleArenaBounds === 'function'
+    ? battleArenaBounds()
+    : { left: 70, right: W - 70, top: H * 0.36, bottom: H * 0.88 };
   ctx.fillStyle = BATTLE_FLOOR;
-  ctx.fillRect(0, floorY, W, H - floorY);
-  const cx = W * 0.5;
-  const cy = H * 0.67;
-  const rx = Math.min(W * 0.34, 184);
-  const ry = H * 0.135;
-  drawLumpyBlobShape(cx, cy, rx * 0.96, ry * 1.1, placeWorld.battle.ringLumps, t * 0.15, 0.006);
+  ctx.fillRect(0, H * 0.39, W, H * 0.61);
+  ctx.save();
+  applyBattleViewTransform();
+  ctx.fillStyle = BATTLE_FLOOR;
+  ctx.fillRect(bounds.left - 90, bounds.top - 22, worldW + 180, bounds.bottom - bounds.top + 80);
+  const cx = worldW * 0.5;
+  const cy = H * 0.66;
+  const rx = Math.min(worldW * 0.28, W * 0.84, 520);
+  const ry = H * 0.2;
+  drawLumpyBlobShape(cx, cy, rx * 0.98, ry * 1.08, placeWorld.battle.ringLumps, t * 0.15, 0.006);
   ctx.fillStyle = BATTLE_SAND;
   ctx.fill();
   ctx.strokeStyle = BATTLE_RING;
-  ctx.lineWidth = Math.max(3, W * 0.005);
+  ctx.lineWidth = Math.max(3, W * 0.006);
   drawLumpyBlobShape(cx, cy, rx, ry, placeWorld.battle.ringLumps, t * 0.12, 0.01);
   ctx.stroke();
   ctx.strokeStyle = BATTLE_RING;
   ctx.lineWidth = Math.max(1.5, W * 0.0025);
   ctx.beginPath();
-  ctx.moveTo(cx - rx * 0.74, cy + Math.sin(t) * 2);
-  ctx.quadraticCurveTo(cx, cy - ry * 0.12, cx + rx * 0.74, cy + Math.cos(t * 0.7) * 2);
+  ctx.moveTo(cx - rx * 0.78, cy + Math.sin(t) * 3);
+  ctx.quadraticCurveTo(cx - rx * 0.26, cy - ry * 0.22, cx + rx * 0.08, cy + Math.cos(t * 0.7) * 2);
+  ctx.quadraticCurveTo(cx + rx * 0.42, cy + ry * 0.18, cx + rx * 0.78, cy - Math.sin(t * 0.8) * 3);
   ctx.stroke();
+  ctx.strokeStyle = BATTLE_RING;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(bounds.left, bounds.top);
+  ctx.lineTo(bounds.left, bounds.bottom);
+  ctx.moveTo(bounds.right, bounds.top);
+  ctx.lineTo(bounds.right, bounds.bottom);
+  ctx.stroke();
+  drawBattleTerrain(t);
   for (const flag of placeWorld.battle.flags) drawBattleFlag(flag, t);
   drawBattleFootprints();
+  ctx.restore();
 }
 
 function drawWorld(t) {
@@ -1050,6 +1187,7 @@ function reactionPulse(kind) {
 function draw(t) {
   ctx.clearRect(0, 0, W, H);
   drawWorld(t);
+  const battleScene = currentPlace() === 'battle';
 
   if (currentStage() === 'egg') {
     if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);
@@ -1060,9 +1198,15 @@ function draw(t) {
     return;
   }
 
+  if (battleScene) {
+    ctx.save();
+    applyBattleViewTransform();
+  }
   if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);
 
-  const s = depthScale(), r = stagedRadius();
+  const actorRenderScale = battleScene && typeof battleActorScale === 'function' ? battleActorScale() : 1;
+  const s = depthScale() * actorRenderScale;
+  const r = stagedRadius() * actorRenderScale;
   const bellyBlend = poseValue('belly');
   const sleepBlend = poseValue('sleep');
   const sniffBlend = poseValue('sniff');
@@ -1121,7 +1265,6 @@ function draw(t) {
   }
   if (ball && ball.phase !== 'carried') drawBallObject(ball.phase === 'fading' ? clamp(ball.fadeT / 1.5, 0, 1) : 1);
   drawBattleObject();
-  drawBattleResult();
 
   // 꼬리 (몸 뒤)
   if (bellyBlend < 0.98) {
@@ -1323,4 +1466,9 @@ function draw(t) {
 
   drawParticlesLayer();
   drawPetCaption();
+  if (battleScene) {
+    ctx.restore();
+    if (battle && battle.phase === 'active') drawBattleHud();
+  }
+  drawBattleResult();
 }

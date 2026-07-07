@@ -151,7 +151,7 @@
   .g { display: flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 700; }
   .bar { width: clamp(56px, 17vw, 84px); height: 11px; background: rgba(150,135,110,.2); border: 2px solid var(--drawn-paper-line); border-radius: 999px; overflow: hidden; transform: rotate(-0.5deg); }
   .bar i { display: block; height: 100%; width: 50%; background: var(--care-hunger); border-radius: 5px; }
-	  #feedBtn, #restBtn, #playBtn, #outingBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #memorySheetBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn, #battleCloseBtn, #battleChallengeBtn {
+	  #feedBtn, #restBtn, #playBtn, #outingBtn, #moreBtn, #returnBtn, #walkBtn, #battleBtn, #shopBtn, #memorySheetBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #bodyStatusCloseBtn, #shopCloseBtn, #battleCloseBtn, #battleChallengeBtn {
     --tilt: 0deg;
     min-height: 44px; padding: 9px 14px; border: 2px solid var(--drawn-ink-soft); border-radius: 26px 22px 25px 23px;
     background: var(--care-warm); color: var(--drawn-ink);
@@ -196,13 +196,13 @@
 	  #shopBtn { --tilt: -0.25deg; }
 	  #notebookBtn { --tilt: 0.55deg; }
 	  #memorySheetBtn { --tilt: -0.4deg; }
-	  #shopBtn, #memorySheetBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #shopCloseBtn, #battleCloseBtn { background: transparent; color: var(--text-ui); border-color: transparent; }
+	  #shopBtn, #memorySheetBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #bodyStatusCloseBtn, #shopCloseBtn, #battleCloseBtn { background: transparent; color: var(--text-ui); border-color: transparent; }
 	  #outingSheet #shopBtn { background: var(--care-warm); color: var(--drawn-ink); border-color: var(--drawn-ink-soft); }
 	  #battleChallengeBtn { --tilt: -0.4deg; width: 100%; margin-top: 12px; background: var(--care-battle); color: #4d4358; }
 	  #debugAdultBtn:active { transform: rotate(-1.2deg) scale(0.96); }
 	  #memoryBtn:active { transform: rotate(1.3deg) scale(0.96); }
-	  #feedBtn:active, #restBtn:active, #playBtn:active, #outingBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #memorySheetBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #memoryCloseBtn:active, #shopCloseBtn:active, #battleCloseBtn:active, #battleChallengeBtn:active, .shop-buy:active, .rematch-btn:active { transform: rotate(var(--tilt)) scale(0.96); }
-	  #debugAdultBtn.is-locked, #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #outingBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #memorySheetBtn.is-locked, #notebookBtn.is-locked, #battleChallengeBtn.is-locked, .shop-buy:disabled, .rematch-btn:disabled {
+	  #feedBtn:active, #restBtn:active, #playBtn:active, #outingBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #memorySheetBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #memoryCloseBtn:active, #bodyStatusCloseBtn:active, #shopCloseBtn:active, #battleCloseBtn:active, #battleChallengeBtn:active, .shop-buy:active, .rematch-btn:active { transform: rotate(var(--tilt)) scale(0.96); }
+	  #debugAdultBtn.is-locked, #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #outingBtn.is-locked, #bodyStatusBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #memorySheetBtn.is-locked, #notebookBtn.is-locked, #battleChallengeBtn.is-locked, .shop-buy:disabled, .rematch-btn:disabled {
 	    opacity: 0.58;
 	    filter: saturate(0.72);
 	  }
@@ -214,7 +214,7 @@
     touch-action: manipulation;
   }
   #sheetScrim { z-index: 4; }
-	  #notebookScrim, #memoryScrim, #shopScrim, #battleScrim { z-index: 6; }
+	  #notebookScrim, #memoryScrim, #bodyStatusScrim, #shopScrim, #battleScrim { z-index: 6; }
   .bottom-sheet {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
     box-sizing: border-box;
@@ -233,7 +233,7 @@
     pointer-events: auto;
   }
   .bottom-sheet[hidden] { display: flex; }
-	  .notebook-panel[hidden], .memory-panel[hidden], .shop-panel[hidden], .battle-panel[hidden], .overlay-scrim[hidden] { display: none; }
+	  .notebook-panel[hidden], .memory-panel[hidden], .body-status-panel[hidden], .shop-panel[hidden], .battle-panel[hidden], .overlay-scrim[hidden] { display: none; }
   .bottom-sheet button {
     width: 100%;
     background: transparent;
@@ -244,7 +244,7 @@
     font-size: 18px;
   }
   .bottom-sheet button:active { background: var(--surface-panel-deep); }
-	  .notebook-panel, .memory-panel, .shop-panel, .battle-panel {
+	  .notebook-panel, .memory-panel, .body-status-panel, .shop-panel, .battle-panel {
 	    position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 7;
 	    max-height: min(560px, calc(100dvh - 56px));
 	    box-sizing: border-box;
@@ -256,15 +256,15 @@
 	    color: var(--text-ui);
 	    font: 700 16px/1.35 var(--font-hand);
 	  }
-	  .notebook-close, .memory-close, .shop-close, .battle-close {
+	  .notebook-close, .memory-close, .body-status-close, .shop-close, .battle-close {
 	    float: right;
 	    min-height: 44px;
 	    padding: 8px 4px;
 	  }
-	  .notebook-content, .memory-content, .shop-content, .battle-content { clear: both; }
-	  .notebook-panel h2, .notebook-panel h3, .notebook-panel p, .memory-panel h2, .memory-panel h3, .shop-panel h2, .shop-panel h3, .shop-panel p, .battle-panel h2, .battle-panel h3, .battle-panel p { margin: 0; }
-	  .notebook-panel h2, .memory-panel h2, .shop-panel h2, .battle-panel h2 { font-size: 21px; line-height: 1.15; font-weight: 700; color: var(--drawn-ink); transform: rotate(-0.5deg); }
-	  .notebook-panel h3, .memory-panel h3, .shop-panel h3, .battle-panel h3 { margin-top: 16px; font-size: 17px; line-height: 1.2; font-weight: 700; color: var(--text-muted); }
+	  .notebook-content, .memory-content, .body-status-content, .shop-content, .battle-content { clear: both; }
+	  .notebook-panel h2, .notebook-panel h3, .notebook-panel p, .memory-panel h2, .memory-panel h3, .body-status-panel h2, .body-status-panel h3, .body-status-panel p, .shop-panel h2, .shop-panel h3, .shop-panel p, .battle-panel h2, .battle-panel h3, .battle-panel p { margin: 0; }
+	  .notebook-panel h2, .memory-panel h2, .body-status-panel h2, .shop-panel h2, .battle-panel h2 { font-size: 21px; line-height: 1.15; font-weight: 700; color: var(--drawn-ink); transform: rotate(-0.5deg); }
+	  .notebook-panel h3, .memory-panel h3, .body-status-panel h3, .shop-panel h3, .battle-panel h3 { margin-top: 16px; font-size: 17px; line-height: 1.2; font-weight: 700; color: var(--text-muted); }
 	  .notebook-panel ul, .memory-panel ul { margin: 6px 0 0; padding: 0; list-style: none; }
 	  .notebook-panel li, .memory-panel li { padding: 5px 0; color: var(--text-ui); }
 	  .notebook-panel li + li, .memory-panel li + li { margin-top: 2px; }
@@ -285,6 +285,16 @@
 	  .paw-mark.is-filled { opacity: 0.9; }
 	  .body-observation { grid-column: 2; color: var(--text-ui); }
 	  .body-stat-hint { grid-column: 2; margin-top: -4px; color: var(--text-muted); font-size: 14px; line-height: 1.25; }
+	  .body-status-stats { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+	  .body-meter-row { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; align-items: center; padding: 7px 0 8px; border-top: 1px solid var(--drawn-paper-line); }
+	  .body-meter-head { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; color: var(--drawn-ink); font-size: 18px; line-height: 1.15; }
+	  .body-meter-track { grid-column: 1 / -1; height: 11px; border: 2px solid var(--drawn-paper-line); border-radius: 999px; background: rgba(150,135,110,.16); overflow: hidden; transform: rotate(-0.25deg); }
+	  .body-meter-track i { display: block; height: 100%; width: 0; border-radius: 999px; background: var(--care-hunger); }
+	  .body-meter-row.is-quick .body-meter-track i { background: var(--care-energy); }
+	  .body-meter-row.is-power .body-meter-track i { background: var(--care-battle); }
+	  .body-meter-row .paw-scale { grid-column: 1; }
+	  .body-meter-meta { grid-column: 2; justify-self: end; color: var(--text-ui); font-size: 15px; line-height: 1.15; white-space: nowrap; }
+	  .body-meter-hint { grid-column: 1 / -1; color: var(--text-muted); font-size: 14px; line-height: 1.25; }
 	  .memory-groups section:first-child h3 { margin-top: 10px; }
 	  .shop-balance { color: var(--text-muted); }
 	  .shop-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }

@@ -8,6 +8,7 @@ const playBtn = document.getElementById('playBtn');
 const debugAdultBtn = document.getElementById('debugAdultBtn');
 const memoryBtn = document.getElementById('memoryBtn');
 const outingBtn = document.getElementById('outingBtn');
+const bodyStatusBtn = document.getElementById('bodyStatusBtn');
 const moreBtn = document.getElementById('moreBtn');
 const returnBtn = document.getElementById('returnBtn');
 const walkBtn = document.getElementById('walkBtn');
@@ -40,6 +41,11 @@ const memoryScrim = document.getElementById('memoryScrim');
 const memoryPanel = document.getElementById('memoryPanel');
 const memoryCloseBtn = document.getElementById('memoryCloseBtn');
 const memoryGroups = document.getElementById('memoryGroups');
+const bodyStatusScrim = document.getElementById('bodyStatusScrim');
+const bodyStatusPanel = document.getElementById('bodyStatusPanel');
+const bodyStatusCloseBtn = document.getElementById('bodyStatusCloseBtn');
+const bodyStatusSummary = document.getElementById('bodyStatusSummary');
+const bodyStatusStats = document.getElementById('bodyStatusStats');
 const shopScrim = document.getElementById('shopScrim');
 const shopPanel = document.getElementById('shopPanel');
 const shopCloseBtn = document.getElementById('shopCloseBtn');
@@ -56,7 +62,9 @@ closeOutingSheet();
 closeBattlePanel();
 closeNotebook();
 closeMemory();
+closeBodyStatusPanel();
 closeShop();
+let sheetOpenedAt = 0;
 feedBtn.addEventListener('click', () => {
   if (isTraveling()) {
     pet.caption = '도착하면 먹자';
@@ -113,6 +121,10 @@ outingBtn.addEventListener('click', () => {
   if (outingSheet.hidden) openOutingSheet();
   else closeOutingSheet();
 });
+bodyStatusBtn.addEventListener('click', () => {
+  if (bodyStatusPanel.hidden) openBodyStatusPanel();
+  else closeBodyStatusPanel();
+});
 moreBtn.addEventListener('click', () => {
   if (moreSheet.hidden) openMoreSheet();
   else closeMoreSheet();
@@ -137,7 +149,10 @@ memorySheetBtn.addEventListener('click', () => {
 notebookBtn.addEventListener('click', () => {
   openNotebook();
 });
-sheetScrim.addEventListener('click', closeAllSheets);
+sheetScrim.addEventListener('click', () => {
+  if (performance.now() - sheetOpenedAt < 260) return;
+  closeAllSheets();
+});
 battleScrim.addEventListener('click', closeBattlePanel);
 battleCloseBtn.addEventListener('click', closeBattlePanel);
 battleChallengeBtn.addEventListener('click', () => {
@@ -149,11 +164,14 @@ notebookScrim.addEventListener('click', closeNotebook);
 notebookCloseBtn.addEventListener('click', closeNotebook);
 memoryScrim.addEventListener('click', closeMemory);
 memoryCloseBtn.addEventListener('click', closeMemory);
+bodyStatusScrim.addEventListener('click', closeBodyStatusPanel);
+bodyStatusCloseBtn.addEventListener('click', closeBodyStatusPanel);
 shopScrim.addEventListener('click', closeShop);
 shopCloseBtn.addEventListener('click', closeShop);
 function openMoreSheet() {
   if (currentPlace() !== 'home' || isTraveling()) return;
   closeOutingSheet();
+  sheetOpenedAt = performance.now();
   sheetScrim.hidden = false;
   moreSheet.hidden = false;
   moreSheet.classList.add('is-open');
@@ -168,6 +186,7 @@ function closeMoreSheet() {
 function openOutingSheet() {
   if (currentPlace() !== 'home' || isTraveling()) return;
   closeMoreSheet();
+  sheetOpenedAt = performance.now();
   sheetScrim.hidden = false;
   outingSheet.hidden = false;
   outingSheet.classList.add('is-open');
@@ -185,6 +204,7 @@ function closeAllSheets() {
 }
 function openBattlePanel() {
   closeAllSheets();
+  closeBodyStatusPanel();
   renderBattlePanel();
   battleScrim.hidden = false;
   battlePanel.hidden = false;
@@ -196,6 +216,7 @@ function closeBattlePanel() {
 function openNotebook() {
   closeAllSheets();
   closeBattlePanel();
+  closeBodyStatusPanel();
   renderNotebook();
   notebookScrim.hidden = false;
   notebookPanel.hidden = false;
@@ -207,6 +228,7 @@ function closeNotebook() {
 function openMemory() {
   closeAllSheets();
   closeBattlePanel();
+  closeBodyStatusPanel();
   renderMemoryPanel();
   memoryScrim.hidden = false;
   memoryPanel.hidden = false;
@@ -217,9 +239,28 @@ function closeMemory() {
   memoryPanel.hidden = true;
   memoryBtn.setAttribute('aria-expanded', 'false');
 }
+function openBodyStatusPanel() {
+  if (currentStage() === 'egg') return;
+  if (currentPlace() !== 'home' || isTraveling()) return;
+  closeAllSheets();
+  closeBattlePanel();
+  closeNotebook();
+  closeMemory();
+  closeShop();
+  renderBodyStatusPanel();
+  bodyStatusScrim.hidden = false;
+  bodyStatusPanel.hidden = false;
+  bodyStatusBtn.setAttribute('aria-expanded', 'true');
+}
+function closeBodyStatusPanel() {
+  bodyStatusScrim.hidden = true;
+  bodyStatusPanel.hidden = true;
+  bodyStatusBtn.setAttribute('aria-expanded', 'false');
+}
 function openShop() {
   closeAllSheets();
   closeBattlePanel();
+  closeBodyStatusPanel();
   renderShop();
   shopScrim.hidden = false;
   shopPanel.hidden = false;
@@ -303,6 +344,12 @@ function renderPawScale(value) {
   }
   return scale;
 }
+function bodyStatScore(value) {
+  return Math.round(clamp(value / 5, 0, 1) * 100);
+}
+function bodyStatRemaining(score) {
+  return score >= 100 ? '가득 채움' : `100까지 ${100 - score}`;
+}
 function statObservation(key, value) {
   const lines = STAT_OBSERVATIONS[key];
   if (value <= 1) return lines[0];
@@ -381,6 +428,43 @@ function renderNotebook() {
     notebookBodyStats.appendChild(row);
   }
 }
+function renderBodyStatusPanel() {
+  bodyStatusStats.textContent = '';
+  const scores = STAT_KEYS.map(key => bodyStatScore(careStats.stats[key]));
+  const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0;
+  bodyStatusSummary.textContent = average > 0 ? `몸 기록 ${average}/100` : '아직 몸 기록 전';
+  for (const key of STAT_KEYS) {
+    const value = careStats.stats[key];
+    const score = bodyStatScore(value);
+    const row = document.createElement('div');
+    row.className = `body-meter-row is-${key}`;
+    const head = document.createElement('div');
+    head.className = 'body-meter-head';
+    const label = document.createElement('span');
+    label.textContent = STAT_LABELS[key];
+    const scoreText = document.createElement('span');
+    scoreText.textContent = `${score}/100`;
+    head.appendChild(label);
+    head.appendChild(scoreText);
+    const track = document.createElement('div');
+    track.className = 'body-meter-track';
+    const fill = document.createElement('i');
+    fill.style.width = `${score}%`;
+    track.appendChild(fill);
+    const meta = document.createElement('div');
+    meta.className = 'body-meter-meta';
+    meta.textContent = bodyStatRemaining(score);
+    const hint = document.createElement('div');
+    hint.className = 'body-meter-hint';
+    hint.textContent = STAT_HINTS[key];
+    row.appendChild(head);
+    row.appendChild(track);
+    row.appendChild(renderPawScale(value));
+    row.appendChild(meta);
+    row.appendChild(hint);
+    bodyStatusStats.appendChild(row);
+  }
+}
 function renderShop() {
   shopBalance.textContent = `주워온 반짝 ${careStats.pebbles}개`;
   shopList.textContent = '';
@@ -442,6 +526,7 @@ function updateGauges() {
   setButtonLocked(restBtn, stage === 'egg');
   setButtonLocked(playBtn, stage !== 'adult');
   setButtonLocked(debugAdultBtn, stage === 'adult' || isStagePreview());
+  setButtonLocked(bodyStatusBtn, stage === 'egg' || place !== 'home' || traveling);
   setButtonLocked(outingBtn, stage === 'egg' || place !== 'home' || traveling || Boolean(battle));
   setButtonLocked(moreBtn, place !== 'home' || traveling);
   setButtonLocked(walkBtn, stage === 'egg' || Boolean(battle));
@@ -454,6 +539,7 @@ function updateGauges() {
   if (place !== 'home' || traveling) {
     closeAllSheets();
     closeBattlePanel();
+    closeBodyStatusPanel();
   }
 }
 

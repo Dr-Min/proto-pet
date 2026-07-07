@@ -208,9 +208,11 @@ function furnitureHitTest(x, y) {
 function outingSignAnchor() {
   const w = clamp(W * 0.28, 96, 138);
   const h = clamp(H * 0.055, 36, 46);
+  const floorY = H * 0.38;
   return {
     x: W * 0.5,
-    y: clamp(H * 0.235, 128, H * 0.32),
+    y: clamp(floorY - H * 0.145, 132, floorY - 58),
+    groundY: floorY + clamp(H * 0.018, 10, 18),
     w,
     h,
   };
@@ -221,7 +223,32 @@ function outingSignHitTest(x, y) {
   const sign = outingSignAnchor();
   const dx = Math.abs(x - sign.x);
   const dy = Math.abs(y - sign.y);
-  return dx <= sign.w * 0.58 && dy <= sign.h * 0.72;
+  const onBoard = dx <= sign.w * 0.62 && dy <= sign.h * 0.78;
+  const onPost = dx <= sign.w * 0.32 && y >= sign.y + sign.h * 0.35 && y <= sign.groundY + 8;
+  return onBoard || onPost;
+}
+function bodyStatusBoardAnchor() {
+  const w = clamp(W * 0.22, 82, 116);
+  const h = clamp(H * 0.052, 36, 44);
+  const floorY = H * 0.38;
+  return {
+    x: clamp(W * 0.23, 86, W - 86),
+    y: clamp(floorY - H * 0.06, 150, floorY - 42),
+    groundY: floorY + clamp(H * 0.018, 10, 18),
+    w,
+    h,
+  };
+}
+function bodyStatusBoardHitTest(x, y) {
+  if (typeof currentPlace === 'function' && currentPlace() !== 'home') return false;
+  if (typeof isTraveling === 'function' && isTraveling()) return false;
+  if (typeof currentStage === 'function' && currentStage() === 'egg') return false;
+  const board = bodyStatusBoardAnchor();
+  const dx = Math.abs(x - board.x);
+  const dy = Math.abs(y - board.y);
+  const onBoard = dx <= board.w * 0.62 && dy <= board.h * 0.76;
+  const onPost = dx <= board.w * 0.34 && y >= board.y + board.h * 0.32 && y <= board.groundY + 8;
+  return onBoard || onPost;
 }
 function foodTypeById(id) {
   return FOOD_TYPES.find(type => type.id === id) || FOOD_TYPES[0];
@@ -399,6 +426,56 @@ applySize();
 
 function depthScaleAt(y) { return 0.75 + (y / H) * 0.45; }
 function depthScale() { return depthScaleAt(pet.y); }
+function battleActorScale() { return typeof currentPlace === 'function' && currentPlace() === 'battle' ? 0.82 : 1; }
+function battleWorldWidth() { return Math.max(W * 1.75, 720); }
+function battleArenaBounds() {
+  const worldW = battleWorldWidth();
+  return {
+    left: 68,
+    right: worldW - 68,
+    top: H * 0.36,
+    bottom: H * 0.88,
+  };
+}
+function battleTerrainSpecs() {
+  const worldW = battleWorldWidth();
+  return [
+    { id: 'left-ridge', kind: 'ridge', x: worldW * 0.3, y: H * 0.71, w: clamp(W * 0.68, 230, 390), h: 26, angle: -0.15 },
+    { id: 'right-ridge', kind: 'ridge', x: worldW * 0.68, y: H * 0.59, w: clamp(W * 0.64, 220, 360), h: 24, angle: 0.17 },
+    { id: 'low-stone', kind: 'stone', x: worldW * 0.18, y: H * 0.76, r: clamp(W * 0.052, 22, 36) },
+    { id: 'high-stone', kind: 'stone', x: worldW * 0.84, y: H * 0.66, r: clamp(W * 0.045, 19, 32) },
+  ];
+}
+function battleViewScale() { return 0.82; }
+function battleCameraFocusX() {
+  const worldW = battleWorldWidth();
+  if (typeof battle !== 'undefined' && battle) return (pet.x + battle.x) / 2;
+  return worldW * 0.5;
+}
+function battleCameraFocusY() {
+  if (typeof battle !== 'undefined' && battle) return (pet.y + battle.y) / 2;
+  return H * 0.66;
+}
+function battleCameraTarget() {
+  const scale = battleViewScale();
+  const minX = W / (2 * scale);
+  const maxX = battleWorldWidth() - minX;
+  return {
+    x: clamp(battleCameraFocusX(), Math.min(minX, maxX), Math.max(minX, maxX)),
+    y: clamp(battleCameraFocusY(), H * 0.42, H * 0.76),
+  };
+}
+function battleCameraState() {
+  const target = battleCameraTarget();
+  const source = typeof battle !== 'undefined' && battle && battle.camera ? battle.camera : target;
+  return {
+    x: Number.isFinite(source.x) ? source.x : target.x,
+    y: Number.isFinite(source.y) ? source.y : target.y,
+    scale: battleViewScale(),
+    screenX: W * 0.5,
+    screenY: H * 0.62,
+  };
+}
 function ownerPlayPoint(yRatio) {
   return { x: W / 2, y: H * yRatio };
 }
@@ -473,6 +550,12 @@ function makePlaceWorld() {
     },
     battle: {
       ringLumps: makeLumps(battleRng, 18, 0.075),
+      terrainLumps: {
+        leftRidge: makeLumps(battleRng, 14, 0.08),
+        rightRidge: makeLumps(battleRng, 14, 0.08),
+        lowStone: makeLumps(battleRng, 10, 0.14),
+        highStone: makeLumps(battleRng, 10, 0.14),
+      },
       flags: [
         { x: 0.2, y: 0.51, side: 1, phase: battleRng() * 8 },
         { x: 0.8, y: 0.51, side: -1, phase: battleRng() * 8 },
