@@ -8,6 +8,7 @@ const PLAY_BALL_SEAM = 'rgba(96,74,56,0.4)';
 const BATTLE_FOE = '#c9b7a2';
 const BATTLE_FOE_DARK = 'rgba(90,70,55,0.32)';
 const PET_GRIME = 'rgba(96,74,56,0.18)';
+const DRAWN_INK = '#6f5a45';
 const SURFACE_PAGE = '#f4efe4';
 const SURFACE_FLOOR = '#ece5d3';
 const WALK_FLOOR = '#e1e7d1';
@@ -373,6 +374,48 @@ function drawHomeWorld(t) {
   ctx.fillStyle = SURFACE_FLOOR;
   ctx.fillRect(0, floorY, W, H - floorY);
   drawWallFurniture(t);
+  drawOutingSign(t);
+}
+
+function drawOutingSign(t) {
+  if (typeof outingSignAnchor !== 'function') return;
+  const sign = outingSignAnchor();
+  const sway = Math.sin(t * 1.1) * 0.01;
+  ctx.save();
+  ctx.translate(sign.x, sign.y);
+  ctx.rotate(-0.045 + sway);
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  for (const sx of [-0.32, 0.32]) {
+    ctx.beginPath();
+    ctx.moveTo(sx * sign.w, -sign.h * 0.92);
+    ctx.lineTo(sx * sign.w, -sign.h * 0.48);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(sx * sign.w, -sign.h * 0.98, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = FURNITURE_WHEEL_DARK;
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(111,90,69,0.07)';
+  ctx.beginPath();
+  ctx.ellipse(0, sign.h * 0.52, sign.w * 0.43, sign.h * 0.11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,251,240,0.82)';
+  const signLumps = placeWorld.home.furnitureLumps.sign || placeWorld.home.furnitureLumps.cushion || [0, 0.02, -0.01, 0.015, -0.02, 0.01, 0, -0.015];
+  drawLumpyBlobShape(0, 0, sign.w * 0.5, sign.h * 0.5, signLumps, t * 0.35, 0.006);
+  ctx.fill();
+  ctx.strokeStyle = FURNITURE_WHEEL_DARK;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = DRAWN_INK;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.max(18, sign.h * 0.48)}px ${HAND_FONT}`;
+  ctx.fillText('외출', 0, 1);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.restore();
 }
 
 function drawWheelFurniture(x, y, s, t, part = 'full') {

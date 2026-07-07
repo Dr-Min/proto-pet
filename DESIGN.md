@@ -165,7 +165,7 @@ All spacing derives from a base of 4px.
 
 - **Structure**: native `button` fixed in the upper-left play space.
 - **Purpose**: temporary development control for forcing the pet to adult stage during battle testing.
-- **Spacing**: keep it below the hint when narrow screens wrap the hint.
+- **Spacing**: keep it below the centered relationship rank and away from the top-right record menu.
 - **States**: default, active, locked-looking when already adult or in stage preview.
 - **Accessibility**: explicit accessible label; minimum touch target remains usable on mobile.
 - **Surface**: small paper-label button using the hand font, soft ink outline, and stable tilt.
@@ -184,24 +184,24 @@ All spacing derives from a base of 4px.
 
 - **Structure**: one compact `#bondBadge` fixed at the very top, containing `#rankLine` only.
 - **Variants**: `유대 · 초면` through `유대 · 충신`.
-- **Spacing**: separate from the tutorial sign; desktop centers it, mobile pins it to the top-left so it does not collide with `외출/기록`.
+- **Spacing**: always centered at the very top on desktop and mobile. It must not drift to the top-left; top-left is reserved for temporary debug controls and top-right for 기록.
 - **States**: rank updates from daily care, walk returns, and battle wins.
 - **Accessibility**: visible text; details appear again inside the notebook.
 - **Motion**: rank-up feedback uses existing captions, hearts, and the pet's short proud reaction pulse.
 
-### Tutorial Sign
+### Outing Sign
 
-- **Structure**: top-center wall-hung hand-drawn sign containing only the short control hint.
-- **Surface**: rectangular paper/wooden sign, not a pill; it uses soft sketch borders, subtle board grain, hanging strings, nail dots, and a small drop shadow so it reads like it is hung on the wall.
-- **Spacing**: sits below the separate relationship rank and stays clear of the top-right outing/record buttons and top-left debug button on 320px+ mobile.
-- **States**: static, text-only, never blocks canvas input.
-- **Accessibility**: visible Korean text; no icon-only instruction.
+- **Structure**: canvas-drawn wall-hung sign in the home scene labeled `외출`. It replaces the visible top `외출` button.
+- **Surface**: rectangular paper/wooden sign, not a pill; it uses soft sketch borders, hanging strings, nail dots, and a small drop shadow so it reads like room furniture.
+- **Spacing**: lives on the wall layer below the relationship rank and above the floor line. It must remain tappable on 320px+ mobile without blocking the pet.
+- **States**: visible only in the home scene. Tapping it opens the outing bottom sheet for 산책, 전투, and 상점.
+- **Accessibility**: a visually hidden native `외출` button may remain as the keyboard/screen-reader fallback; the visible player-facing trigger is the room sign.
 - **Motion**: no decorative animation.
 
 ### Outing Menu
 
-- **Structure**: fixed top-right `외출` paper-label button opens a bottom sheet containing 산책, 전투, 상점.
-- **Spacing**: the trigger lives outside the bottom care row so the core care actions stay visually primary.
+- **Structure**: the home-scene Outing Sign opens a bottom sheet containing 산책, 전투, 상점.
+- **Spacing**: there is no visible top `외출` button. The trigger is part of the room so core care actions stay visually primary.
 - **States**: unavailable while away, traveling, egg-stage, or already battling.
 - **Accessibility**: native buttons; each refused action answers with pet text.
 - **Motion**: same bottom-sheet slide as other menus.
@@ -209,7 +209,7 @@ All spacing derives from a base of 4px.
 ### Record Menu
 
 - **Structure**: fixed top-right `기록` paper-label button opens a bottom sheet containing 기억 and 수첩.
-- **Spacing**: sits beside `외출` as a secondary global menu, not inside the care economy.
+- **Spacing**: sits alone in the top-right as a secondary global menu, not inside the care economy.
 - **States**: closed, open, panel launched, subdued while away or traveling.
 - **Accessibility**: native buttons open their existing panels.
 - **Motion**: same bottom-sheet slide as other menus.
@@ -363,7 +363,7 @@ All spacing derives from a base of 4px.
 - Animate only transform or canvas-rendered motion.
 - Behavior changes must preserve visual continuity: body scale, body center, feet/paws, eyes, and face position follow the new pose through `pet.pose` blending rather than switching frames immediately.
 - Caption reactions must stay additive: `pet.reactionKind` may briefly lift ears, squash/stretch the body, or change eye shape, but it must not replace the underlying behavior animation.
-- Pointer interactions must support both mouse and touch.
+- Pointer interactions must support both mouse and touch. On mobile, rubbing movement belongs to petting first; grabbing requires a short hold before movement so petting and lifting do not compete.
 
 ## 7. Depth & Surface
 

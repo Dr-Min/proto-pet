@@ -205,6 +205,24 @@ function furnitureHitTest(x, y) {
   }
   return '';
 }
+function outingSignAnchor() {
+  const w = clamp(W * 0.28, 96, 138);
+  const h = clamp(H * 0.055, 36, 46);
+  return {
+    x: W * 0.5,
+    y: clamp(H * 0.235, 128, H * 0.32),
+    w,
+    h,
+  };
+}
+function outingSignHitTest(x, y) {
+  if (typeof currentPlace === 'function' && currentPlace() !== 'home') return false;
+  if (typeof isTraveling === 'function' && isTraveling()) return false;
+  const sign = outingSignAnchor();
+  const dx = Math.abs(x - sign.x);
+  const dy = Math.abs(y - sign.y);
+  return dx <= sign.w * 0.58 && dy <= sign.h * 0.72;
+}
 function foodTypeById(id) {
   return FOOD_TYPES.find(type => type.id === id) || FOOD_TYPES[0];
 }
@@ -431,6 +449,7 @@ function makePlaceWorld() {
         wheel: makeLumps(homeRng, 16, 0.06),
         cushion: makeLumps(homeRng, 12, 0.08),
         plant: makeLumps(homeRng, 9, 0.12),
+        sign: makeLumps(homeRng, 10, 0.04),
       },
     },
     walk: {

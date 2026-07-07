@@ -33,6 +33,17 @@
 	  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; font-family: var(--font-hand); }
   canvas { display: block; touch-action: none; }
+  .screen-reader-only:not(:focus):not(:active) {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
   #bondBadge {
     position: fixed;
     top: calc(8px + env(safe-area-inset-top));
@@ -50,63 +61,6 @@
     pointer-events: none;
     transform: translateX(-50%) rotate(-0.35deg);
     box-shadow: 0 4px 10px rgba(111,90,69,0.08);
-  }
-  #topSign {
-    position: fixed;
-    top: 60px;
-    left: 50%;
-    z-index: 3;
-    width: min(316px, calc(100vw - 76px));
-    box-sizing: border-box;
-    padding: 10px 14px 9px;
-    border: 2px solid var(--drawn-ink-soft);
-    border-radius: 8px 11px 9px 10px;
-    background:
-      repeating-linear-gradient(90deg, rgba(111,90,69,0.035) 0 1px, transparent 1px 42px),
-      linear-gradient(180deg, rgba(255,251,240,0.86), rgba(232,223,203,0.82));
-    color: var(--drawn-ink);
-    text-align: center;
-    user-select: none;
-    pointer-events: none;
-    transform: translateX(-50%) rotate(-0.65deg);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.36),
-      inset 0 -3px 0 rgba(111,90,69,0.045),
-      0 7px 14px rgba(111,90,69,0.11);
-  }
-  #topSign::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: -23px;
-    height: 24px;
-    background:
-      radial-gradient(circle, var(--drawn-ink-soft) 0 2.5px, transparent 3px) 22% 2px / 9px 9px no-repeat,
-      radial-gradient(circle, var(--drawn-ink-soft) 0 2.5px, transparent 3px) 78% 2px / 9px 9px no-repeat,
-      linear-gradient(var(--drawn-ink-soft), var(--drawn-ink-soft)) 22% 8px / 2px 18px no-repeat,
-      linear-gradient(var(--drawn-ink-soft), var(--drawn-ink-soft)) 78% 8px / 2px 18px no-repeat;
-    pointer-events: none;
-  }
-  #topSign::after {
-    content: "";
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: -4px;
-    height: 5px;
-    border-radius: 50%;
-    background: rgba(111,90,69,0.08);
-    filter: blur(1px);
-    pointer-events: none;
-  }
-  #hint {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font: 700 14px/1.2 var(--font-hand);
-    color: var(--drawn-ink);
-    transform: rotate(0.35deg);
   }
   #topMenu {
     position: fixed;
@@ -217,6 +171,24 @@
     border-radius: 19px 17px 18px 20px;
   }
   #outingBtn { --tilt: -0.7deg; background: rgba(185,207,166,0.82); color: #46573d; }
+  #outingBtn.screen-reader-only:not(:focus):not(:active) {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    min-width: 1px;
+    min-height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: none;
+  }
   #moreBtn { --tilt: 1deg; background: rgba(232,223,203,0.82); color: var(--text-ui); }
   #returnBtn { --tilt: -0.5deg; display: none; width: 100%; background: var(--care-walk); color: #46573d; }
 	  #walkBtn { --tilt: -0.8deg; background: var(--care-walk); color: #46573d; }
@@ -350,23 +322,14 @@
 	    transform: rotate(var(--tilt));
 	  }
   @media (max-width: 520px) {
-    #bondBadge { left: 12px; max-width: 136px; padding: 6px 10px 5px; transform: rotate(-0.6deg); }
-    #topSign::before {
-      background:
-        radial-gradient(circle, var(--drawn-ink-soft) 0 2.5px, transparent 3px) 24% 2px / 9px 9px no-repeat,
-        radial-gradient(circle, var(--drawn-ink-soft) 0 2.5px, transparent 3px) 60% 2px / 9px 9px no-repeat,
-        linear-gradient(var(--drawn-ink-soft), var(--drawn-ink-soft)) 24% 8px / 2px 18px no-repeat,
-        linear-gradient(var(--drawn-ink-soft), var(--drawn-ink-soft)) 60% 8px / 2px 18px no-repeat;
-    }
-    #debugAdultBtn { top: 112px; left: 12px; }
+    #bondBadge { left: 50%; max-width: 146px; padding: 6px 10px 5px; transform: translateX(-50%) rotate(-0.45deg); }
+    #debugAdultBtn { top: 58px; left: 12px; }
   }
   @media (max-width: 380px) {
     #bondBadge { max-width: 128px; }
-    #topSign { top: 62px; width: calc(100vw - 72px); padding: 8px 10px 8px; }
-    #hint { font-size: 13px; }
     #rankLine { font-size: 16px; }
     #furnitureRemoveZone { top: 112px; width: min(164px, 44vw); font-size: 16px; }
-    #debugAdultBtn { top: 112px; left: 12px; min-height: 34px; padding: 6px 10px; font-size: 14px; }
+    #debugAdultBtn { top: 58px; left: 12px; min-height: 34px; padding: 6px 10px; font-size: 14px; }
     #memoryBtn { font-size: 16px; right: 10px; }
     #topMenu { right: 10px; gap: 5px; }
     #outingBtn, #moreBtn { min-width: 50px; min-height: 38px; padding: 7px 8px; font-size: 15px; }

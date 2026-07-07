@@ -40,6 +40,7 @@ function isTouchPointer(e) { return e.pointerType === 'touch' || e.pointerType =
 function isTouchType(type) { return type === 'touch' || type === 'pen'; }
 function dragThreshold(e) { return isTouchPointer(e) ? 18 : 12; }
 function rubThreshold(e) { return isTouchPointer(e) ? 7 : 4; }
+function touchDragHoldMs() { return 420; }
 function furniturePressThreshold() { return isTouchType(input.pointerType) ? 24 : 18; }
 function furnitureRemovePointerHit(x, y) {
   const zone = document.getElementById('furnitureRemoveZone');
@@ -236,8 +237,15 @@ function finishPointer(e) {
 
 cv.addEventListener('pointerdown', e => {
   mouse.x = e.clientX; mouse.y = e.clientY;
+  mouse.px = e.clientX; mouse.py = e.clientY;
   const hitsPet = petHitTest(e.clientX, e.clientY, 1.85);
-  const hitFurniture = hitsPet || currentPlace() !== 'home' || isTraveling() ? '' : furnitureHitTest(e.clientX, e.clientY);
+  const hitsOutingSign = !hitsPet && typeof outingSignHitTest === 'function' && outingSignHitTest(e.clientX, e.clientY);
+  const hitFurniture = hitsPet || hitsOutingSign || currentPlace() !== 'home' || isTraveling() ? '' : furnitureHitTest(e.clientX, e.clientY);
+  if (hitsOutingSign) {
+    if (typeof openOutingSheet === 'function') openOutingSheet();
+    e.preventDefault();
+    return;
+  }
   if (!hitsPet && !hitFurniture) return;
   input.active = true;
   input.pointerId = e.pointerId;
@@ -274,9 +282,16 @@ cv.addEventListener('pointermove', e => {
     e.preventDefault();
     return;
   }
-  if (input.mode === 'pending' && (fromStart > dragThreshold(e) || (elapsed > 180 && fromStart > rubThreshold(e)))) startDrag(e);
-  else if (input.mode === 'pending' && frameMove > rubThreshold(e)) input.mode = 'pet';
-  else if (input.mode === 'pet' && fromStart > dragThreshold(e) * 1.45 && elapsed > 120) startDrag(e);
+  if (input.mode === 'pending' && isTouchPointer(e)) {
+    if (elapsed >= touchDragHoldMs() && fromStart > dragThreshold(e)) startDrag(e);
+    else if (frameMove > rubThreshold(e) || fromStart > rubThreshold(e)) input.mode = 'pet';
+  } else if (input.mode === 'pending' && (fromStart > dragThreshold(e) || (elapsed > 180 && fromStart > rubThreshold(e)))) {
+    startDrag(e);
+  } else if (input.mode === 'pending' && frameMove > rubThreshold(e)) {
+    input.mode = 'pet';
+  } else if (input.mode === 'pet' && !isTouchPointer(e) && fromStart > dragThreshold(e) * 1.45 && elapsed > 120) {
+    startDrag(e);
+  }
   e.preventDefault();
 });
 
