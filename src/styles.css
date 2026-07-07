@@ -30,6 +30,14 @@
 	    --day-tone: rgba(0,0,0,0);
 	    --day-evening-tone: rgba(217,143,122,0.06);
 	    --day-night-tone: rgba(64,78,118,0.10);
+	    --world-battle-alley-floor: #d9d4c4;
+	    --world-battle-alley-sky: #ece7df;
+	    --world-battle-alley-sand: #cbc0ac;
+	    --world-battle-alley-accent: #b8a9c7;
+	    --world-battle-town-floor: #d6dece;
+	    --world-battle-town-sky: #edf0e6;
+	    --world-battle-town-sand: #c5d2b8;
+	    --world-battle-town-accent: #cfaaa0;
 	  }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--surface-page); touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; font-family: var(--font-hand); }
   canvas { display: block; touch-action: none; }
@@ -321,6 +329,72 @@
 	  .battle-preview { width: 96px; height: 72px; display: block; }
 	  .battle-opponent-name { font-weight: 600; color: var(--text-ui); }
 	  .battle-opponent-line, .battle-rematch-note { color: var(--text-muted); }
+	  .battle-region-list {
+	    display: flex;
+	    flex-direction: column;
+	    gap: 7px;
+	    margin-top: 10px;
+	    max-height: min(270px, 34dvh);
+	    overflow: auto;
+	    padding-right: 3px;
+	    overscroll-behavior: contain;
+	  }
+	  .battle-region-row {
+	    display: grid;
+	    grid-template-columns: 34px 1fr auto;
+	    gap: 4px 6px;
+	    align-items: center;
+	    min-height: 50px;
+	    padding: 8px 9px;
+	    border: 2px solid var(--drawn-paper-line);
+	    border-radius: 16px 18px 15px 17px;
+	    background: rgba(244,239,228,0.5);
+	    color: var(--text-ui);
+	    font: 700 15px/1.12 var(--font-hand);
+	    text-align: left;
+	    cursor: pointer;
+	    touch-action: manipulation;
+	  }
+	  .battle-region-index {
+	    color: var(--text-muted);
+	    font-size: 13px;
+	    line-height: 1;
+	    text-align: center;
+	  }
+	  .battle-region-row.is-selected {
+	    border-color: var(--drawn-ink-soft);
+	    background: rgba(199,177,216,0.32);
+	    color: var(--drawn-ink);
+	  }
+	  .battle-region-row.is-locked {
+	    opacity: 0.52;
+	    filter: saturate(0.7);
+	    cursor: default;
+	  }
+	  .battle-region-name {
+	    overflow: hidden;
+	    text-overflow: ellipsis;
+	    white-space: nowrap;
+	  }
+	  .battle-region-meta {
+	    color: var(--text-muted);
+	    font-size: 13px;
+	    line-height: 1;
+	  }
+	  .battle-region-progress {
+	    grid-column: 2 / -1;
+	    height: 7px;
+	    overflow: hidden;
+	    border-radius: 999px;
+	    background: rgba(150,135,110,.16);
+	  }
+	  .battle-region-progress i {
+	    display: block;
+	    height: 100%;
+	    width: 0;
+	    border-radius: 999px;
+	    background: var(--care-battle);
+	  }
 	  .battle-rematch-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 	  .rematch-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; min-height: 44px; }
 	  .rematch-btn {
@@ -354,4 +428,6 @@
 	    .shop-preview { width: 62px; }
 	    .battle-opponent-card { grid-template-columns: 82px 1fr; }
 	    .battle-preview { width: 82px; }
+	    .battle-region-list { gap: 5px; max-height: min(250px, 33dvh); }
+	    .battle-region-row { min-height: 48px; padding: 7px 7px; font-size: 14px; }
 	  }

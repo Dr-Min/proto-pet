@@ -439,6 +439,23 @@ function battleArenaBounds() {
 }
 function battleTerrainSpecs() {
   const worldW = battleWorldWidth();
+  const themeId = typeof currentBattleThemeId === 'function' ? currentBattleThemeId() : 'yard';
+  if (themeId === 'alley') {
+    return [
+      { id: 'left-ridge', kind: 'ridge', x: worldW * 0.24, y: H * 0.63, w: clamp(W * 0.5, 190, 320), h: 24, angle: 0.2 },
+      { id: 'right-ridge', kind: 'ridge', x: worldW * 0.72, y: H * 0.72, w: clamp(W * 0.56, 210, 350), h: 25, angle: -0.16 },
+      { id: 'low-stone', kind: 'stone', x: worldW * 0.36, y: H * 0.78, r: clamp(W * 0.048, 20, 34) },
+      { id: 'high-stone', kind: 'stone', x: worldW * 0.82, y: H * 0.58, r: clamp(W * 0.05, 21, 34) },
+    ];
+  }
+  if (themeId === 'town') {
+    return [
+      { id: 'left-ridge', kind: 'ridge', x: worldW * 0.34, y: H * 0.58, w: clamp(W * 0.58, 220, 370), h: 25, angle: -0.22 },
+      { id: 'right-ridge', kind: 'ridge', x: worldW * 0.7, y: H * 0.68, w: clamp(W * 0.7, 240, 410), h: 27, angle: 0.14 },
+      { id: 'low-stone', kind: 'stone', x: worldW * 0.2, y: H * 0.72, r: clamp(W * 0.055, 23, 38) },
+      { id: 'high-stone', kind: 'stone', x: worldW * 0.55, y: H * 0.78, r: clamp(W * 0.045, 19, 32) },
+    ];
+  }
   return [
     { id: 'left-ridge', kind: 'ridge', x: worldW * 0.3, y: H * 0.71, w: clamp(W * 0.68, 230, 390), h: 26, angle: -0.15 },
     { id: 'right-ridge', kind: 'ridge', x: worldW * 0.68, y: H * 0.59, w: clamp(W * 0.64, 220, 360), h: 24, angle: 0.17 },
@@ -731,10 +748,27 @@ const particles = [];
 function spawn(type, x, y) {
   particles.push({ type, x, y, vx: rand(-14, 14), vy: rand(-46, -26), life: type === 'spark' ? 1.05 : 1.4, t: 0 });
 }
+function spawnBattleHitBurst(type, x, y, dir = 1) {
+  const sign = dir >= 0 ? 1 : -1;
+  for (let i = 0; i < 7; i++) {
+    particles.push({
+      type,
+      x: x + rand(-12, 12),
+      y: y + rand(-12, 12),
+      vx: sign * rand(28, 86) + rand(-12, 12),
+      vy: rand(-42, 26),
+      life: rand(0.34, 0.54),
+      t: 0,
+      size: rand(9, 20),
+      rot: rand(-0.7, 0.7),
+    });
+  }
+}
 function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.type === 'dust' ? 40 : -6) * dt;
+    const hitParticle = p.type === 'battle-blue' || p.type === 'battle-red';
+    p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.type === 'dust' ? 40 : hitParticle ? 16 : -6) * dt;
     if (p.t > p.life) particles.splice(i, 1);
   }
 }

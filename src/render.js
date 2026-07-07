@@ -40,6 +40,47 @@ const DAY_EVENING_TONE = 'rgba(217,143,122,0.06)';
 const DAY_NIGHT_TONE = 'rgba(64,78,118,0.10)';
 const HAND_FONT = '"Gaegu", "Apple SD Gothic Neo", -apple-system, sans-serif';
 
+function cssVarValue(name, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+const BATTLE_REGION_PALETTES = {
+  yard: {
+    sky: BATTLE_SKY,
+    floor: BATTLE_FLOOR,
+    sand: BATTLE_SAND,
+    ring: BATTLE_RING,
+    flag: BATTLE_FLAG,
+    footprint: BATTLE_FOOTPRINT,
+    path: '#d7ccb7',
+    accent: BATTLE_FLAG,
+  },
+  alley: {
+    sky: cssVarValue('--world-battle-alley-sky', '#ece7df'),
+    floor: cssVarValue('--world-battle-alley-floor', '#d9d4c4'),
+    sand: cssVarValue('--world-battle-alley-sand', '#cbc0ac'),
+    ring: 'rgba(91,82,74,0.24)',
+    flag: cssVarValue('--world-battle-alley-accent', '#b8a9c7'),
+    footprint: 'rgba(91,82,74,0.14)',
+    path: '#c6bcaa',
+    accent: cssVarValue('--world-battle-alley-accent', '#b8a9c7'),
+  },
+  town: {
+    sky: cssVarValue('--world-battle-town-sky', '#edf0e6'),
+    floor: cssVarValue('--world-battle-town-floor', '#d6dece'),
+    sand: cssVarValue('--world-battle-town-sand', '#c5d2b8'),
+    ring: 'rgba(87,105,72,0.22)',
+    flag: cssVarValue('--world-battle-town-accent', '#cfaaa0'),
+    footprint: 'rgba(87,105,72,0.13)',
+    path: '#bdcaaa',
+    accent: cssVarValue('--world-battle-town-accent', '#cfaaa0'),
+  },
+};
+function battleRegionPalette() {
+  const id = typeof currentBattleThemeId === 'function' ? currentBattleThemeId() : 'yard';
+  return BATTLE_REGION_PALETTES[id] || BATTLE_REGION_PALETTES.yard;
+}
+
 function geneValue(name, fallback) {
   return typeof genes === 'undefined' ? fallback : genes[name];
 }
@@ -63,6 +104,23 @@ function drawParticlesLayer() {
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, 3.8 * a, 1.5 * a, p.t * 4, 0, Math.PI * 2);
       ctx.fill();
+    } else if (p.type === 'battle-blue' || p.type === 'battle-red') {
+      const blue = p.type === 'battle-blue';
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.rot || 0) + p.t * (blue ? 3.4 : -3.1));
+      ctx.strokeStyle = blue ? `rgba(74,139,196,${a * 0.9})` : `rgba(206,83,89,${a * 0.88})`;
+      ctx.lineWidth = Math.max(2, (p.size || 14) * 0.18 * a);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-(p.size || 14) * a, 0);
+      ctx.quadraticCurveTo(0, -(p.size || 14) * 0.55 * a, (p.size || 14) * 1.1 * a, 0);
+      ctx.stroke();
+      ctx.fillStyle = blue ? `rgba(143,183,217,${a * 0.45})` : `rgba(217,119,107,${a * 0.45})`;
+      ctx.beginPath();
+      ctx.ellipse((p.size || 14) * 0.25 * a, 1.5 * a, (p.size || 14) * 0.22 * a, (p.size || 14) * 0.1 * a, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     } else {
       ctx.fillStyle = `rgba(170,150,120,${a * 0.6})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, 3 * a, 0, Math.PI * 2); ctx.fill();
@@ -918,21 +976,21 @@ function drawWalkWorld(t) {
   if (!butterfly || butterfly.noseT <= 0) drawButterfly(t);
 }
 
-function drawBattleFlag(flag, t) {
+function drawBattleFlag(flag, t, palette = battleRegionPalette()) {
   const worldW = typeof battleWorldWidth === 'function' ? battleWorldWidth() : W;
   const x = flag.x * worldW;
   const y = flag.y * H;
   const s = depthScaleAt(y);
   const poleH = 42 * s;
   const wave = Math.sin(t * 3.6 + flag.phase) * 5 * s;
-  ctx.strokeStyle = BATTLE_RING;
+  ctx.strokeStyle = palette.ring;
   ctx.lineWidth = Math.max(1.5, 2 * s);
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(x, y + 14 * s);
   ctx.lineTo(x, y - poleH);
   ctx.stroke();
-  ctx.fillStyle = BATTLE_FLAG;
+  ctx.fillStyle = palette.flag;
   ctx.beginPath();
   ctx.moveTo(x, y - poleH + 5 * s);
   ctx.quadraticCurveTo(x + flag.side * (20 * s + wave), y - poleH + 1 * s, x + flag.side * 31 * s, y - poleH + 11 * s);
@@ -941,8 +999,8 @@ function drawBattleFlag(flag, t) {
   ctx.fill();
 }
 
-function drawBattleFootprints() {
-  ctx.fillStyle = BATTLE_FOOTPRINT;
+function drawBattleFootprints(palette = battleRegionPalette()) {
+  ctx.fillStyle = palette.footprint;
   const worldW = typeof battleWorldWidth === 'function' ? battleWorldWidth() : W;
   for (const fp of placeWorld.battle.footprints) {
     const x = fp.x * worldW;
@@ -959,7 +1017,7 @@ function drawBattleFootprints() {
   }
 }
 
-function drawBattleTerrain(t) {
+function drawBattleTerrain(t, palette = battleRegionPalette()) {
   if (typeof battleTerrainSpecs !== 'function') return;
   const lumps = placeWorld.battle.terrainLumps || {};
   for (const spec of battleTerrainSpecs()) {
@@ -969,18 +1027,18 @@ function drawBattleTerrain(t) {
     ctx.rotate((spec.angle || 0) + wobble);
     if (spec.kind === 'stone') {
       drawLumpyBlobShape(0, 0, spec.r * 1.18, spec.r * 0.82, lumps[spec.id === 'low-stone' ? 'lowStone' : 'highStone'], t * 0.18, 0.012);
-      ctx.fillStyle = BATTLE_RING;
+      ctx.fillStyle = palette.ring;
       ctx.fill();
-      ctx.strokeStyle = BATTLE_RING;
+      ctx.strokeStyle = palette.ring;
       ctx.lineWidth = Math.max(1.8, spec.r * 0.07);
       ctx.stroke();
     } else {
       drawLumpyBlobShape(0, 0, spec.w * 0.5, spec.h * 0.82, lumps[spec.id === 'left-ridge' ? 'leftRidge' : 'rightRidge'], t * 0.12, 0.006);
       ctx.globalAlpha *= 0.72;
-      ctx.fillStyle = BATTLE_SAND;
+      ctx.fillStyle = palette.sand;
       ctx.fill();
       ctx.globalAlpha /= 0.72;
-      ctx.strokeStyle = BATTLE_RING;
+      ctx.strokeStyle = palette.ring;
       ctx.lineWidth = Math.max(2, spec.h * 0.11);
       ctx.stroke();
     }
@@ -989,37 +1047,38 @@ function drawBattleTerrain(t) {
 }
 
 function drawBattleWorld(t) {
-  ctx.fillStyle = BATTLE_SKY;
+  const palette = battleRegionPalette();
+  ctx.fillStyle = palette.sky;
   ctx.fillRect(0, 0, W, H);
   const worldW = typeof battleWorldWidth === 'function' ? battleWorldWidth() : W;
   const bounds = typeof battleArenaBounds === 'function'
     ? battleArenaBounds()
     : { left: 70, right: W - 70, top: H * 0.36, bottom: H * 0.88 };
-  ctx.fillStyle = BATTLE_FLOOR;
+  ctx.fillStyle = palette.floor;
   ctx.fillRect(0, H * 0.39, W, H * 0.61);
   ctx.save();
   applyBattleViewTransform();
-  ctx.fillStyle = BATTLE_FLOOR;
+  ctx.fillStyle = palette.floor;
   ctx.fillRect(bounds.left - 90, bounds.top - 22, worldW + 180, bounds.bottom - bounds.top + 80);
   const cx = worldW * 0.5;
   const cy = H * 0.66;
   const rx = Math.min(worldW * 0.28, W * 0.84, 520);
   const ry = H * 0.2;
   drawLumpyBlobShape(cx, cy, rx * 0.98, ry * 1.08, placeWorld.battle.ringLumps, t * 0.15, 0.006);
-  ctx.fillStyle = BATTLE_SAND;
+  ctx.fillStyle = palette.sand;
   ctx.fill();
-  ctx.strokeStyle = BATTLE_RING;
+  ctx.strokeStyle = palette.ring;
   ctx.lineWidth = Math.max(3, W * 0.006);
   drawLumpyBlobShape(cx, cy, rx, ry, placeWorld.battle.ringLumps, t * 0.12, 0.01);
   ctx.stroke();
-  ctx.strokeStyle = BATTLE_RING;
+  ctx.strokeStyle = palette.ring;
   ctx.lineWidth = Math.max(1.5, W * 0.0025);
   ctx.beginPath();
   ctx.moveTo(cx - rx * 0.78, cy + Math.sin(t) * 3);
   ctx.quadraticCurveTo(cx - rx * 0.26, cy - ry * 0.22, cx + rx * 0.08, cy + Math.cos(t * 0.7) * 2);
   ctx.quadraticCurveTo(cx + rx * 0.42, cy + ry * 0.18, cx + rx * 0.78, cy - Math.sin(t * 0.8) * 3);
   ctx.stroke();
-  ctx.strokeStyle = BATTLE_RING;
+  ctx.strokeStyle = palette.ring;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(bounds.left, bounds.top);
@@ -1027,10 +1086,69 @@ function drawBattleWorld(t) {
   ctx.moveTo(bounds.right, bounds.top);
   ctx.lineTo(bounds.right, bounds.bottom);
   ctx.stroke();
-  drawBattleTerrain(t);
-  for (const flag of placeWorld.battle.flags) drawBattleFlag(flag, t);
-  drawBattleFootprints();
+  drawBattleTerrain(t, palette);
+  for (const flag of placeWorld.battle.flags) drawBattleFlag(flag, t, palette);
+  drawBattleFootprints(palette);
   ctx.restore();
+}
+
+function drawBattleExpeditionWorld(t) {
+  const palette = battleRegionPalette();
+  const expedition = typeof battleExpeditionState === 'function' ? battleExpeditionState() : null;
+  const scroll = expedition ? expedition.scroll : t * 0.9;
+  const floorY = H * 0.36;
+  ctx.fillStyle = palette.sky;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = palette.floor;
+  ctx.fillRect(0, floorY, W, H - floorY);
+  const pathW = clamp(W * 0.36, 118, 184);
+  const pathX = W * 0.5;
+  ctx.fillStyle = palette.path;
+  ctx.beginPath();
+  ctx.moveTo(pathX - pathW * 0.5, floorY - 8);
+  ctx.bezierCurveTo(pathX - pathW * 0.72, H * 0.52, pathX - pathW * 0.24, H * 0.66, pathX - pathW * 0.62, H + 40);
+  ctx.lineTo(pathX + pathW * 0.56, H + 40);
+  ctx.bezierCurveTo(pathX + pathW * 0.12, H * 0.68, pathX + pathW * 0.66, H * 0.54, pathX + pathW * 0.46, floorY - 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = palette.ring;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  const offset = (scroll * 190) % 118;
+  for (let i = -1; i < 8; i++) {
+    const y = floorY + ((i * 118 + offset) % (H - floorY + 150)) - 42;
+    const side = i % 2 === 0 ? -1 : 1;
+    const x = pathX + side * (pathW * 0.58 + (i % 3) * 18);
+    const s = depthScaleAt(clamp(y, floorY, H));
+    drawLumpyBlobShape(x, y, 18 * s, 9 * s, placeWorld.battle.terrainLumps.lowStone, t * 0.18 + i, 0.012);
+    ctx.fillStyle = i % 3 === 0 ? palette.accent : palette.sand;
+    ctx.globalAlpha = 0.62;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = palette.footprint;
+  for (let i = -1; i < 9; i++) {
+    const y = floorY + ((i * 82 + offset * 1.15) % (H - floorY + 120)) - 32;
+    const x = pathX + Math.sin(i * 1.7) * pathW * 0.2;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(i) * 0.32);
+    ctx.beginPath();
+    ctx.ellipse(-6, -2, 5, 2.4, -0.2, 0, Math.PI * 2);
+    ctx.ellipse(6, 5, 5, 2.4, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  if (expedition && expedition.encounterAt - expedition.t < 0.8) {
+    const pulse = clamp(1 - (expedition.encounterAt - expedition.t) / 0.8, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = pulse * 0.38;
+    ctx.fillStyle = palette.ring;
+    ctx.beginPath();
+    ctx.ellipse(W * 0.5, H * 0.46, 42 + pulse * 34, 11 + pulse * 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawWorld(t) {
@@ -1038,7 +1156,9 @@ function drawWorld(t) {
   if (placeName === 'walk') {
     drawWalkWorld(t);
   } else if (placeName === 'battle') {
-    drawBattleWorld(t);
+    const expeditionScene = typeof isBattleExpeditionActive === 'function' && isBattleExpeditionActive() && !battle;
+    if (expeditionScene) drawBattleExpeditionWorld(t);
+    else drawBattleWorld(t);
   } else {
     drawHomeWorld(t);
   }
@@ -1187,7 +1307,8 @@ function reactionPulse(kind) {
 function draw(t) {
   ctx.clearRect(0, 0, W, H);
   drawWorld(t);
-  const battleScene = currentPlace() === 'battle';
+  const expeditionScene = typeof isBattleExpeditionActive === 'function' && isBattleExpeditionActive() && !battle;
+  const battleScene = currentPlace() === 'battle' && !expeditionScene;
 
   if (currentStage() === 'egg') {
     if (currentPlace() === 'home') drawFloorFurnitureBehindPet(t);

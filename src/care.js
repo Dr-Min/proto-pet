@@ -39,6 +39,7 @@ careStats.furniturePlaced = migrateFurniturePlaced(null);
 let food = null;                             // {x, y} 밥그릇
 let ball = null;
 let battle = null;
+let battleExpedition = null;
 let battleResult = null;
 let battleDefeatReturn = null;
 let place = 'home';
@@ -104,10 +105,13 @@ const BATTLE_FOE_DEFEAT_MIN_SECONDS = 0.9;
 const BATTLE_FOE_DEFEAT_MAX_SECONDS = 4.2;
 const BATTLE_PHYSICS_STEP_MAX = 1000 / 30;
 const BATTLE_CAMERA_FOLLOW = 7.5;
+const BATTLE_EXPEDITION_MIN_SECONDS = 2.35;
+const BATTLE_EXPEDITION_MAX_SECONDS = 3.65;
 const LEAGUES = [
   {
     id: 'yard',
     name: '공터 모임',
+    themeId: 'yard',
     memory: '공터를 평정한 날',
     opponents: [
       { id: 'yard-mungchi', name: '먼지 뭉치', seed: 0x120F17, personality: '겁쟁이', powerCoeff: 0.08, intro: '먼지 굴러옴', winLine: '나 피해도 돼?', loseLine: '먼지가 인정함' },
@@ -118,6 +122,7 @@ const LEAGUES = [
   {
     id: 'alley',
     name: '골목 대회',
+    themeId: 'alley',
     memory: '골목을 지나간 날',
     opponents: [
       { id: 'alley-bori', name: '보리알', seed: 0xB0121A, personality: '겁쟁이', powerCoeff: 1.08, intro: '보리알 숨는 중', winLine: '보리알 버팀', loseLine: '보리알 놓침' },
@@ -128,6 +133,7 @@ const LEAGUES = [
   {
     id: 'town',
     name: '마을 최강전',
+    themeId: 'town',
     memory: '마을 앞에 선 날',
     opponents: [
       { id: 'town-nurung', name: '누룽 꼬리', seed: 0x901EAF, personality: '겁쟁이', powerCoeff: 1.96, intro: '꼬리만 보임', winLine: '꼬리가 살림', loseLine: '꼬리도 놀람' },
@@ -136,7 +142,8 @@ const LEAGUES = [
     ],
   },
 ];
-const LEAGUE_OPPONENTS = LEAGUES.flatMap(league => league.opponents.map((opponent, index) => ({ ...opponent, leagueId: league.id, leagueName: league.name, leagueIndex: LEAGUES.indexOf(league), index })));
+const BATTLE_REGION_THEME_SEQUENCE = ['yard', 'alley', 'town'];
+const LEAGUE_OPPONENTS = LEAGUES.flatMap((league, leagueIndex) => league.opponents.map((opponent, index) => ({ ...opponent, leagueId: league.id, leagueName: league.name, leagueIndex, index })));
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
 const STAT_KEYS = ['tough', 'quick', 'power'];
@@ -484,6 +491,9 @@ function leagueById(id) {
 function leagueOpponentIds(league) {
   return league.opponents.map(opponent => opponent.id);
 }
+function defeatedOpponentSet() {
+  return new Set(careStats.league.defeated);
+}
 function migrateLeague(savedLeague, oldBattleWins) {
   const validIds = LEAGUE_OPPONENTS.map(opponent => opponent.id);
   const defeated = [];
@@ -514,6 +524,54 @@ function currentLeagueOpponent() {
   const league = currentLeague();
   return LEAGUE_OPPONENTS.find(opponent => opponent.leagueId === league.id && !isOpponentDefeated(opponent.id))
     || opponentById(league.opponents[league.opponents.length - 1].id);
+}
+function leagueProgressCount(league) {
+  const defeated = defeatedOpponentSet();
+  return leagueOpponentIds(league).filter(id => defeated.has(id)).length;
+}
+function isLeagueCleared(league) {
+  return leagueProgressCount(league) >= leagueOpponentIds(league).length;
+}
+function isLeagueUnlocked(league) {
+  const index = LEAGUES.findIndex(item => item.id === league.id);
+  if (index <= 0) return true;
+  for (let i = 0; i < index; i++) {
+    if (!isLeagueCleared(LEAGUES[i])) return false;
+  }
+  return true;
+}
+function nextOpponentForLeague(league) {
+  return LEAGUE_OPPONENTS.find(opponent => opponent.leagueId === league.id && !isOpponentDefeated(opponent.id))
+    || opponentById(league.opponents[league.opponents.length - 1].id);
+}
+function battleRegionOptions() {
+  const defeated = defeatedOpponentSet();
+  let previousRegionsCleared = true;
+  return LEAGUES.map((league, index) => {
+    const opponentIds = leagueOpponentIds(league);
+    const defeatedCount = opponentIds.filter(id => defeated.has(id)).length;
+    const total = opponentIds.length;
+    const cleared = defeatedCount >= total;
+    const unlocked = previousRegionsCleared;
+    previousRegionsCleared = previousRegionsCleared && cleared;
+    const themeId = leagueThemeId(league, index);
+    return {
+      id: league.id,
+      league,
+      index,
+      themeId,
+      defeated: defeatedCount,
+      total,
+      unlocked,
+      cleared,
+      nextOpponent: nextOpponentForLeague(league),
+    };
+  });
+}
+function leagueThemeId(league, index = LEAGUES.findIndex(item => item.id === league.id)) {
+  if (league && BATTLE_REGION_THEME_SEQUENCE.includes(league.themeId)) return league.themeId;
+  const safeIndex = Math.max(0, index);
+  return BATTLE_REGION_THEME_SEQUENCE[safeIndex % BATTLE_REGION_THEME_SEQUENCE.length];
 }
 function defeatedOpponentsForRematch() {
   return LEAGUE_OPPONENTS.filter(opponent => isOpponentDefeated(opponent.id));
@@ -633,6 +691,19 @@ function canPlayBallNow() { return currentStage() === 'adult'; }
 function currentPlace() { return place; }
 function isTraveling() { return Boolean(travel); }
 function travelState() { return travel ? { ...travel } : null; }
+function isBattleExpeditionActive() { return Boolean(battleExpedition); }
+function battleExpeditionState() { return battleExpedition ? { ...battleExpedition } : null; }
+function currentBattleRegionId() {
+  if (battle && battle.regionId) return battle.regionId;
+  if (battleExpedition && battleExpedition.leagueId) return battleExpedition.leagueId;
+  if (travel && travel.to === 'battle' && travel.leagueId) return travel.leagueId;
+  return careStats.league.current || 'yard';
+}
+function currentBattleThemeId() {
+  const regionId = currentBattleRegionId();
+  const league = leagueById(regionId);
+  return leagueThemeId(league);
+}
 function awayFromHome() { return place !== 'home'; }
 function dayStamp(time) {
   const date = new Date(time);
@@ -894,6 +965,7 @@ function startTravel(to, options = {}) {
     pet.captionT = 0;
     return false;
   }
+  if (battleExpedition && to !== 'battle') battleExpedition = null;
   const exitSide = pet.x < W / 2 ? -1 : 1;
   const targetY = clamp(pet.y + rand(-24, 24), H * 0.5, H * 0.78);
   if (to !== 'walk') endWalkVisit();
@@ -906,6 +978,7 @@ function startTravel(to, options = {}) {
     t: 0,
     startBattle: Boolean(options.startBattle),
     opponentId: typeof options.opponentId === 'string' ? options.opponentId : '',
+    leagueId: typeof options.leagueId === 'string' ? options.leagueId : '',
   };
   clearPlaceObjects();
   battleReturnT = 0;
@@ -947,6 +1020,7 @@ function completeTravelStep() {
 	  const origin = travel.from;
 	  const shouldStartBattle = travel.startBattle;
 	  const opponentId = travel.opponentId;
+	  const leagueId = travel.leagueId;
 	  travel = null;
   if (destination === 'walk') {
     beginWalkVisit();
@@ -961,7 +1035,7 @@ function completeTravelStep() {
     pet.behavior = 'sniff';
     pet.behaviorT = rand(BEHAVIORS.sniff.dur[0], BEHAVIORS.sniff.dur[1]);
   } else if (destination === 'battle' && shouldStartBattle) {
-    startBattleHere(opponentId);
+    startBattleExpedition(opponentId, leagueId);
 	  } else {
 	    let rankedUp = false;
 	    if (destination === 'home' && origin === 'walk') {
@@ -981,13 +1055,17 @@ function updateTravel(dt) {
 }
 function updateBattleReturn(dt) {
   if (battleReturnT <= 0) return;
-  if (battle || travel || battleDefeatReturn || place !== 'battle') {
+  const lingeringBattle = battle && battle.phase === 'defeated' && battle.keepVisible;
+  if ((battle && !lingeringBattle) || travel || battleExpedition || battleDefeatReturn || place !== 'battle') {
     battleReturnT = 0;
     return;
   }
   if (input.mode === 'drag') return;
   battleReturnT = Math.max(0, battleReturnT - dt);
-  if (battleReturnT <= 0) startTravel('home');
+  if (battleReturnT <= 0) {
+    if (lingeringBattle) battle = null;
+    startTravel('home');
+  }
 }
 function battleDefeatReturnTarget() {
   if (!battleDefeatReturn) return null;
@@ -1494,9 +1572,14 @@ function recordFetchComplete() {
   for (let i = 0; i < 3; i++) spawn('heart', pet.x + rand(-22, 22), pet.y - pet.r * depthScale() * rand(1.0, 1.65));
   requestAiLine('fetch_done', false);
 }
-function requestBattle(opponentId = '') {
+function requestBattle(opponentId = '', leagueId = '') {
   if (battle) {
     cheerBattle();
+    return;
+  }
+  if (battleExpedition) {
+    pet.caption = '적 찾는 중';
+    pet.captionT = 0;
     return;
   }
   if (travel) {
@@ -1525,17 +1608,79 @@ function requestBattle(opponentId = '') {
     affectNeed('bond', 0.004);
     return;
   }
-  const opponent = opponentById(opponentId) || currentLeagueOpponent();
-  if (!opponent) return;
-  if (place !== 'battle') {
-    startTravel('battle', { startBattle: true, opponentId: opponent.id });
+  const requestedOpponent = opponentById(opponentId);
+  const league = leagueById(leagueId || (requestedOpponent && requestedOpponent.leagueId) || careStats.league.current);
+  if (!isLeagueUnlocked(league)) {
+    pet.caption = '거긴 아직 무서워';
+    pet.captionT = 0;
     return;
   }
-  startBattleHere(opponent.id);
+  const opponent = requestedOpponent || nextOpponentForLeague(league) || currentLeagueOpponent();
+  if (!opponent) return;
+  if (place !== 'battle') {
+    startTravel('battle', { startBattle: true, opponentId: opponent.id, leagueId: league.id });
+    return;
+  }
+  startBattleExpedition(opponent.id, league.id);
+}
+function startBattleExpedition(opponentId = '', leagueId = '') {
+  const requestedOpponent = opponentById(opponentId);
+  const league = leagueById(leagueId || (requestedOpponent && requestedOpponent.leagueId) || careStats.league.current);
+  if (!isLeagueUnlocked(league)) {
+    pet.caption = '거긴 아직 무서워';
+    pet.captionT = 0;
+    return false;
+  }
+  const opponent = requestedOpponent || nextOpponentForLeague(league) || currentLeagueOpponent();
+  if (!opponent) return false;
+  battleExpedition = {
+    leagueId: league.id,
+    opponentId: opponent.id,
+    t: 0,
+    scroll: 0,
+    encounterAt: rand(BATTLE_EXPEDITION_MIN_SECONDS, BATTLE_EXPEDITION_MAX_SECONDS),
+    sway: rand(0, Math.PI * 2),
+  };
+  battleReturnT = 0;
+  pet.behavior = 'travel';
+  pet.behaviorT = 60;
+  pet.target.x = W * 0.5;
+  pet.target.y = H * 0.66;
+  pet.caption = `${league.name} 가는 중`;
+  pet.captionT = 0;
+  return true;
+}
+function updateBattleExpedition(dt) {
+  if (!battleExpedition || battle || travel) return;
+  battleExpedition.t += dt;
+  battleExpedition.scroll += dt * (0.92 + stageScale('speed') * 0.08);
+  const walkX = W * 0.5 + Math.sin(battleExpedition.t * 1.9 + battleExpedition.sway) * Math.min(30, W * 0.08);
+  const walkY = H * 0.66 + Math.sin(battleExpedition.t * 3.2) * 8;
+  const prevX = pet.x;
+  const prevY = pet.y;
+  const k = 1 - Math.exp(-7.5 * dt);
+  pet.x = lerp(pet.x, walkX, k);
+  pet.y = lerp(pet.y, walkY, k);
+  pet.target.x = walkX;
+  pet.target.y = walkY;
+  pet.vx = (pet.x - prevX) / Math.max(dt, 0.001);
+  pet.vy = (pet.y - prevY) / Math.max(dt, 0.001);
+  pet.dir = Math.sin(battleExpedition.t * 1.6 + battleExpedition.sway) >= 0 ? 1 : -1;
+  if (battleExpedition.t > battleExpedition.encounterAt - 0.7 && pet.captionT > 1.15) {
+    pet.caption = '뭔가 온다';
+    pet.captionT = 0;
+  }
+  if (battleExpedition.t >= battleExpedition.encounterAt) {
+    const opponentIdToStart = battleExpedition.opponentId;
+    battleExpedition = null;
+    startBattleHere(opponentIdToStart);
+  }
 }
 function startBattleHere(opponentId = '') {
   const opponent = opponentById(opponentId) || currentLeagueOpponent();
   if (!opponent) return;
+  const regionId = opponent.leagueId || (battleExpedition && battleExpedition.leagueId) || careStats.league.current || 'yard';
+  battleExpedition = null;
   battleResult = null;
   battleDefeatReturn = null;
   pet.defeatT = 0;
@@ -1573,6 +1718,7 @@ function startBattleHere(opponentId = '') {
     entrySide,
     entryT: 0,
     opponentId: opponent.id,
+    regionId,
     rematch: defeated,
     plan,
     roundIndex: 0,
@@ -1897,8 +2043,11 @@ function updateBattleDefeated(dt) {
     if (battle.haloVisible) {
       battle.haloT += dt;
       if (battle.haloT > 1.35) {
-        battle = null;
-        if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
+        battle.keepVisible = true;
+        if (!battle.returnQueued) {
+          battle.returnQueued = true;
+          if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
+        }
       }
     }
     return;
@@ -1934,8 +2083,11 @@ function updateBattleDefeated(dt) {
   if (battle.haloVisible) {
     battle.haloT += dt;
     if (battle.haloT > 2.25) {
-      battle = null;
-      if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
+      battle.keepVisible = true;
+      if (!battle.returnQueued) {
+        battle.returnQueued = true;
+        if (place === 'battle') battleReturnT = BATTLE_RETURN_DELAY;
+      }
     }
   }
 }
@@ -2082,12 +2234,14 @@ function playBattlePlanRounds() {
     if (round.actor === 'pet') {
       battle.hitT = 0.22;
       applyBattleRoundImpact(round);
+      spawnBattleHitBurst('battle-blue', battle.x, battle.y - 18, Math.sign(battle.x - pet.x || 1));
       pet.squashVel = clamp(pet.squashVel - 1.6, -9, 9);
       spawn('dust', battle.x + rand(-14, 14), battle.y + rand(-6, 6));
     } else {
       battle.foeHitT = 0.22;
       battle.petImpactT = 0.28;
       applyBattleRoundImpact(round);
+      spawnBattleHitBurst('battle-red', pet.x, pet.y - stagedRadius() * 0.92, Math.sign(pet.x - battle.x || -1));
       pet.squashVel = clamp(pet.squashVel - 2.4, -10, 10);
       if (pet.captionT > 1.1) {
         pet.caption = '헛발질했다';
@@ -2270,6 +2424,7 @@ function recordPetting(amount) {
 function updateCare(dt, { airborne, speed }) {
   updateBattleResult(dt);
   updateTravel(dt);
+  updateBattleExpedition(dt);
   updateBattle(dt);
   updateBattleReturn(dt);
   if (pet.stageTween) {

@@ -23,6 +23,7 @@ const battleScrim = document.getElementById('battleScrim');
 const battlePanel = document.getElementById('battlePanel');
 const battleCloseBtn = document.getElementById('battleCloseBtn');
 const battleLeagueName = document.getElementById('battleLeagueName');
+const battleRegionList = document.getElementById('battleRegionList');
 const battleOpponentCard = document.getElementById('battleOpponentCard');
 const battleChallengeBtn = document.getElementById('battleChallengeBtn');
 const battleRematchSection = document.getElementById('battleRematchSection');
@@ -65,6 +66,7 @@ closeMemory();
 closeBodyStatusPanel();
 closeShop();
 let sheetOpenedAt = 0;
+let bodyStatusOpenedAt = 0;
 feedBtn.addEventListener('click', () => {
   if (isTraveling()) {
     pet.caption = '도착하면 먹자';
@@ -157,14 +159,18 @@ battleScrim.addEventListener('click', closeBattlePanel);
 battleCloseBtn.addEventListener('click', closeBattlePanel);
 battleChallengeBtn.addEventListener('click', () => {
   const opponentId = battleChallengeBtn.dataset.opponentId || '';
+  const leagueId = battleChallengeBtn.dataset.leagueId || '';
   closeBattlePanel();
-  requestBattle(opponentId);
+  requestBattle(opponentId, leagueId);
 });
 notebookScrim.addEventListener('click', closeNotebook);
 notebookCloseBtn.addEventListener('click', closeNotebook);
 memoryScrim.addEventListener('click', closeMemory);
 memoryCloseBtn.addEventListener('click', closeMemory);
-bodyStatusScrim.addEventListener('click', closeBodyStatusPanel);
+bodyStatusScrim.addEventListener('click', () => {
+  if (performance.now() - bodyStatusOpenedAt < 260) return;
+  closeBodyStatusPanel();
+});
 bodyStatusCloseBtn.addEventListener('click', closeBodyStatusPanel);
 shopScrim.addEventListener('click', closeShop);
 shopCloseBtn.addEventListener('click', closeShop);
@@ -248,6 +254,7 @@ function openBodyStatusPanel() {
   closeMemory();
   closeShop();
   renderBodyStatusPanel();
+  bodyStatusOpenedAt = performance.now();
   bodyStatusScrim.hidden = false;
   bodyStatusPanel.hidden = false;
   bodyStatusBtn.setAttribute('aria-expanded', 'true');
@@ -293,18 +300,28 @@ function appendBattleOpponentCard(container, opponent, line) {
   container.appendChild(text);
 }
 function battlePanelLocked() {
-  return currentStage() !== 'adult' || needs.energy < 0.28 || Boolean(battle) || isTraveling();
+  return currentStage() !== 'adult' || needs.energy < 0.28 || Boolean(battle) || isTraveling() || (typeof isBattleExpeditionActive === 'function' && isBattleExpeditionActive());
 }
 function renderBattlePanel() {
-  const league = currentLeague();
-  const opponent = currentLeagueOpponent();
+  const regions = typeof battleRegionOptions === 'function' ? battleRegionOptions() : [];
+  const fallbackLeague = currentLeague();
+  const savedLeagueId = battlePanel.dataset.leagueId || fallbackLeague.id;
+  const selectedRegion = regions.find(region => region.id === savedLeagueId && region.unlocked)
+    || regions.find(region => region.unlocked)
+    || { id: fallbackLeague.id, league: fallbackLeague, nextOpponent: currentLeagueOpponent(), unlocked: true, defeated: 0, total: fallbackLeague.opponents.length };
+  battlePanel.dataset.leagueId = selectedRegion.id;
+  battleLeagueName.textContent = '어디 갈까';
+  renderBattleRegions(regions, selectedRegion.id);
+  const opponent = selectedRegion.nextOpponent || currentLeagueOpponent();
   const defeated = isOpponentDefeated(opponent.id);
-  const line = defeated && opponent.rival ? opponent.rematchLine : opponent.intro;
-  battleLeagueName.textContent = league.name;
+  const line = selectedRegion.unlocked
+    ? (defeated && opponent.rival ? opponent.rematchLine : opponent.intro)
+    : '앞 동네 먼저';
   appendBattleOpponentCard(battleOpponentCard, opponent, line);
   battleChallengeBtn.dataset.opponentId = opponent.id;
-  battleChallengeBtn.textContent = defeated ? '재도전' : '도전';
-  setButtonLocked(battleChallengeBtn, battlePanelLocked());
+  battleChallengeBtn.dataset.leagueId = selectedRegion.id;
+  battleChallengeBtn.textContent = defeated ? '다시 진입' : '진입';
+  setButtonLocked(battleChallengeBtn, battlePanelLocked() || !selectedRegion.unlocked);
   battleRematchList.textContent = '';
   const rematches = defeatedOpponentsForRematch();
   battleRematchSection.hidden = rematches.length === 0;
@@ -326,12 +343,50 @@ function renderBattlePanel() {
     button.disabled = battlePanelLocked();
     button.addEventListener('click', () => {
       closeBattlePanel();
-      requestBattle(rematch.id);
+      requestBattle(rematch.id, rematch.leagueId);
     });
     row.appendChild(text);
     row.appendChild(button);
     battleRematchList.appendChild(row);
   }
+}
+function renderBattleRegions(regions, selectedId) {
+  if (!battleRegionList) return;
+  battleRegionList.textContent = '';
+  let selectedButton = null;
+  const indexDigits = Math.max(2, String(regions.length).length);
+  for (const region of regions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `battle-region-row${region.id === selectedId ? ' is-selected' : ''}${region.unlocked ? '' : ' is-locked'}`;
+    button.disabled = !region.unlocked;
+    button.setAttribute('aria-selected', region.id === selectedId ? 'true' : 'false');
+    const index = document.createElement('span');
+    index.className = 'battle-region-index';
+    index.textContent = String((region.index || 0) + 1).padStart(indexDigits, '0');
+    const name = document.createElement('span');
+    name.className = 'battle-region-name';
+    name.textContent = region.league.name;
+    const meta = document.createElement('span');
+    meta.className = 'battle-region-meta';
+    meta.textContent = region.unlocked ? `${region.defeated}/${region.total}` : '잠김';
+    const progress = document.createElement('span');
+    progress.className = 'battle-region-progress';
+    const fill = document.createElement('i');
+    fill.style.width = `${region.total ? Math.round(region.defeated / region.total * 100) : 0}%`;
+    progress.appendChild(fill);
+    button.appendChild(index);
+    button.appendChild(name);
+    button.appendChild(meta);
+    button.appendChild(progress);
+    button.addEventListener('click', () => {
+      battlePanel.dataset.leagueId = region.id;
+      renderBattlePanel();
+    });
+    battleRegionList.appendChild(button);
+    if (region.id === selectedId) selectedButton = button;
+  }
+  if (selectedButton) requestAnimationFrame(() => selectedButton.scrollIntoView({ block: 'nearest' }));
 }
 function renderPawScale(value) {
   const scale = document.createElement('div');

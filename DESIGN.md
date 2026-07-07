@@ -69,6 +69,14 @@ The UI now leans into a hand-drawn pocket-world language inspired by small playf
 | World/battle-ring | --world-battle-ring | rgba(120,96,72,0.22) | n/a | Subtle sparring ring marks |
 | World/battle-flag | --world-battle-flag | #c9a8a0 | n/a | Muted fluttering training flags |
 | World/battle-footprint | --world-battle-footprint | rgba(112,91,70,0.13) | n/a | Faint old footprint marks |
+| World/battle-alley-floor | --world-battle-alley-floor | #d9d4c4 | n/a | Alley-region battle ground plane |
+| World/battle-alley-sky | --world-battle-alley-sky | #ece7df | n/a | Alley-region muted sky |
+| World/battle-alley-sand | --world-battle-alley-sand | #cbc0ac | n/a | Alley-region path and inner ring |
+| World/battle-alley-accent | --world-battle-alley-accent | #b8a9c7 | n/a | Alley-region small flag/accent marks |
+| World/battle-town-floor | --world-battle-town-floor | #d6dece | n/a | Town-region battle ground plane |
+| World/battle-town-sky | --world-battle-town-sky | #edf0e6 | n/a | Town-region muted sky |
+| World/battle-town-sand | --world-battle-town-sand | #c5d2b8 | n/a | Town-region path and inner ring |
+| World/battle-town-accent | --world-battle-town-accent | #cfaaa0 | n/a | Town-region small flag/accent marks |
 | Pet/grime | --pet-grime | rgba(96,74,56,0.18) | n/a | Subtle dust marks after long absence |
 | Food/kibble-base | --food-kibble-base | #f0c98b | n/a | Default round food bowl |
 | Food/kibble-top | --food-kibble-top | #d59b57 | n/a | Default round food mound |
@@ -223,6 +231,18 @@ All spacing derives from a base of 4px.
 - **States**: closed, open, 0/100 through 100/100. Numbers are allowed only in this on-demand panel, never as a persistent home HUD.
 - **Accessibility**: progress is visible as text and not only color. Close button remains a native button.
 - **Motion**: panel open/close follows the existing overlay language; meter fills do not need animated count-up yet.
+
+### Battle Region Picker
+
+- **Structure**: compact scrollable region list inside the battle panel. It must scale past 100 regions without fixed three-slot assumptions. Each row shows a padded region number, name, defeated/total progress, and a small progress track.
+- **States**: later regions are locked until every previous region is cleared. The selected region controls the next opponent and the expedition theme.
+- **Surface**: small paper buttons with soft uneven borders; no glossy stage-select chrome.
+
+### Battle Expedition
+
+- **Structure**: after choosing a region, the pet travels into a vertically scrolling path before the opponent appears.
+- **Motion**: the background moves top-to-bottom so the pet feels like it is walking deeper into the region while staying readable on mobile.
+- **States**: once the encounter timer completes, the fight transitions into the region-themed arena. Region data may define `themeId`; if omitted, battle themes cycle through the existing soft yard/alley/town palettes instead of falling back to one hard-coded stage.
 
 ### Record Menu
 
