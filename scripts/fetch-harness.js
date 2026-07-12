@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const sourceFiles = ['src/battle-core.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
+const sourceFiles = ['src/battle-core.js', 'src/opponent-roster.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
 
 function makeContext() {
   const elements = new Map();

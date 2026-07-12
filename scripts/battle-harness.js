@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const sourceFiles = ['src/render.js', 'src/battle-core.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
+const sourceFiles = ['src/render.js', 'src/battle-core.js', 'src/opponent-roster.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
 
 function makeContext(search = '?seed=12345') {
   const elements = new Map();
@@ -42,12 +42,16 @@ function makeContext(search = '?seed=12345') {
     },
     document: {
       body: { dataset: {} },
+      documentElement: {},
       getElementById: element,
       createElement(tag) {
         return makeElement(tag, ctx);
       },
       addEventListener() {},
       hidden: false,
+    },
+    getComputedStyle() {
+      return { getPropertyValue() { return ''; } };
     },
     requestAnimationFrame() {},
     setInterval() {},
@@ -136,8 +140,8 @@ function testBattleCanWin() {
   assert(state.energy < 0.9, 'battle costs energy');
   assert(state.bond > 0.9, 'battle win rewards bond');
   assert(state.place === 'battle', 'battle result resolves at the battle place');
-  assert(state.defeated.includes('yard-mungchi'), 'first league opponent is marked defeated');
-  assert(state.next === 'yard-kongtteok', 'next undefeated opponent is unlocked deterministically');
+  assert(state.defeated.includes('foe-001'), 'first stage opponent is marked defeated');
+  assert(state.next === 'foe-002', 'next undefeated opponent is unlocked deterministically');
   tickUntil(context, 'currentPlace() === "home" && !isTraveling()', 'battle return home');
   state = run(context, '({ place: currentPlace(), battle, memory: careStats.lastCareLine })');
   assert(state.place === 'home' && state.battle === null, 'pet returns home after battle result');
@@ -154,6 +158,55 @@ function testCheerCanBeIgnoredWhenBondLow() {
   const state = run(context, '({ caption: pet.caption, hp: battle && battle.hp })');
   assert(['지금 집중 중', '내 맘대로 할래', '조금 바빠', '못 들은 척', '귀 닫는 중', '진지한 척 유지'].includes(state.caption), 'low-bond cheer can be ignored');
   assert(state.hp === 1, 'ignored cheer does not damage opponent');
+}
+
+function testBattleContextExposesMeaningfulCheer() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.9; needs.bond = 0.9; bondMilestone = bondStage(needs.bond); startBattleHere("foe-001"); battle.plan = { ...battle.plan, won: false, scoreDelta: -0.08 }; updateGauges();');
+  let state = run(context, '({ label: __elements.get("returnBtn").textContent, action: __elements.get("returnBtn").dataset.action })');
+  assert(state.label === '관전중' && state.action === 'return', 'battle entry does not advertise an unavailable cheer');
+  run(context, 'battle.phase = "active"; updateGauges();');
+  state = run(context, '({ label: __elements.get("returnBtn").textContent, action: __elements.get("returnBtn").dataset.action, won: battle.plan.won })');
+  assert(state.label === '응원', 'active battle context exposes cheer instead of return');
+  assert(state.action === 'cheer', 'active battle receives the battle action theme');
+  assert(state.won === false, 'the close battle starts as a loss');
+  run(context, '__elements.get("returnBtn").listeners.click();');
+  state = run(context, '({ won: battle.plan.won, damage: battle.cheerDamage || 0, heardLine: BATTLE_CHEER_LINES.includes(pet.caption) })');
+  assert(state.won === true, 'a heard cheer can turn a close loss');
+  assert(state.damage > 0, 'a heard cheer remains visible in later battle rounds');
+  assert(state.heardLine, 'heard cheer uses the pet response');
+}
+
+function testRepeatedCheerCannotShowAKnockoutThenLose() {
+  const context = makeContext();
+  const repeated = run(context, `(() => {
+    const plan = { won: false, scoreDelta: -0.25, rounds: [
+      { at: 0.5, actor: 'foe', petHp: 0.5, foeHp: 0.2 },
+      { at: 1, actor: 'foe', petHp: 0, foeHp: 0.12, decisive: true },
+    ] };
+    const first = applyBattleCheerCore(plan, { bond: 1, focus: 1 });
+    return applyBattleCheerCore(first.plan, { bond: 1, focus: 1 });
+  })()`);
+  assert(repeated.plan.won === true, 'repeated heard cheers accumulate enough influence to turn a close fight');
+
+  run(context, `careStats.stage = "adult"; startBattleHere("foe-001");
+    battle.phase = "active";
+    battle.plan = { won: false, scoreDelta: -0.4, duration: 2, rounds: [{ at: 0, actor: "pet", damage: 0.1, petHp: 0.6, foeHp: 0.1 }] };
+    battle.roundIndex = 0; battle.t = 1; battle.cheerDamage = 0.18; playBattlePlanRounds();`);
+  const state = run(context, '({ hp: battle.hp, won: battle.plan.won })');
+  assert(state.won === false && state.hp > 0, 'a losing plan never displays a zero-HP opponent that keeps fighting');
+
+  run(context, `battle.plan = { ...battle.plan, won: false, scoreDelta: -1, focusChance: 1 };
+    battle.phase = "active"; battle.hp = 0.05; battle.cheerT = 0; battle.cheerDamage = 0; needs.bond = 1; cheerBattle();`);
+  const immediate = run(context, '({ hp: battle.hp, won: battle.plan.won })');
+  assert(immediate.won === false && immediate.hp > 0, 'the immediate cheer response uses the same non-knockout HP rule');
+}
+
+function testFirstBattleMemoryIsRecordedOnce() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.9; startBattleHere("foe-001"); battle = null; startBattleHere("foe-001");');
+  const count = run(context, 'careStats.memoryLog.filter(entry => entry.text === "처음 싸움 구경한 날").length');
+  assert(count === 1, 'the first-battle memory is not duplicated');
 }
 
 function testBattleCoreIsDeterministic() {
@@ -177,31 +230,33 @@ function testLeagueMigrationFromOldWins() {
   run(context, `localStorage.setItem('protopet-care-v1', JSON.stringify({ stage: 'adult', hunger: 0.8, energy: 0.8, bond: 0.2, battleWins: 2, ts: Date.now() })); loadCareState();`);
   const state = run(context, '({ wins: careStats.battleWins, defeated: careStats.league.defeated.slice(), current: careStats.league.current, next: currentLeagueOpponent().id })');
   assert(state.wins === 2, 'old battleWins remains unchanged');
-  assert(state.defeated.join('|') === 'yard-mungchi|yard-kongtteok', 'old wins migrate into first league defeated opponents');
-  assert(state.current === 'yard', 'migration keeps current league at the next unfinished league');
-  assert(state.next === 'yard-dubu', 'migration unlocks the next first-league opponent');
+  assert(state.defeated.join('|') === 'foe-001|foe-002', 'old wins migrate into first stage defeated opponents');
+  assert(state.current === 'stage-001', 'migration keeps current stage at the next unfinished node');
+  assert(state.next === 'foe-003', 'migration unlocks the next first-stage opponent');
 }
 
 function testBattlePanelShowsNextOpponentAndRematches() {
   const context = makeContext();
-  run(context, 'careStats.stage = "adult"; careStats.league.defeated = ["yard-mungchi"]; markLeagueCurrentFromProgress(); openBattlePanel();');
-  const state = run(context, '({ open: !__elements.get("battlePanel").hidden, league: __elements.get("battleLeagueName").textContent, cardChildren: __elements.get("battleOpponentCard").children.length, challenge: __elements.get("battleChallengeBtn").dataset.opponentId, rematchRows: __elements.get("battleRematchList").children.length })');
+  run(context, 'careStats.stage = "adult"; careStats.league.defeated = ["foe-001"]; markLeagueCurrentFromProgress(); openBattlePanel();');
+  const state = run(context, '({ open: !__elements.get("battlePanel").hidden, league: __elements.get("battleLeagueName").textContent, regionRows: Array.from(__elements.get("battleRegionList").children).filter(child => String(child.className).includes("battle-region-node")).length, links: Array.from(__elements.get("battleRegionList").children).filter(child => String(child.className).includes("battle-region-link")).length, cardChildren: __elements.get("battleOpponentCard").children.length, challenge: __elements.get("battleChallengeBtn").dataset.opponentId, rematchRows: __elements.get("battleRematchList").children.length })');
   assert(state.open === true, 'battle panel opens');
-  assert(state.league === '공터 모임', 'battle panel shows current league');
+  assert(state.league === '스테이지 맵', 'battle panel introduces the stage map');
+  assert(state.regionRows === 100, 'battle panel renders every configured stage node');
+  assert(state.links === 99, 'battle panel connects stage nodes');
   assert(state.cardChildren === 2, 'battle panel renders opponent preview and text');
-  assert(state.challenge === 'yard-kongtteok', 'challenge targets next undefeated opponent');
+  assert(state.challenge === 'foe-002', 'challenge targets next undefeated opponent');
   assert(state.rematchRows === 1, 'defeated opponents render as rematches');
 }
 
 function testLeagueClearAndRivalMemory() {
   const context = makeContext();
-  run(context, 'careStats.stage = "adult"; careStats.league.defeated = ["yard-mungchi", "yard-kongtteok"]; careStats.pebbles = 0; battle = { y: pet.y, opponentId: "yard-dubu", rematch: false }; finishBattle(true);');
+  run(context, 'careStats.stage = "adult"; careStats.league.defeated = ["foe-001", "foe-002"]; careStats.pebbles = 0; battle = { y: pet.y, opponentId: "foe-003", rematch: false }; finishBattle(true);');
   const state = run(context, '({ defeated: careStats.league.defeated.slice(), current: careStats.league.current, pebbles: careStats.pebbles, memories: careStats.memoryLog.map(entry => entry.text) })');
-  assert(state.defeated.includes('yard-dubu'), 'rival win marks the league rival defeated');
-  assert(state.current === 'alley', 'clearing a league unlocks the next league');
+  assert(state.defeated.includes('foe-003'), 'rival win marks the stage rival defeated');
+  assert(state.current === 'stage-002', 'clearing a stage unlocks the next stage node');
   assert(state.pebbles === 10, 'league clear grants normal win reward plus league reward');
   assert(state.memories.includes('두부 반장이 인정해준 날'), 'rival recognition memory is recorded');
-  assert(state.memories.includes('공터를 평정한 날'), 'league clear memory is recorded');
+  assert(state.memories.includes('공터 1길을 지난 날'), 'stage clear memory is recorded');
 }
 
 function testWalkTravelsOutAndReturnsHome() {
@@ -260,6 +315,9 @@ testLeagueMigrationFromOldWins();
 testBattlePanelShowsNextOpponentAndRematches();
 testBattleCanWin();
 testCheerCanBeIgnoredWhenBondLow();
+testBattleContextExposesMeaningfulCheer();
+testRepeatedCheerCannotShowAKnockoutThenLose();
+testFirstBattleMemoryIsRecordedOnce();
 testLeagueClearAndRivalMemory();
 testWalkTravelsOutAndReturnsHome();
 testWalkFindsThingsAndReturnsHome();

@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const sourceFiles = ['src/battle-core.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
+const sourceFiles = ['src/battle-core.js', 'src/opponent-roster.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
 
 function makeContext(search = '?seed=12345') {
   const elements = new Map();
@@ -152,10 +152,19 @@ function testMemoryLogMigratesAndKeepsRecentLines() {
   assert(state.last.at > 0, 'rememberCare records a timestamp');
 }
 
+function testCorruptedSaveIsBackedUpBeforeRecovery() {
+  const context = makeContext();
+  run(context, `localStorage.setItem('protopet-care-v1', '{broken'); loadCareState(); saveCareState();`);
+  const state = run(context, `({ backup: localStorage.getItem('protopet-care-v1-corrupt-backup'), recovered: JSON.parse(localStorage.getItem('protopet-care-v1')) })`);
+  assert(state.backup === '{broken', 'corrupted save text is preserved for recovery');
+  assert(state.recovered && state.recovered.stage === 'egg', 'the app can continue with a valid replacement save');
+}
+
 testEggActionsStayInEgg();
 testWarmEggHatchesAfterAgeGate();
 testBabyGrowsOnNextSleepWhenReady();
 testBabyPlayIsLocked();
 testBabyEyesUseTunedScale();
 testMemoryLogMigratesAndKeepsRecentLines();
+testCorruptedSaveIsBackedUpBeforeRecovery();
 console.log('growth harness passed');

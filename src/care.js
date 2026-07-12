@@ -47,6 +47,7 @@ let travel = null;
 let battleReturnT = 0;
 let walkReturnT = 0;
 const SAVE_KEY = 'protopet-care-v1';
+const CORRUPT_SAVE_KEY = `${SAVE_KEY}-corrupt-backup`;
 const CARE_ACTION_BITS = { meal: 1, rest: 2, pet: 4 };
 const ROUGHNESS_THROW_GAIN = 0.34;
 const ROUGHNESS_SURPRISE_GAIN = 0.18;
@@ -107,7 +108,7 @@ const BATTLE_PHYSICS_STEP_MAX = 1000 / 30;
 const BATTLE_CAMERA_FOLLOW = 7.5;
 const BATTLE_EXPEDITION_MIN_SECONDS = 2.35;
 const BATTLE_EXPEDITION_MAX_SECONDS = 3.65;
-const LEAGUES = [
+const FALLBACK_LEAGUES = [
   {
     id: 'yard',
     name: '공터 모임',
@@ -142,7 +143,60 @@ const LEAGUES = [
     ],
   },
 ];
+const BATTLE_STAGE_SIZE = 3;
 const BATTLE_REGION_THEME_SEQUENCE = ['yard', 'alley', 'town'];
+function rosterOpponentsSource() {
+  return typeof globalThis !== 'undefined' && Array.isArray(globalThis.OPPONENT_ROSTER)
+    ? globalThis.OPPONENT_ROSTER
+    : [];
+}
+function rosterTierSource() {
+  return typeof globalThis !== 'undefined' && Array.isArray(globalThis.OPPONENT_TIERS)
+    ? globalThis.OPPONENT_TIERS
+    : [];
+}
+function battleStageId(stageNumber) {
+  return `stage-${String(stageNumber).padStart(3, '0')}`;
+}
+function battleStageBaseName(opponent, tier) {
+  const source = tier && tier.name ? tier.name : opponent && opponent.tierName ? opponent.tierName : '바깥 줄';
+  return String(source).replace(/\s*줄$/, '');
+}
+function normalizeRosterOpponent(opponent, stageIndex, slotIndex) {
+  return {
+    ...opponent,
+    personality: opponent.personality || '침착',
+    powerCoeff: Number.isFinite(Number(opponent.powerCoeff)) ? Number(opponent.powerCoeff) : stageIndex * 0.08 + slotIndex * 0.05,
+    rival: slotIndex === BATTLE_STAGE_SIZE - 1,
+    rematchLine: opponent.rematchLine || '또 만났네',
+  };
+}
+function buildBattleLeagues() {
+  const roster = rosterOpponentsSource();
+  if (!roster.length) return FALLBACK_LEAGUES;
+  const tierMap = new Map(rosterTierSource().map(tier => [tier.id, tier]));
+  const leagues = [];
+  for (let start = 0; start < roster.length; start += BATTLE_STAGE_SIZE) {
+    const opponents = roster.slice(start, start + BATTLE_STAGE_SIZE);
+    if (!opponents.length) continue;
+    const stageIndex = Math.floor(start / BATTLE_STAGE_SIZE);
+    const stageNumber = stageIndex + 1;
+    const first = opponents[0];
+    const tier = tierMap.get(first.tier) || null;
+    const tierStage = stageIndex % 10 + 1;
+    const baseName = battleStageBaseName(first, tier);
+    const name = `${baseName} ${tierStage}길`;
+    leagues.push({
+      id: battleStageId(stageNumber),
+      name,
+      themeId: BATTLE_REGION_THEME_SEQUENCE[stageIndex % BATTLE_REGION_THEME_SEQUENCE.length],
+      memory: `${name}을 지난 날`,
+      opponents: opponents.map((opponent, slotIndex) => normalizeRosterOpponent(opponent, stageIndex, slotIndex)),
+    });
+  }
+  return leagues.length ? leagues : FALLBACK_LEAGUES;
+}
+const LEAGUES = buildBattleLeagues();
 const LEAGUE_OPPONENTS = LEAGUES.flatMap((league, leagueIndex) => league.opponents.map((opponent, index) => ({ ...opponent, leagueId: league.id, leagueName: league.name, leagueIndex, index })));
 let sessionFetchRecorded = false;
 let nextAiLineAt = 0;
@@ -336,8 +390,10 @@ function saveCareState() {
 }
 
 function loadCareState() {
+  let raw = '';
   try {
-    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    raw = localStorage.getItem(SAVE_KEY) || '';
+    const saved = JSON.parse(raw || 'null');
     if (!saved) return;
     const now = nowTime();
     const savedTs = Number(saved.ts);
@@ -409,7 +465,11 @@ function loadCareState() {
 	    careStats.kinship = normalizeKinship(saved.kinship);
 	    bondMilestone = Math.floor(clamp(Number.isFinite(savedBondMilestone) ? savedBondMilestone : bondStage(needs.bond), 0, BOND_MILESTONES.length));
     handleReturnEvents(away);
-  } catch (_) {}
+  } catch (_) {
+    if (raw) {
+      try { localStorage.setItem(CORRUPT_SAVE_KEY, raw); } catch (_) {}
+    }
+  }
 }
 loadCareState();
 setInterval(saveCareState, 5000);
@@ -497,18 +557,22 @@ function defeatedOpponentSet() {
 function migrateLeague(savedLeague, oldBattleWins) {
   const validIds = LEAGUE_OPPONENTS.map(opponent => opponent.id);
   const defeated = [];
+  let legacyDefeatedCount = 0;
   if (savedLeague && typeof savedLeague === 'object' && Array.isArray(savedLeague.defeated)) {
     for (const id of savedLeague.defeated) {
       if (validIds.includes(id) && !defeated.includes(id)) defeated.push(id);
+      else legacyDefeatedCount += 1;
     }
-  } else {
-    const count = Math.floor(clamp(Number(oldBattleWins) || 0, 0, LEAGUE_OPPONENTS.length));
+  }
+  if (!defeated.length || legacyDefeatedCount > 0) {
+    const count = Math.floor(clamp(Math.max(Number(oldBattleWins) || 0, defeated.length + legacyDefeatedCount), 0, LEAGUE_OPPONENTS.length));
     for (let i = 0; i < count; i++) defeated.push(LEAGUE_OPPONENTS[i].id);
   }
+  const uniqueDefeated = [...new Set(defeated)].filter(id => validIds.includes(id));
   const savedCurrent = savedLeague && typeof savedLeague === 'object' ? savedLeague.current : '';
-  const next = LEAGUE_OPPONENTS.find(opponent => !defeated.includes(opponent.id));
+  const next = LEAGUE_OPPONENTS.find(opponent => !uniqueDefeated.includes(opponent.id));
   const current = leagueById(typeof savedCurrent === 'string' ? savedCurrent : next && next.leagueId).id;
-  return { defeated, current };
+  return { defeated: uniqueDefeated, current };
 }
 function isOpponentDefeated(id) {
   return careStats.league.defeated.includes(id);
@@ -1150,7 +1214,7 @@ function opponentBattleCoreSide(opponent) {
     seed: opponent.seed,
     personality: opponent.personality,
     powerCoeff: opponent.powerCoeff,
-    stats: { tough: 0, quick: 0, power: 0 },
+    stats: opponent.stats && typeof opponent.stats === 'object' ? opponent.stats : { tough: 0, quick: 0, power: 0 },
     condition: { hunger: 0.65, energy: 0.58, bond: 0 },
     traits: [],
   };
@@ -1378,35 +1442,6 @@ function tryGrowAdultOnSleep() {
   pet.happy = 1;
   for (let i = 0; i < 5; i++) spawn('heart', pet.x + rand(-24, 24), pet.y - pet.r * depthScale() * rand(1.0, 1.7));
   for (let i = 0; i < 5; i++) spawn('dust', pet.x + rand(-26, 26), pet.y + rand(-6, 8));
-  return true;
-}
-function growAdultForDebug() {
-  if (isStagePreview()) {
-    pet.caption = '미리보기 중';
-    pet.captionT = 0;
-    return false;
-  }
-  if (currentStage() === 'adult') {
-    pet.caption = '이미 다 컸어';
-    pet.captionT = 0;
-    return false;
-  }
-  const from = currentStage();
-  careStats.hatchWarmth = 1;
-  if (!transitionStage('adult')) return false;
-  rememberCare('테스트로 어른 된 날');
-  needs.hunger = Math.max(needs.hunger, 0.72);
-  needs.energy = Math.max(needs.energy, 0.82);
-  needs.bond = Math.max(needs.bond, 0.18);
-  pet.caption = from === 'egg' ? '갑자기 컸어' : '나 좀 커졌어';
-  pet.captionT = 0;
-  pet.happy = 1;
-  pet.hatchFxT = Math.max(pet.hatchFxT || 0, from === 'egg' ? 0.7 : 0);
-  pet.jy = 0;
-  pet.jvy = 0;
-  for (let i = 0; i < 7; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(0.9, 1.8));
-  for (let i = 0; i < 7; i++) spawn('dust', pet.x + rand(-28, 28), pet.y + rand(-8, 10));
-  saveCareState();
   return true;
 }
 function recordRoughPlay(amount) {
@@ -1691,11 +1726,12 @@ function startBattleHere(opponentId = '') {
   const foeX = worldW * 0.62;
   const entrySide = foeX > petStartX ? 1 : -1;
   const entryX = entrySide > 0 ? bounds.right + 108 : bounds.left - 108;
-  const plan = resolveBattleCore({
+  const coreInput = {
     seed: (genes.seed ^ opponent.seed ^ careStats.battleWins) | 0,
     pet: playerBattleCoreSide(),
     foe: opponentBattleCoreSide(opponent),
-  });
+  };
+  const plan = resolveBattleCore(coreInput);
   const defeated = isOpponentDefeated(opponent.id);
   const battleY = clamp(pet.y + rand(-50, 45), H * 0.48, H * 0.78);
   pet.x = petStartX;
@@ -1713,6 +1749,7 @@ function startBattleHere(opponentId = '') {
     hitT: 0,
     foeHitT: 0,
     cheerT: 0,
+    cheerDamage: 0,
     nextAct: 0.4,
     phase: 'entering',
     entrySide,
@@ -1721,6 +1758,7 @@ function startBattleHere(opponentId = '') {
     regionId,
     rematch: defeated,
     plan,
+    coreInput,
     roundIndex: 0,
     shape: makeBlobGenes(opponent.seed),
     physics: null,
@@ -1738,7 +1776,7 @@ function startBattleHere(opponentId = '') {
   pet.behaviorT = 60;
   pet.caption = defeated && opponent.rival ? opponent.rematchLine : opponent.intro || randomLine(BATTLE_START_LINES);
   pet.captionT = 0;
-  rememberCare('처음 싸움 구경한 날');
+  if (!careStats.memoryLog.some(entry => entry.text === '처음 싸움 구경한 날')) rememberCare('처음 싸움 구경한 날');
   requestAiLine('battle_start', false);
 }
 function matterApi() {
@@ -1962,7 +2000,10 @@ function cheerBattle() {
   const focus = battle.plan && Number.isFinite(battle.plan.focusChance) ? battle.plan.focusChance : battleFocusChance();
   const heard = focus >= 0.48 || needs.bond >= 0.55;
   if (heard) {
-    battle.hp = clamp(battle.hp - 0.05 - focus * 0.05 - needs.bond * 0.04, 0, 1);
+    const cheer = applyBattleCheerCore(battle.plan, { bond: needs.bond, focus });
+    battle.plan = cheer.plan;
+    battle.cheerDamage = clamp((battle.cheerDamage || 0) + cheer.damage, 0, 0.18);
+    battle.hp = displayedBattleFoeHp(battle.hp - cheer.damage);
     pet.happy = Math.max(pet.happy, 0.7);
     pet.caption = randomLine(BATTLE_CHEER_LINES);
     spawn('heart', pet.x + rand(-18, 18), pet.y - pet.r * depthScale() * rand(1.0, 1.5));
@@ -1972,6 +2013,10 @@ function cheerBattle() {
     affectNeed('bond', 0.002);
   }
   pet.captionT = 0;
+}
+function displayedBattleFoeHp(value) {
+  const hp = clamp(value, 0, 1);
+  return battle && battle.plan && battle.plan.won !== true ? Math.max(hp, 0.04) : hp;
 }
 function updateBattleEntry(dt) {
   if (!battle) return;
@@ -2229,7 +2274,8 @@ function playBattlePlanRounds() {
   while (battle.roundIndex < battle.plan.rounds.length && battle.t >= battle.plan.rounds[battle.roundIndex].at) {
     const round = battle.plan.rounds[battle.roundIndex];
     battle.roundIndex += 1;
-    battle.hp = clamp(round.foeHp, 0, 1);
+    const adjustedFoeHp = round.foeHp - (battle.cheerDamage || 0);
+    battle.hp = displayedBattleFoeHp(adjustedFoeHp);
     battle.petHp = clamp(round.petHp, 0, 1);
     if (round.actor === 'pet') {
       battle.hitT = 0.22;
@@ -2310,12 +2356,18 @@ function noteCareAction(kind) {
   careStats.routineBits = 0;
   careStats.routineCount += 1;
   careStats.lastRoutineAt = nowTime();
+  const previousBondMilestone = bondMilestone;
   affectNeed('bond', 0.045);
   rememberCare(careStats.routineCount > 1 ? '오늘도 풀코스로 챙겨받음' : '밥, 잠, 쓰담 다 받은 날');
-  grantDailyKinship();
+  const rankedUp = grantDailyKinship();
+  const milestoneCaption = rankedUp || bondMilestone > previousBondMilestone ? pet.caption : '';
   pet.happy = 1;
   for (let i = 0; i < 6; i++) spawn('heart', pet.x + rand(-26, 26), pet.y - pet.r * depthScale() * rand(1.0, 1.8));
   grantPebbles(1, ROUTINE_PEBBLE_CAPTIONS);
+  if (milestoneCaption) {
+    pet.caption = milestoneCaption;
+    pet.captionT = 0;
+  }
   return true;
 }
 function isFavoriteFood(foodType) {

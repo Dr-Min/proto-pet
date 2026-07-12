@@ -48,12 +48,17 @@ function update(dt) {
           affectNeed('energy', likedFood ? 0.05 : 0.04);
           affectNeed('bond', likedFood ? 0.032 : 0.015);
           const routineCompleted = recordMeal(eatenFood);
+          const careRewardCaption = routineCompleted ? pet.caption : '';
           food = null;
           for (let i = 0; i < (likedFood ? 5 : 3); i++) spawn('heart', pet.x + rand(-20, 20), pet.y - pet.r);
           setBehavior('stare');
-          pet.caption = routineCompleted ? '나 챙겨줬네' : likedFood ? '이거 좋아!' : '다 먹어버림';
+          if (!routineCompleted) pet.caption = likedFood ? '이거 좋아!' : '다 먹어버림';
           pet.captionT = 0;
           petReact('proud', likedFood ? 0.78 : 0.62);
+          if (careRewardCaption) {
+            pet.caption = careRewardCaption;
+            pet.captionT = 0;
+          }
         }
       }
     }

@@ -185,6 +185,17 @@ function bounceReact({ lines, strength, x, y }) {
   for (let i = 0; i < count; i++) spawn('dust', x + rand(-14, 14), y + rand(-4, 6));
 }
 
+function resetPointer(e) {
+  const pointerId = e && e.pointerId;
+  input.active = false;
+  input.pointerId = null;
+  input.pointerType = '';
+  input.mode = 'idle';
+  input.furnitureId = '';
+  input.furnitureCancelled = false;
+  try { cv.releasePointerCapture(pointerId); } catch (_) {}
+}
+
 function finishPointer(e) {
   if (!input.active || input.pointerId !== e.pointerId) return;
   const elapsed = performance.now() - input.downAt;
@@ -227,16 +238,29 @@ function finishPointer(e) {
   } else if (!wasPetting && elapsed < 260 && moved < rubThreshold(e) * 1.4 && petHitTest(e.clientX, e.clientY, 1.8)) {
     surprisePet();
   }
-  input.active = false;
-  input.pointerId = null;
-  input.pointerType = '';
-  input.mode = 'idle';
-  input.furnitureId = '';
-  input.furnitureCancelled = false;
-  try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+  resetPointer(e);
+}
+
+function cancelPointer(e) {
+  if (!input.active || input.pointerId !== e.pointerId) return;
+  if (input.mode === 'drag') {
+    pet.vx = 0;
+    pet.vy = 0;
+    pet.jvy = 0;
+    pet.behavior = 'stare';
+    pet.behaviorT = Math.max(pet.behaviorT, 1.2);
+  }
+  if (input.mode === 'furniture-drag') {
+    const anchor = furnitureAnchor(input.furnitureId);
+    furnitureMotion.heldId = '';
+    furnitureMotion.x = anchor.x;
+    furnitureMotion.y = anchor.y;
+  }
+  resetPointer(e);
 }
 
 cv.addEventListener('pointerdown', e => {
+  if (input.active && input.pointerId !== e.pointerId) return;
   mouse.x = e.clientX; mouse.y = e.clientY;
   mouse.px = e.clientX; mouse.py = e.clientY;
   const hitsPet = petHitTest(e.clientX, e.clientY, 1.85);
@@ -305,7 +329,8 @@ cv.addEventListener('pointermove', e => {
 });
 
 cv.addEventListener('pointerup', finishPointer);
-cv.addEventListener('pointercancel', finishPointer);
+cv.addEventListener('pointercancel', cancelPointer);
+cv.addEventListener('lostpointercapture', cancelPointer);
 
 function updatePetting(dt) {
   const s = depthScale();

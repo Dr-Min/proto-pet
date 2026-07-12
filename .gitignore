@@ -2,4 +2,5 @@
 .vercel
 .env*
 .omo/
+.DS_Store
 install-korean-law-mcp.sh

@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const sourceFiles = ['src/render.js', 'src/battle-core.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
+const sourceFiles = ['src/render.js', 'src/battle-core.js', 'src/opponent-roster.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
 
 function makeContext(search = '?seed=12345') {
   const elements = new Map();
@@ -44,12 +44,16 @@ function makeContext(search = '?seed=12345') {
     },
     document: {
       body: { dataset: {} },
+      documentElement: {},
       getElementById: element,
       createElement(tag) {
         return makeElement(tag, ctx);
       },
       addEventListener() {},
       hidden: false,
+    },
+    getComputedStyle() {
+      return { getPropertyValue() { return ''; } };
     },
     requestAnimationFrame() {},
     setInterval() {},
@@ -190,6 +194,19 @@ function testFurnitureCanBeStoredAndRestored() {
   assert(state.stored.length === 0 && state.visible.includes('plant') && state.has === true && state.owns === true, 'restored furniture becomes visible without losing ownership');
 }
 
+function testPointerCancelHasNoReleaseSideEffects() {
+  const context = makeContext();
+  run(context, 'careStats.stage = "adult"; needs.energy = 0.8; roughPlayState.roughness = 0; input.active = true; input.pointerId = 21; input.pointerType = "mouse"; input.mode = "drag"; input.downAt = 0; input.lastMoveAt = 0; input.startX = pet.x; input.startY = pet.y; input.releaseVX = 900; input.releaseVY = -700; pet.jy = -70; __setNow(200); __elements.get("c").listeners.pointercancel({ pointerId: 21, clientX: pet.x + 80, clientY: pet.y - 80 });');
+  let state = run(context, '({ active: input.active, mode: input.mode, energy: needs.energy, roughness: roughPlayState.roughness })');
+  assert(state.active === false && state.mode === 'idle', 'pointer cancellation clears the active interaction');
+  assert(near(state.energy, 0.8) && near(state.roughness, 0), 'pointer cancellation does not count as a throw');
+
+  run(context, 'careStats.furnitureOwned = ["plant"]; careStats.furnitureStored = []; careStats.furniturePlaced = migrateFurniturePlaced(null); input.active = true; input.pointerId = 22; input.pointerType = "mouse"; input.mode = "furniture-drag"; input.furnitureId = "plant"; furnitureMotion.heldId = "plant"; furnitureMotion.x = W * 0.5; furnitureMotion.y = 120; __elements.get("c").listeners.pointercancel({ pointerId: 22, clientX: W * 0.5, clientY: 120 });');
+  state = run(context, '({ stored: careStats.furnitureStored.slice(), held: furnitureMotion.heldId, active: input.active })');
+  assert(state.stored.length === 0, 'pointer cancellation does not store dragged furniture');
+  assert(state.held === '' && state.active === false, 'pointer cancellation releases furniture without committing placement');
+}
+
 function testWalkDiscoveryPebblesAreDaily() {
   const context = makeContext();
   run(context, 'careStats.stage = "adult"; grantWalkDiscoveryShinyPebble();');
@@ -219,7 +236,11 @@ function testRoutinePebbleAndBuyingFurniture() {
   run(context, 'noteCareAction("meal"); noteCareAction("rest"); noteCareAction("pet");');
   let state = run(context, '({ pebbles: careStats.pebbles, caption: pet.caption })');
   assert(state.pebbles === 1, 'full care round grants one pebble');
-  assert(['이거 줄게', '고마워서 줌', '반짝 놓고 갈게', '입에서 선물 나옴', '작은 보상 배송', '반짝 반납 중'].includes(state.caption), 'routine reward uses pebble caption');
+  assert(state.caption === '눈인사 됐다', 'relationship rank-up stays visible over the routine pebble reward');
+  run(context, 'noteCareAction("meal"); noteCareAction("rest"); noteCareAction("pet");');
+  state = run(context, '({ pebbles: careStats.pebbles, caption: pet.caption })');
+  assert(state.pebbles === 2, 'later same-day care rounds still grant their pebble');
+  assert(['이거 줄게', '고마워서 줌', '반짝 놓고 갈게', '입에서 선물 나옴', '작은 보상 배송', '반짝 반납 중'].includes(state.caption), 'routine reward uses pebble caption when no larger milestone occurs');
   run(context, 'careStats.pebbles = 5;');
   assert(run(context, 'buyFurniture("plant")') === false, 'cannot buy furniture without enough pebbles');
   run(context, 'careStats.pebbles = 20;');
@@ -227,6 +248,16 @@ function testRoutinePebbleAndBuyingFurniture() {
   state = run(context, '({ pebbles: careStats.pebbles, owned: careStats.furnitureOwned.slice() })');
   assert(state.pebbles === 14, 'buying deducts the furniture price');
   assert(state.owned.includes('plant'), 'bought furniture is saved as owned');
+}
+
+function testMealLastPreservesRelationshipRankCaption() {
+  const context = makeContext();
+  run(context, `careStats.stage = "adult"; careStats.routineBits = 6; needs.hunger = 0.2;
+    food = { x: pet.x, y: pet.y, kind: FOOD_TYPES.find(item => !isFavoriteFood(item)).id };
+    pet.behavior = "eat"; pet.behaviorT = 10; pet.munchT = 2.39; update(0.02);`);
+  const state = run(context, '({ routineCount: careStats.routineCount, caption: pet.caption })');
+  assert(state.routineCount === 1, 'meal can complete the care routine through the real simulation path');
+  assert(state.caption === '눈인사 됐다', `meal-last care routine keeps the relationship rank-up caption, got ${state.caption}`);
 }
 
 function testWheelSessionTrainsQuickAndCheerBonuses() {
@@ -269,9 +300,11 @@ testFurniturePlacementClampsAndSeparates();
 testFurnitureBehaviorTargetsPlacedPosition();
 testFurnitureLongPressDragAndPetPriority();
 testFurnitureCanBeStoredAndRestored();
+testPointerCancelHasNoReleaseSideEffects();
 testWalkDiscoveryPebblesAreDaily();
 testBattlePebblesAndStats();
 testRoutinePebbleAndBuyingFurniture();
+testMealLastPreservesRelationshipRankCaption();
 testWheelSessionTrainsQuickAndCheerBonuses();
 testCushionImprovesSleepRecovery();
 testFurnitureDrawAndPanelsDoNotThrow();

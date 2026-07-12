@@ -5,7 +5,6 @@ const gH = document.getElementById('gH'), gE = document.getElementById('gE'), gB
 const feedBtn = document.getElementById('feedBtn');
 const restBtn = document.getElementById('restBtn');
 const playBtn = document.getElementById('playBtn');
-const debugAdultBtn = document.getElementById('debugAdultBtn');
 const memoryBtn = document.getElementById('memoryBtn');
 const outingBtn = document.getElementById('outingBtn');
 const bodyStatusBtn = document.getElementById('bodyStatusBtn');
@@ -113,9 +112,6 @@ restBtn.addEventListener('click', () => {
 playBtn.addEventListener('click', () => {
   requestPlayBall();
 });
-debugAdultBtn.addEventListener('click', () => {
-  growAdultForDebug();
-});
 memoryBtn.addEventListener('click', () => {
   openMemory();
 });
@@ -132,6 +128,10 @@ moreBtn.addEventListener('click', () => {
   else closeMoreSheet();
 });
 returnBtn.addEventListener('click', () => {
+  if (battle) {
+    cheerBattle();
+    return;
+  }
   if (isTraveling()) return;
   requestWalk();
 });
@@ -190,7 +190,7 @@ function closeMoreSheet() {
   if (outingSheet.hidden) sheetScrim.hidden = true;
 }
 function openOutingSheet() {
-  if (currentPlace() !== 'home' || isTraveling()) return;
+  if (currentStage() === 'egg' || currentPlace() !== 'home' || isTraveling()) return;
   closeMoreSheet();
   sheetOpenedAt = performance.now();
   sheetScrim.hidden = false;
@@ -211,9 +211,9 @@ function closeAllSheets() {
 function openBattlePanel() {
   closeAllSheets();
   closeBodyStatusPanel();
-  renderBattlePanel();
   battleScrim.hidden = false;
   battlePanel.hidden = false;
+  renderBattlePanel();
 }
 function closeBattlePanel() {
   battleScrim.hidden = true;
@@ -310,7 +310,7 @@ function renderBattlePanel() {
     || regions.find(region => region.unlocked)
     || { id: fallbackLeague.id, league: fallbackLeague, nextOpponent: currentLeagueOpponent(), unlocked: true, defeated: 0, total: fallbackLeague.opponents.length };
   battlePanel.dataset.leagueId = selectedRegion.id;
-  battleLeagueName.textContent = '어디 갈까';
+  battleLeagueName.textContent = '스테이지 맵';
   renderBattleRegions(regions, selectedRegion.id);
   const opponent = selectedRegion.nextOpponent || currentLeagueOpponent();
   const defeated = isOpponentDefeated(opponent.id);
@@ -353,16 +353,40 @@ function renderBattlePanel() {
 function renderBattleRegions(regions, selectedId) {
   if (!battleRegionList) return;
   battleRegionList.textContent = '';
+  battleRegionList.classList.add('battle-region-map');
+  const mapWidth = battleRegionList.clientWidth || Math.min(window.innerWidth - 54, 360);
+  const mapHeight = battleRegionMapHeight(regions.length);
+  const spacer = document.createElement('div');
+  spacer.className = 'battle-region-map-space';
+  spacer.style.height = `${mapHeight}px`;
+  battleRegionList.appendChild(spacer);
+  const points = regions.map((_, index) => battleRegionNodePoint(index));
+  for (let i = 1; i < points.length; i++) {
+    const from = points[i - 1];
+    const to = points[i];
+    const dx = (to.x - from.x) / 100 * mapWidth;
+    const dy = to.y - from.y;
+    const link = document.createElement('span');
+    link.className = `battle-region-link${regions[i - 1].cleared ? ' is-cleared' : ''}${regions[i].unlocked ? '' : ' is-locked'}`;
+    link.style.left = `${from.x}%`;
+    link.style.top = `${from.y}px`;
+    link.style.width = `${Math.hypot(dx, dy)}px`;
+    link.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+    battleRegionList.appendChild(link);
+  }
   let selectedButton = null;
   const indexDigits = Math.max(2, String(regions.length).length);
   for (const region of regions) {
+    const point = points[region.index] || battleRegionNodePoint(region.index || 0);
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `battle-region-row${region.id === selectedId ? ' is-selected' : ''}${region.unlocked ? '' : ' is-locked'}`;
+    button.className = `battle-region-node${region.id === selectedId ? ' is-selected' : ''}${region.unlocked ? '' : ' is-locked'}${region.cleared ? ' is-cleared' : ''}`;
     button.disabled = !region.unlocked;
     button.setAttribute('aria-selected', region.id === selectedId ? 'true' : 'false');
+    button.style.left = `${point.x}%`;
+    button.style.top = `${point.y}px`;
     const index = document.createElement('span');
-    index.className = 'battle-region-index';
+    index.className = 'battle-region-token';
     index.textContent = String((region.index || 0) + 1).padStart(indexDigits, '0');
     const name = document.createElement('span');
     name.className = 'battle-region-name';
@@ -386,7 +410,19 @@ function renderBattleRegions(regions, selectedId) {
     battleRegionList.appendChild(button);
     if (region.id === selectedId) selectedButton = button;
   }
-  if (selectedButton) requestAnimationFrame(() => selectedButton.scrollIntoView({ block: 'nearest' }));
+  if (selectedButton) requestAnimationFrame(() => selectedButton.scrollIntoView({ block: 'center', inline: 'nearest' }));
+}
+function battleRegionNodePoint(index) {
+  const xPattern = [50, 68, 76, 58, 34, 24, 42, 66];
+  return {
+    x: xPattern[Math.abs(index) % xPattern.length],
+    y: 62 + index * 104,
+  };
+}
+function battleRegionMapHeight(count) {
+  if (!count) return 260;
+  const last = battleRegionNodePoint(count - 1);
+  return Math.max(260, last.y + 82);
 }
 function renderPawScale(value) {
   const scale = document.createElement('div');
@@ -575,12 +611,13 @@ function updateGauges() {
   gE.style.background = needs.energy < 0.3 ? 'var(--care-low)' : 'var(--care-energy)';
   gB.style.width = needs.bond * 100 + '%';
   gB.style.background = needs.bond < 0.25 ? 'var(--care-bond-low)' : 'var(--care-bond)';
-  memoryLine.textContent = stage !== 'egg' && memoryText === '아직 세상 구경 전' ? '오늘 아직 아무 일 없음' : memoryText;
+  memoryLine.textContent = stage === 'egg'
+    ? '알을 살살 문질러 봐'
+    : memoryText === '아직 세상 구경 전' ? '오늘 아직 아무 일 없음' : memoryText;
   rankLine.textContent = `유대 · ${kinshipRank().name}`;
   setButtonLocked(feedBtn, stage === 'egg');
   setButtonLocked(restBtn, stage === 'egg');
   setButtonLocked(playBtn, stage !== 'adult');
-  setButtonLocked(debugAdultBtn, stage === 'adult' || isStagePreview());
   setButtonLocked(bodyStatusBtn, stage === 'egg' || place !== 'home' || traveling);
   setButtonLocked(outingBtn, stage === 'egg' || place !== 'home' || traveling || Boolean(battle));
   setButtonLocked(moreBtn, place !== 'home' || traveling);
@@ -589,7 +626,9 @@ function updateGauges() {
   setButtonLocked(shopBtn, false);
   setButtonLocked(memorySheetBtn, false);
   setButtonLocked(notebookBtn, false);
-  returnBtn.textContent = traveling ? '이동중' : '귀가';
+  const canCheer = Boolean(battle && battle.phase === 'active');
+  returnBtn.dataset.action = canCheer ? 'cheer' : 'return';
+  returnBtn.textContent = canCheer ? '응원' : battle ? '관전중' : traveling ? '이동중' : '귀가';
   setButtonLocked(returnBtn, traveling);
   if (place !== 'home' || traveling) {
     closeAllSheets();

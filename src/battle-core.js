@@ -80,6 +80,34 @@ function battleCorePower(side) {
   return 0.82 + stats.quick * 0.04 + stats.power * 0.055 + condition.energy * 0.18 + condition.bond * 0.18 + personality.pressure * 0.18 + foodBoost;
 }
 
+function applyBattleCheerCore(plan, input) {
+  const sourcePlan = plan && typeof plan === 'object' ? plan : {};
+  const signal = input && typeof input === 'object' ? input : {};
+  const bond = battleCoreClamp(Number(signal.bond) || 0, 0, 1);
+  const focus = battleCoreClamp(Number(signal.focus) || 0, 0, 1);
+  const damage = battleCoreClamp(0.05 + focus * 0.05 + bond * 0.04, 0.05, 0.14);
+  const swing = battleCoreClamp(0.03 + bond * 0.1 + focus * 0.04, 0.03, 0.16);
+  const scoreDelta = Number(sourcePlan.scoreDelta);
+  const cheerSwing = battleCoreClamp((Number(sourcePlan.cheerSwing) || 0) + swing, 0, 0.48);
+  const influencedPlan = { ...sourcePlan, cheerSwing };
+  const turnsBattle = sourcePlan.won !== true && Number.isFinite(scoreDelta) && scoreDelta + cheerSwing >= 0;
+  if (!turnsBattle || !Array.isArray(sourcePlan.rounds)) return { damage, swing, plan: influencedPlan, turned: false };
+
+  const rounds = sourcePlan.rounds.map(round => ({ ...round }));
+  const decisiveIndex = rounds.findIndex(round => round.decisive);
+  if (decisiveIndex < 0) return { damage, swing, plan: influencedPlan, turned: false };
+  const previous = rounds[Math.max(0, decisiveIndex - 1)] || { petHp: 1, foeHp: 1 };
+  rounds[decisiveIndex] = {
+    ...rounds[decisiveIndex],
+    actor: 'pet',
+    damage: battleCoreClamp(Number(previous.foeHp) || 0, 0, 1),
+    petHp: battleCoreClamp(Math.max(Number(previous.petHp) || 0, 0.05), 0, 1),
+    foeHp: 0,
+    decisive: true,
+  };
+  return { damage, swing, plan: { ...influencedPlan, won: true, rounds }, turned: true };
+}
+
 function resolveBattleCore(input) {
   const battleInput = input && typeof input === 'object' ? input : {};
   const pet = battleInput.pet || {};
@@ -133,6 +161,7 @@ if (typeof module !== 'undefined') {
     battleCoreFocusChance,
     battleCorePower,
     battleCoreScore,
+    applyBattleCheerCore,
     resolveBattleCore,
   };
 }

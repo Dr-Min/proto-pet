@@ -1,9 +1,9 @@
   :root {
     --surface-page: #f4efe4;
     --text-muted: #9a8f7d;
-    --text-ui: #8a7f6c;
+    --text-ui: #706653;
     --font-hand: "Gaegu", "Apple SD Gothic Neo", -apple-system, sans-serif;
-    --drawn-ink: #6f5a45;
+    --drawn-ink: #594632;
     --drawn-ink-soft: rgba(111,90,69,0.32);
     --drawn-paper-line: rgba(111,90,69,0.18);
     --care-hunger: #a8c686;
@@ -78,17 +78,6 @@
     display: flex;
     gap: 6px;
     align-items: center;
-  }
-  #debugAdultBtn {
-    position: fixed; top: 58px; left: 14px; z-index: 3;
-    min-width: 54px; min-height: 36px; padding: 7px 11px;
-    border: 2px solid var(--drawn-ink-soft);
-    border-radius: 17px 19px 16px 20px;
-    background: rgba(244,239,228,0.68);
-    color: var(--drawn-ink);
-    font: 700 15px/1.1 var(--font-hand);
-    cursor: pointer; touch-action: manipulation;
-    transform: rotate(-1.2deg);
   }
   #memoryBtn {
     position: fixed; top: 6px; right: 12px; z-index: 3;
@@ -199,6 +188,7 @@
   }
   #moreBtn { --tilt: 1deg; background: rgba(232,223,203,0.82); color: var(--text-ui); }
   #returnBtn { --tilt: -0.5deg; display: none; width: 100%; background: var(--care-walk); color: #46573d; }
+	  #returnBtn[data-action="cheer"] { background: var(--care-battle); color: #4d4358; }
 	  #walkBtn { --tilt: -0.8deg; background: var(--care-walk); color: #46573d; }
 	  #battleBtn { --tilt: 0.9deg; background: var(--care-battle); color: #4d4358; }
 	  #shopBtn { --tilt: -0.25deg; }
@@ -207,10 +197,9 @@
 	  #shopBtn, #memorySheetBtn, #notebookBtn, #notebookCloseBtn, #memoryCloseBtn, #bodyStatusCloseBtn, #shopCloseBtn, #battleCloseBtn { background: transparent; color: var(--text-ui); border-color: transparent; }
 	  #outingSheet #shopBtn { background: var(--care-warm); color: var(--drawn-ink); border-color: var(--drawn-ink-soft); }
 	  #battleChallengeBtn { --tilt: -0.4deg; width: 100%; margin-top: 12px; background: var(--care-battle); color: #4d4358; }
-	  #debugAdultBtn:active { transform: rotate(-1.2deg) scale(0.96); }
 	  #memoryBtn:active { transform: rotate(1.3deg) scale(0.96); }
 	  #feedBtn:active, #restBtn:active, #playBtn:active, #outingBtn:active, #moreBtn:active, #returnBtn:active, #walkBtn:active, #battleBtn:active, #shopBtn:active, #memorySheetBtn:active, #notebookBtn:active, #notebookCloseBtn:active, #memoryCloseBtn:active, #bodyStatusCloseBtn:active, #shopCloseBtn:active, #battleCloseBtn:active, #battleChallengeBtn:active, .shop-buy:active, .rematch-btn:active { transform: rotate(var(--tilt)) scale(0.96); }
-	  #debugAdultBtn.is-locked, #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #outingBtn.is-locked, #bodyStatusBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #memorySheetBtn.is-locked, #notebookBtn.is-locked, #battleChallengeBtn.is-locked, .shop-buy:disabled, .rematch-btn:disabled {
+	  #feedBtn.is-locked, #restBtn.is-locked, #playBtn.is-locked, #outingBtn.is-locked, #bodyStatusBtn.is-locked, #moreBtn.is-locked, #returnBtn.is-locked, #walkBtn.is-locked, #battleBtn.is-locked, #shopBtn.is-locked, #memorySheetBtn.is-locked, #notebookBtn.is-locked, #battleChallengeBtn.is-locked, .shop-buy:disabled, .rematch-btn:disabled {
 	    opacity: 0.58;
 	    filter: saturate(0.72);
 	  }
@@ -329,64 +318,99 @@
 	  .battle-preview { width: 96px; height: 72px; display: block; }
 	  .battle-opponent-name { font-weight: 600; color: var(--text-ui); }
 	  .battle-opponent-line, .battle-rematch-note { color: var(--text-muted); }
-	  .battle-region-list {
-	    display: flex;
-	    flex-direction: column;
-	    gap: 7px;
-	    margin-top: 10px;
-	    max-height: min(270px, 34dvh);
-	    overflow: auto;
-	    padding-right: 3px;
-	    overscroll-behavior: contain;
-	  }
-	  .battle-region-row {
-	    display: grid;
-	    grid-template-columns: 34px 1fr auto;
-	    gap: 4px 6px;
-	    align-items: center;
-	    min-height: 50px;
-	    padding: 8px 9px;
-	    border: 2px solid var(--drawn-paper-line);
-	    border-radius: 16px 18px 15px 17px;
-	    background: rgba(244,239,228,0.5);
-	    color: var(--text-ui);
-	    font: 700 15px/1.12 var(--font-hand);
-	    text-align: left;
-	    cursor: pointer;
-	    touch-action: manipulation;
-	  }
-	  .battle-region-index {
-	    color: var(--text-muted);
-	    font-size: 13px;
-	    line-height: 1;
-	    text-align: center;
-	  }
-	  .battle-region-row.is-selected {
-	    border-color: var(--drawn-ink-soft);
-	    background: rgba(199,177,216,0.32);
-	    color: var(--drawn-ink);
-	  }
-	  .battle-region-row.is-locked {
-	    opacity: 0.52;
-	    filter: saturate(0.7);
-	    cursor: default;
-	  }
-	  .battle-region-name {
-	    overflow: hidden;
-	    text-overflow: ellipsis;
-	    white-space: nowrap;
-	  }
-	  .battle-region-meta {
-	    color: var(--text-muted);
-	    font-size: 13px;
-	    line-height: 1;
-	  }
-	  .battle-region-progress {
-	    grid-column: 2 / -1;
-	    height: 7px;
-	    overflow: hidden;
-	    border-radius: 999px;
-	    background: rgba(150,135,110,.16);
+		  .battle-region-list {
+		    position: relative;
+		    margin-top: 10px;
+		    height: min(342px, 39dvh);
+		    min-height: 250px;
+		    overflow: auto;
+		    padding: 0;
+		    border: 2px solid rgba(111,90,69,0.14);
+		    border-radius: 20px 23px 18px 24px;
+		    background:
+		      radial-gradient(circle at 28% 18%, rgba(185,207,166,0.18) 0 24px, transparent 25px),
+		      radial-gradient(circle at 78% 66%, rgba(199,177,216,0.16) 0 28px, transparent 29px),
+		      rgba(244,239,228,0.38);
+		    overscroll-behavior: contain;
+		  }
+		  .battle-region-map-space { width: 100%; pointer-events: none; }
+		  .battle-region-link {
+		    position: absolute;
+		    z-index: 0;
+		    height: 4px;
+		    border-radius: 999px;
+		    background: repeating-linear-gradient(90deg, rgba(111,90,69,0.24) 0 8px, transparent 8px 14px);
+		    transform-origin: left center;
+		    pointer-events: none;
+		  }
+		  .battle-region-link.is-cleared {
+		    background: repeating-linear-gradient(90deg, rgba(96,116,74,0.42) 0 8px, transparent 8px 14px);
+		  }
+		  .battle-region-link.is-locked { opacity: 0.38; }
+		  .battle-region-node {
+		    position: absolute;
+		    z-index: 1;
+		    display: grid;
+		    grid-template-columns: 40px minmax(0, 1fr) auto;
+		    gap: 4px 7px;
+		    align-items: center;
+		    width: min(178px, 48vw);
+		    min-height: 58px;
+		    padding: 7px 8px;
+		    border: 2px solid var(--drawn-paper-line);
+		    border-radius: 999px 22px 21px 999px;
+		    background: rgba(244,239,228,0.82);
+		    color: var(--text-ui);
+		    font: 700 15px/1.08 var(--font-hand);
+		    text-align: left;
+		    cursor: pointer;
+		    touch-action: manipulation;
+		    transform: translate(-50%, -50%) rotate(-0.4deg);
+		    box-shadow: 0 5px 0 rgba(111,90,69,0.05);
+		  }
+		  .battle-region-token {
+		    grid-row: 1 / span 2;
+		    display: grid;
+		    place-items: center;
+		    width: 36px;
+		    height: 36px;
+		    border: 2px solid rgba(111,90,69,0.18);
+		    border-radius: 50%;
+		    background: rgba(232,223,203,0.72);
+		    color: var(--drawn-ink);
+		    font-size: 13px;
+		    line-height: 1;
+		  }
+		  .battle-region-node.is-selected {
+		    border-color: var(--drawn-ink-soft);
+		    background: rgba(199,177,216,0.5);
+		    color: var(--drawn-ink);
+		    transform: translate(-50%, -50%) rotate(0.55deg) scale(1.03);
+		  }
+		  .battle-region-node.is-cleared .battle-region-token {
+		    background: rgba(185,207,166,0.68);
+		  }
+		  .battle-region-node.is-locked {
+		    opacity: 0.56;
+		    filter: saturate(0.65);
+		    cursor: default;
+		  }
+		  .battle-region-name {
+		    overflow: hidden;
+		    text-overflow: ellipsis;
+		    white-space: nowrap;
+		  }
+		  .battle-region-meta {
+		    color: var(--text-muted);
+		    font-size: 13px;
+		    line-height: 1;
+		  }
+		  .battle-region-progress {
+		    grid-column: 2 / -1;
+		    height: 7px;
+		    overflow: hidden;
+		    border-radius: 999px;
+		    background: rgba(150,135,110,.16);
 	  }
 	  .battle-region-progress i {
 	    display: block;
@@ -407,13 +431,11 @@
 	  }
   @media (max-width: 520px) {
     #bondBadge { left: 50%; max-width: 146px; padding: 6px 10px 5px; transform: translateX(-50%) rotate(-0.45deg); }
-    #debugAdultBtn { top: 58px; left: 12px; }
   }
   @media (max-width: 380px) {
     #bondBadge { max-width: 128px; }
     #rankLine { font-size: 16px; }
     #furnitureRemoveZone { top: 112px; width: min(164px, 44vw); font-size: 16px; }
-    #debugAdultBtn { top: 58px; left: 12px; min-height: 34px; padding: 6px 10px; font-size: 14px; }
     #memoryBtn { font-size: 16px; right: 10px; }
     #topMenu { right: 10px; gap: 5px; }
     #outingBtn, #moreBtn { min-width: 50px; min-height: 38px; padding: 7px 8px; font-size: 15px; }
@@ -428,6 +450,7 @@
 	    .shop-preview { width: 62px; }
 	    .battle-opponent-card { grid-template-columns: 82px 1fr; }
 	    .battle-preview { width: 82px; }
-	    .battle-region-list { gap: 5px; max-height: min(250px, 33dvh); }
-	    .battle-region-row { min-height: 48px; padding: 7px 7px; font-size: 14px; }
-	  }
+		    .battle-region-list { height: min(318px, 38dvh); min-height: 232px; }
+		    .battle-region-node { width: min(154px, 50vw); min-height: 52px; padding: 6px 7px; font-size: 14px; }
+		    .battle-region-token { width: 32px; height: 32px; font-size: 12px; }
+		  }

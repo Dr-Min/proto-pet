@@ -15,8 +15,8 @@ The UI now leans into a hand-drawn pocket-world language inspired by small playf
 | Surface/page | --surface-page | #f4efe4 | n/a | App background |
 | Surface/floor | --surface-floor | #ece5d3 | n/a | Ground plane |
 | Text/muted | --text-muted | #9a8f7d | n/a | Top hint |
-| Text/ui | --text-ui | #8a7f6c | n/a | Bottom labels and memory line |
-| Drawn/ink | --drawn-ink | #6f5a45 | n/a | Hand-drawn UI outlines and primary text |
+| Text/ui | --text-ui | #706653 | n/a | Bottom labels and memory line |
+| Drawn/ink | --drawn-ink | #594632 | n/a | Hand-drawn UI outlines and primary text |
 | Drawn/ink-soft | --drawn-ink-soft | rgba(111,90,69,0.32) | n/a | Soft sketch borders |
 | Drawn/paper-line | --drawn-paper-line | rgba(111,90,69,0.18) | n/a | Gauge tracks and panel divider lines |
 | Pet/body | --pet-body | #efd9b8 | n/a | Default pet body, varied slightly by gene seed |
@@ -169,16 +169,6 @@ All spacing derives from a base of 4px.
 - **Motion**: active press uses `transform: scale(0.96)`.
 - **Surface**: pastel fill, soft ink outline, and a tiny stable tilt per button. Tilt must never break touch target alignment or text fit.
 
-### Debug Growth Button
-
-- **Structure**: native `button` fixed in the upper-left play space.
-- **Purpose**: temporary development control for forcing the pet to adult stage during battle testing.
-- **Spacing**: keep it below the centered relationship rank and away from the top-right record menu.
-- **States**: default, active, locked-looking when already adult or in stage preview.
-- **Accessibility**: explicit accessible label; minimum touch target remains usable on mobile.
-- **Surface**: small paper-label button using the hand font, soft ink outline, and stable tilt.
-- **Constraint**: this is not part of the player-facing care economy and should stay visually secondary.
-
 ### Care Memory Line
 
 - **Structure**: single `#memoryLine` text row above gauges.
@@ -192,7 +182,7 @@ All spacing derives from a base of 4px.
 
 - **Structure**: one compact `#bondBadge` fixed at the very top, containing `#rankLine` only.
 - **Variants**: `유대 · 초면` through `유대 · 충신`.
-- **Spacing**: always centered at the very top on desktop and mobile. It must not drift to the top-left; top-left is reserved for temporary debug controls and top-right for 기록.
+- **Spacing**: always centered at the very top on desktop and mobile, with the top-right reserved for 기록.
 - **States**: rank updates from daily care, walk returns, and battle wins.
 - **Accessibility**: visible text; details appear again inside the notebook.
 - **Motion**: rank-up feedback uses existing captions, hearts, and the pet's short proud reaction pulse.
@@ -234,14 +224,14 @@ All spacing derives from a base of 4px.
 
 ### Battle Region Picker
 
-- **Structure**: compact scrollable region list inside the battle panel. It must scale past 100 regions without fixed three-slot assumptions. Each row shows a padded region number, name, defeated/total progress, and a small progress track.
-- **States**: later regions are locked until every previous region is cleared. The selected region controls the next opponent and the expedition theme.
-- **Surface**: small paper buttons with soft uneven borders; no glossy stage-select chrome.
+- **Structure**: scrollable stage-node map inside the battle panel. The region/stage itself is the node: stage 1 connects to stage 2, stage 2 connects to stage 3, and so on. It must scale past 100 nodes without fixed three-slot assumptions.
+- **States**: later nodes are locked until every previous node is cleared. The selected node controls the next opponent and the expedition theme.
+- **Surface**: pill-and-circle paper nodes connected by dotted hand-drawn paths; no plain list rows and no glossy stage-select chrome.
 
 ### Battle Expedition
 
 - **Structure**: after choosing a region, the pet travels into a vertically scrolling path before the opponent appears.
-- **Motion**: the background moves top-to-bottom so the pet feels like it is walking deeper into the region while staying readable on mobile.
+- **Motion**: the background moves top-to-bottom as a continuous stream. Stones and footprints must recycle offscreen so they never visibly snap in place.
 - **States**: once the encounter timer completes, the fight transitions into the region-themed arena. Region data may define `themeId`; if omitted, battle themes cycle through the existing soft yard/alley/town palettes instead of falling back to one hard-coded stage.
 
 ### Record Menu

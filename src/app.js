@@ -17,7 +17,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const urlParams = new URLSearchParams(location.search);
-const forcedHour = Number(urlParams.get('hour'));
+const forcedHourValue = urlParams.get('hour');
+const forcedHour = forcedHourValue === null || forcedHourValue.trim() === '' ? NaN : Number(forcedHourValue);
 function nowTime() {
   const injectedNow = typeof window !== 'undefined' ? Number(window.__petNow) : NaN;
   return Number.isFinite(injectedNow) ? injectedNow : Date.now();
@@ -218,6 +219,7 @@ function outingSignAnchor() {
   };
 }
 function outingSignHitTest(x, y) {
+  if (typeof currentStage === 'function' && currentStage() === 'egg') return false;
   if (typeof currentPlace === 'function' && currentPlace() !== 'home') return false;
   if (typeof isTraveling === 'function' && isTraveling()) return false;
   const sign = outingSignAnchor();

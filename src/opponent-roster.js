@@ -493,6 +493,14 @@ function buildOpponentRoster() {
 
 const OPPONENT_ROSTER = buildOpponentRoster();
 
+if (typeof globalThis !== 'undefined') {
+  globalThis.OPPONENT_FORMATIONS = OPPONENT_FORMATIONS;
+  globalThis.OPPONENT_ROSTER = OPPONENT_ROSTER;
+  globalThis.OPPONENT_ROSTER_VERSION = OPPONENT_ROSTER_VERSION;
+  globalThis.OPPONENT_STAT_MEANING = OPPONENT_STAT_MEANING;
+  globalThis.OPPONENT_TIERS = OPPONENT_TIERS;
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     OPPONENT_FORMATIONS,

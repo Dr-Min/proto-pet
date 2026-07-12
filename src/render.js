@@ -8,7 +8,7 @@ const PLAY_BALL_SEAM = 'rgba(96,74,56,0.4)';
 const BATTLE_FOE = '#c9b7a2';
 const BATTLE_FOE_DARK = 'rgba(90,70,55,0.32)';
 const PET_GRIME = 'rgba(96,74,56,0.18)';
-const DRAWN_INK = '#6f5a45';
+const DRAWN_INK = '#594632';
 const SURFACE_PAGE = '#f4efe4';
 const SURFACE_FLOOR = '#ece5d3';
 const WALK_FLOOR = '#e1e7d1';
@@ -1054,12 +1054,25 @@ function drawBattleWorld(t) {
   const bounds = typeof battleArenaBounds === 'function'
     ? battleArenaBounds()
     : { left: 70, right: W - 70, top: H * 0.36, bottom: H * 0.88 };
+  const horizonY = H * 0.36;
   ctx.fillStyle = palette.floor;
-  ctx.fillRect(0, H * 0.39, W, H * 0.61);
+  ctx.beginPath();
+  ctx.moveTo(0, horizonY + Math.sin(t * 0.4) * 2);
+  ctx.bezierCurveTo(W * 0.25, horizonY - 16, W * 0.72, horizonY + 22, W, horizonY - 4);
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fill();
   ctx.save();
   applyBattleViewTransform();
   ctx.fillStyle = palette.floor;
-  ctx.fillRect(bounds.left - 90, bounds.top - 22, worldW + 180, bounds.bottom - bounds.top + 80);
+  ctx.beginPath();
+  ctx.moveTo(bounds.left - 180, bounds.top + 36);
+  ctx.bezierCurveTo(worldW * 0.24, bounds.top - 22, worldW * 0.76, bounds.top + 18, bounds.right + 180, bounds.top + 28);
+  ctx.lineTo(bounds.right + 180, bounds.bottom + 110);
+  ctx.bezierCurveTo(worldW * 0.72, bounds.bottom + 96, worldW * 0.28, bounds.bottom + 126, bounds.left - 180, bounds.bottom + 96);
+  ctx.closePath();
+  ctx.fill();
   const cx = worldW * 0.5;
   const cy = H * 0.66;
   const rx = Math.min(worldW * 0.28, W * 0.84, 520);
@@ -1078,14 +1091,16 @@ function drawBattleWorld(t) {
   ctx.quadraticCurveTo(cx - rx * 0.26, cy - ry * 0.22, cx + rx * 0.08, cy + Math.cos(t * 0.7) * 2);
   ctx.quadraticCurveTo(cx + rx * 0.42, cy + ry * 0.18, cx + rx * 0.78, cy - Math.sin(t * 0.8) * 3);
   ctx.stroke();
-  ctx.strokeStyle = palette.ring;
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(bounds.left, bounds.top);
-  ctx.lineTo(bounds.left, bounds.bottom);
-  ctx.moveTo(bounds.right, bounds.top);
-  ctx.lineTo(bounds.right, bounds.bottom);
-  ctx.stroke();
+  if (W > 520) {
+    ctx.strokeStyle = palette.ring;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(bounds.left, bounds.top);
+    ctx.lineTo(bounds.left, bounds.bottom);
+    ctx.moveTo(bounds.right, bounds.top);
+    ctx.lineTo(bounds.right, bounds.bottom);
+    ctx.stroke();
+  }
   drawBattleTerrain(t, palette);
   for (const flag of placeWorld.battle.flags) drawBattleFlag(flag, t, palette);
   drawBattleFootprints(palette);
@@ -1096,6 +1111,7 @@ function drawBattleExpeditionWorld(t) {
   const palette = battleRegionPalette();
   const expedition = typeof battleExpeditionState === 'function' ? battleExpeditionState() : null;
   const scroll = expedition ? expedition.scroll : t * 0.9;
+  const wrap = (value, span) => ((value % span) + span) % span;
   const floorY = H * 0.36;
   ctx.fillStyle = palette.sky;
   ctx.fillRect(0, 0, W, H);
@@ -1114,11 +1130,14 @@ function drawBattleExpeditionWorld(t) {
   ctx.strokeStyle = palette.ring;
   ctx.lineWidth = 2;
   ctx.stroke();
-  const offset = (scroll * 190) % 118;
-  for (let i = -1; i < 8; i++) {
-    const y = floorY + ((i * 118 + offset) % (H - floorY + 150)) - 42;
+  const scrollPx = scroll * 172;
+  const rockLoop = H - floorY + 270;
+  for (let i = 0; i < 13; i++) {
+    const y = floorY - 92 + wrap(i * 108 + scrollPx, rockLoop);
+    if (y < floorY - 20 || y > H + 78) continue;
     const side = i % 2 === 0 ? -1 : 1;
-    const x = pathX + side * (pathW * 0.58 + (i % 3) * 18);
+    const lane = (i * 37) % 5;
+    const x = pathX + side * (pathW * 0.54 + lane * 9);
     const s = depthScaleAt(clamp(y, floorY, H));
     drawLumpyBlobShape(x, y, 18 * s, 9 * s, placeWorld.battle.terrainLumps.lowStone, t * 0.18 + i, 0.012);
     ctx.fillStyle = i % 3 === 0 ? palette.accent : palette.sand;
@@ -1127,8 +1146,10 @@ function drawBattleExpeditionWorld(t) {
     ctx.globalAlpha = 1;
   }
   ctx.fillStyle = palette.footprint;
-  for (let i = -1; i < 9; i++) {
-    const y = floorY + ((i * 82 + offset * 1.15) % (H - floorY + 120)) - 32;
+  const printLoop = H - floorY + 220;
+  for (let i = 0; i < 14; i++) {
+    const y = floorY - 70 + wrap(i * 74 + scrollPx * 1.12, printLoop);
+    if (y < floorY - 16 || y > H + 58) continue;
     const x = pathX + Math.sin(i * 1.7) * pathW * 0.2;
     ctx.save();
     ctx.translate(x, y);

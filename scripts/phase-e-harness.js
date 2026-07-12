@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const sourceFiles = ['src/render.js', 'src/battle-core.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
+const sourceFiles = ['src/render.js', 'src/battle-core.js', 'src/opponent-roster.js', 'src/app.js', 'src/care.js', 'src/input.js', 'src/sim.js', 'src/boot.js'];
 
 function makeDate(initialNow) {
   let currentNow = initialNow;
@@ -83,6 +83,7 @@ function makeContext({ now = Date.UTC(2026, 6, 7, 12), search = '?seed=12345' } 
     },
     document: {
       body: { dataset: {} },
+      documentElement: {},
       getElementById: element,
       createElement(tag) {
         return {
@@ -96,6 +97,9 @@ function makeContext({ now = Date.UTC(2026, 6, 7, 12), search = '?seed=12345' } 
       },
       addEventListener() {},
       hidden: false,
+    },
+    getComputedStyle() {
+      return { getPropertyValue() { return ''; } };
     },
     requestAnimationFrame() {},
     setInterval() {},
@@ -160,6 +164,30 @@ function testHourOverrideSelectsPeriodAndWeights() {
   assert(near(nightWeights.zoomies, 0.3), 'night lowers zoomies weight');
 }
 
+function testClockHourIsUsedWithoutOverride() {
+  const localEvening = new Date(2026, 6, 7, 18, 0, 0).getTime();
+  const context = makeContext({ now: localEvening, search: '?seed=12345' });
+  assert(run(context, 'currentHour()') === 18, 'normal visits use the device clock hour');
+  assert(run(context, 'dayPeriod()') === 'evening', 'normal visits select the matching day period');
+}
+
+function testProductionUiHasNoGrowthBypass() {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const boot = fs.readFileSync(path.join(root, 'src/boot.js'), 'utf8');
+  assert(!html.includes('debugAdultBtn'), 'production markup does not expose a growth bypass');
+  assert(!boot.includes('growAdultForDebug'), 'production bindings do not persist debug growth');
+}
+
+function testEggCannotOpenOutingMenu() {
+  const context = makeContext({ search: '?seed=12345&hour=12' });
+  run(context, 'updateGauges()');
+  assert(run(context, 'memoryLine.textContent') === '알을 살살 문질러 봐', 'fresh egg tells the player how to reach the first reward');
+  const sign = run(context, 'outingSignAnchor()');
+  assert(run(context, `outingSignHitTest(${sign.x}, ${sign.y})`) === false, 'egg-stage outing sign is not interactive');
+  run(context, 'openOutingSheet()');
+  assert(run(context, 'outingSheet.hidden') === true, 'egg-stage assistive outing control cannot open the menu');
+}
+
 function testDailyGreetingAndAnniversary() {
   const now = Date.UTC(2026, 6, 7, 8);
   const adoptedAt = now - 6 * 86400000;
@@ -213,6 +241,9 @@ function testBellyRubRewardAndMilestone() {
 }
 
 testHourOverrideSelectsPeriodAndWeights();
+testClockHourIsUsedWithoutOverride();
+testProductionUiHasNoGrowthBypass();
+testEggCannotOpenOutingMenu();
 testDailyGreetingAndAnniversary();
 testNightReturnSleepsAndWakeCaption();
 testWelcomeBackRunsToBottomCenter();
